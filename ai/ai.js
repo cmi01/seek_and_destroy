@@ -93,9 +93,20 @@ Game._registerModule("ai", (() => {
     });
   }
 
+  // The priorities manifest is deep-frozen at receipt; a normalize/merge pass
+  // that aliases into it now throws loudly instead of silently corrupting it.
+  function deepFreeze(o){
+    if (o && typeof o === "object" && !Object.isFrozen(o)) {
+      Object.freeze(o);
+      Object.values(o).forEach(deepFreeze);
+    }
+    return o;
+  }
+
   // Registrar exposed ONLY while this file's direct children load.
   getAIAction._register = function(name, mod){
     if (!_regOpen || !(name in _aiModules)) throw new Error("[S&D AI] Unexpected registration for " + name);
+    if (name === "prioritiesData") mod = deepFreeze(mod);
     _aiModules[name] = mod;
   };
 

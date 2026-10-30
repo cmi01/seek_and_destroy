@@ -38,7 +38,7 @@ Served **statically by nginx** on this supercomputer. The public site is a set o
 
 ## Release checklist (per new version)
 
-1. Make the change; keep `?test` self-tests green.
+1. Make the change; keep `?test` self-tests green and `python3 scripts/reference_audit.py` clean (both are part of "verify every version", GUIDING_PRINCIPLES §9).
 2. Smoke-check the origin working tree (not yet what visitors see): `curl -s -H 'Host: seek-and-destroy.vm.internal' http://localhost/index.html`.
 3. `git add -A && git commit`, `git tag vNN`.
 4. **Always get the new changes into `main`** — `main` must never be left behind at an older release. From the `vNN` branch: `git push origin HEAD:main`, then `git push origin refs/heads/vNN && git push origin refs/tags/vNN`. (Use explicit refs — a bare `git push origin vNN` is ambiguous when the branch and tag share a name.)

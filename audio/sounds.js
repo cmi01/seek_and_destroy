@@ -38,9 +38,18 @@ const SoundEngine = (() => {
   let _music = null;
   let _bakedSounds = null;
 
+  // The audio manifest is deep-frozen at receipt so no consumer can mutate it.
+  function deepFreeze(o) {
+    if (o && typeof o === "object" && !Object.isFrozen(o)) {
+      Object.freeze(o);
+      Object.values(o).forEach(deepFreeze);
+    }
+    return o;
+  }
+
   function _registerModule(name, mod) {
     if (!_registrationOpen) return;
-    if (name === "data") _audioData = mod;
+    if (name === "data") _audioData = deepFreeze(mod);
     else if (name === "sfx") _sfxFactory = mod;
     else if (name === "music") _musicFactory = mod;
     else if (name === "assets") _bakedSounds = mod;

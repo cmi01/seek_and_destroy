@@ -9,6 +9,7 @@ The governing idea: **every file knows as little as possible, and only about the
 3. **Every relationship between two cores gets its own dedicated interface.** `main.js` creates the cores and the interfaces and wires them together. It knows nothing else.
 4. **Parents own their children completely.** A parent loads its own children, with its own small loader. There is no shared loader, and nothing is injected from above.
 5. **Children register privately with their direct parent.** They expose no globals. Nothing outside the parent can reach them.
+6. **Load registrars are transient.** While loading its children, a parent may expose a name-gated registration channel (e.g. `getAIAction._register`, a temporary `g.AILogic`, the `Graphics._registerLayer` load window). It is deleted after load and is never a runtime data channel.
 
 ## 2. Core Systems and Interfaces
 
@@ -45,10 +46,12 @@ Core systems may have children, and those children may have children of their ow
 - A child knows **nothing about its parent, siblings or cousins**, only its own direct children.
 - Siblings never call each other. The parent orchestrates them as a pipeline, passing one child's output to the next as plain data.
 - **State lives only in the owning core.** Caches, audio nodes, timers and the game state belong to the core, never to a child.
+- **The state store is the owning core's instrument.** The store container lives in the core (e.g. `core/game.js`); the store child (`core/gameState.js`) operates only on the container its parent passes it and returns plain data. It never returns live references to the state object: return copies, or make access parent-only.
 - The AI is a pure child of Game. It receives a snapshot of only what the AI is allowed to see and returns a decision. It never reaches into live state.
 - Declarative data (rules, campaign, themes, AI priorities, audio definitions, initial state) lives in dedicated data files. Each data file has exactly one owner and references nothing.
 - Assets are split by ownership. Graphics owns its asset pack and Audio owns its own.
 - Tests are split by ownership and loaded on demand by the core they test.
+- **The test bridge is a sanctioned exception.** Tests loaded on demand by the core they test receive a parent-supplied bridge and may mutate state through it. It is the one exception to "a child never modifies state."
 
 ## 4. Narrow Surfaces
 

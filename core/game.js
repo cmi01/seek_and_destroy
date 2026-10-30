@@ -1542,6 +1542,15 @@ function _loadTests(){
   return _testsPromise;
 }
 
+// Data modules are deep-frozen at receipt: every consumer shares sealed data.
+function deepFreeze(o){
+  if (o && typeof o === "object" && !Object.isFrozen(o)) {
+    Object.freeze(o);
+    Object.values(o).forEach(deepFreeze);
+  }
+  return o;
+}
+
 let _gameLoadPromise = null;
 const api = {
   _registerModule(name, mod){
@@ -1582,10 +1591,10 @@ const api = {
         throw new Error("These scripts loaded but did not register their module (see earlier errors):\n  " + missing.join("\n  "));
       }
 
-      RULES_DATA = _modules.rulesData;
-      CAMPAIGN_DATA = _modules.campaignData;
-      BEGINNING_GAME_STATE_DATA = _modules.beginningGameStateData;
-      THEME_DATA = _modules.themesData;
+      RULES_DATA = deepFreeze(_modules.rulesData);
+      CAMPAIGN_DATA = deepFreeze(_modules.campaignData);
+      BEGINNING_GAME_STATE_DATA = deepFreeze(_modules.beginningGameStateData);
+      THEME_DATA = deepFreeze(_modules.themesData);
 
       GRID_SIZE = RULES_DATA.gridSize;
       SPAWN_RADIUS = RULES_DATA.spawnRadius;
