@@ -29,7 +29,7 @@ Design references: `docs/sprite_design.md`, `docs/ui_sound_design.md`, `docs/sfx
 
 ## Deployment (live test URL)
 
-Served **statically from the project root** by nginx on this supercomputer — editing files in the working tree updates what is served (browsers revalidate immediately via `Cache-Control: max-age=0, s-maxage=60`).
+Served **statically by nginx** on this supercomputer. The public site is a set of **versioned snapshots**: `/` 302-redirects to the newest `/vNN/`, which `deploy/snapshot_versions.sh` builds from the `vNN` git tag into `/home/ubuntu/snd-versions/vNN/`. Editing the working tree does **not** change what visitors see — a change only reaches the public URL when its version is tagged **and released** (see the release checklist step 5).
 
 - **Public URL:** `https://seek-and-destroy.abacusai.cloud`
 - **Vhost:** `deploy/seek-and-destroy.conf`, symlinked into `/etc/nginx/conf.d/`, `server_name seek-and-destroy.vm.internal`. Dotfiles, `deploy/`, `README.md` and `serve.sh` are 404-blocked.
@@ -39,9 +39,11 @@ Served **statically from the project root** by nginx on this supercomputer — e
 ## Release checklist (per new version)
 
 1. Make the change; keep `?test` self-tests green.
-2. Confirm the live URL serves the new build (`curl -sI -H 'Host: seek-and-destroy.vm.internal' http://localhost/`).
+2. Smoke-check the origin working tree (not yet what visitors see): `curl -s -H 'Host: seek-and-destroy.vm.internal' http://localhost/index.html`.
 3. `git add -A && git commit`, `git tag vNN`.
 4. **Always get the new changes into `main`** — `main` must never be left behind at an older release. From the `vNN` branch: `git push origin HEAD:main`, then `git push origin refs/heads/vNN && git push origin refs/tags/vNN`. (Use explicit refs — a bare `git push origin vNN` is ambiguous when the branch and tag share a name.)
+5. **Always release the new version to the Abacus supercomputer public URL** (`https://seek-and-destroy.abacusai.cloud`) — run `bash deploy/snapshot_versions.sh`, then `sudo nginx -t && sudo systemctl reload nginx`. The script builds `/home/ubuntu/snd-versions/vNN/` from the tag and repoints the `/` → newest `/vNN/` redirect. A tag that is only committed/pushed is **not** live: nothing reaches the public URL until this step runs.
+6. Confirm the release: `curl -s -o /dev/null -w '%{http_code} -> %{redirect_url}\n' https://seek-and-destroy.abacusai.cloud/` must answer `302` to `/vNN/` — the version just tagged — and that version's files must be served under `/vNN/`. Caveat: the Abacus edge caches for up to 4 h (including 404s) and ignores origin `no-cache`, so a path probed **before** its snapshot existed can serve a stale 404 afterwards; re-check with a `?<random>` query string to force a fresh fetch (the origin always serves the truth).
 
 > Note: the repo must **not** contain `.github/workflows/*` — the connected GitHub App lacks `workflows` permission and the push is rejected. Deployment is via nginx, not GitHub Pages.
 
