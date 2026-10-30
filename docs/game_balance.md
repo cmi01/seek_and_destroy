@@ -25,7 +25,7 @@ Key ability flags:
 
 - **`!flagship`** — losing all your flagships is an instant loss; immune to boarding capture.
 - **`#capital ship`** — select and press `[Space]` to warp in reinforcements within R:6.
-- **`#railgun`** — bypasses shield bubbles, dealing full firepower to hull.
+- **`#railgun`** — breaks shield bubbles and deals full firepower to hull.
 - **`#space marines`** — can board and capture an adjacent (d ≤ 1) spotted non-flagship enemy.
 - **`#shield generator` / `+shield`** — spend 1 AP to raise an octagon shield; reduces a non-railgun hit to 1 HP then collapses, and drops when firing.
 - Status flags `-moved`, `-attacked`, `-shielded`, `-sent boarding party` track what a ship has spent this turn.

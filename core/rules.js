@@ -241,8 +241,11 @@ Game._registerModule("rules", D => {
 
   function computeShootOutcome(unitA, target){
     const shieldDmg = getCombatRules().shieldNonRailgunDamage || 1;
-    if (target.flags.has("+shield") && !unitA.flags.has("#railgun")){
-      return { damageDealt: shieldDmg, shieldStripped: true };
+    if (target.flags.has("+shield")){
+      // Any hit breaks the bubble; only #railgun fire keeps its full
+      // firepower through the break — other weapons are cut to shieldDmg.
+      const dmg = unitA.flags.has("#railgun") ? unitA.firepower : shieldDmg;
+      return { damageDealt: dmg, shieldStripped: true };
     }
     return { damageDealt: unitA.firepower, shieldStripped: false };
   }

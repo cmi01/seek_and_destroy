@@ -404,7 +404,7 @@ getAIAction._register("prioritiesData", {
       "role": "ARMORED_LINE_CRUISER",
       "preservationTier": 2,
       "baseTargetPriority": 150,
-      "notes": "High-HP railgun cruiser capable of absorbing frontline fire while bypassing enemy shield bubbles."
+      "notes": "High-HP railgun cruiser capable of absorbing frontline fire while breaking enemy shield bubbles."
     },
     "Missile Cruiser": {
       "role": "LONG_RANGE_FIRE_SUPPORT",
@@ -458,7 +458,7 @@ getAIAction._register("prioritiesData", {
       "role": "ALPHA_STRIKE_ORDNANCE",
       "preservationTier": 1,
       "baseTargetPriority": 55,
-      "notes": "Fragile close-range missile strike craft (FP:5) used in AGGRESSIVE_SWARM wolfpacks."
+      "notes": "Fragile close-range missile strike craft (FP:7) used in AGGRESSIVE_SWARM wolfpacks."
     },
     "Probe": {
       "role": "RECONNAISSANCE_PICKET",

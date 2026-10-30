@@ -149,11 +149,43 @@ Game._registerModule("sectorGenerator", (() => {
       spawnUnit("Railgun Destroyer", 1, 6, 16, false);
       spawnUnit("Boarding APC", 1, 8, 15, false);
 
-      spawnUnit("Shuttle", 2, 10, 15, false);
-      spawnUnit("Light Cruiser", 2, 9, 12, false);
-      spawnUnit("Heavy Cruiser", 2, 9, 16, false);
-      spawnUnit("Probe", 2, 14, 14, false);
-      spawnUnit("Flagship Battlecruiser", 2, 25, 15, false);
+      // The enemy arrangement is randomly generated: the level's fixed
+      // composition (t2SpawnList) is scattered across the right half of the
+      // board — flagships held far right — clear of asteroids, of each
+      // other, and of any opening strike on the player formation (d >= 3).
+      const enemySpots = [];
+      const pickEnemySpot = (minX, maxX, minGap) => {
+        for (let tries = 0; tries < 120; tries++) {
+          const gx = minX + Math.floor(R() * (maxX - minX + 1));
+          const gy = 4 + Math.floor(R() * 24);
+          if (terrain[gx][gy] === "ASTEROID") continue;
+          if (getUnitAt(gx, gy)) continue;
+          if (enemySpots.some(s => Math.hypot(s.x - gx, s.y - gy) < minGap)) continue;
+          if (units.some(u => u.team === 1 && Math.hypot(u.x - gx, u.y - gy) < 3)) continue;
+          return { x: gx, y: gy };
+        }
+        return null;
+      };
+      const placeEnemy = (shipType, minX, maxX, minGap) => {
+        let spot = pickEnemySpot(minX, maxX, minGap);
+        if (!spot) {
+          for (let gx = minX; gx <= maxX && !spot; gx++) {
+            for (let gy = 4; gy <= 27; gy++) {
+              if (terrain[gx][gy] === "ASTEROID" || getUnitAt(gx, gy)) continue;
+              spot = { x: gx, y: gy };
+              break;
+            }
+          }
+        }
+        if (!spot) return;
+        enemySpots.push(spot);
+        spawnUnit(shipType, 2, spot.x, spot.y, false);
+      };
+      const t2List = spec.t2SpawnList || [];
+      t2List.filter(n => !shipSpecs[n].flags.includes("!flagship"))
+        .forEach(n => placeEnemy(n, 9, 27, 2));
+      t2List.filter(n => shipSpecs[n].flags.includes("!flagship"))
+        .forEach(n => placeEnemy(n, 23, 28, 4.5));
 
       selectedUnit = probe;
       viewport = { viewSpan: 16, viewX: 0, viewY: 7 };
