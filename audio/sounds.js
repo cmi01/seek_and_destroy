@@ -77,7 +77,6 @@ const SoundEngine = (() => {
     TELEMETRY: 0.65,
     SYSTEMS: 0.80,
     COMBAT: 0.95,
-    AMBIENCE: 0.55,
     MUSIC: 0.22
   };
 
@@ -429,8 +428,12 @@ const SoundEngine = (() => {
 
     const busNames = Object.keys(DEFAULT_BUS_LEVELS);
     const badLevels = busNames.filter(b => !(settings.buses[b] >= 0 && settings.buses[b] <= 1));
-    record("A-5 BUS LEVELS", busNames.length === 6 && badLevels.length === 0 && settings.master >= 0 && settings.master <= 1,
-      `${busNames.length} buses; master ${settings.master}; out of range: ${badLevels.length ? badLevels.join(", ") : "none"}`);
+    // Expect exactly the declared buses: every default level present and no extras.
+    const missingBuses = busNames.filter(b => !(b in settings.buses));
+    record("A-5 BUS LEVELS", badLevels.length === 0 && missingBuses.length === 0 &&
+           settings.master >= 0 && settings.master <= 1,
+      `${busNames.length} buses; master ${settings.master}; out of range: ${badLevels.length ? badLevels.join(", ") : "none"}` +
+      `${missingBuses.length ? "; missing: " + missingBuses.join(", ") : ""}`);
 
     const allPass = results.every(r => r.pass);
     console.log("%cSEEK & DESTROY — AUDIO SELF-TEST RESULTS", "color:#c084fc;font-size:14px;");

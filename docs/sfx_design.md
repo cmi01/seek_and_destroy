@@ -31,4 +31,4 @@ Actions by a hidden team-2 ship (not visible to the player) are suppressed or re
 
 ## Looping beds
 
-Two background loops run under everything: `ambience.base` (AMBIENCE bus, gain 0.85) and `music.pad0` (MUSIC bus, gain 0.55). Both stop on the victory/defeat stingers.
+Two background loops once ran under everything. Since v71 only `music.pad0` (MUSIC bus, gain 0.55) remains: the low 55 Hz `ambience.base` drone bed was removed because it read as an idle-machine/refrigerator hum under play. The remaining loop stops on the victory/defeat stingers.
