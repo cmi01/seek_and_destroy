@@ -1,4 +1,4 @@
-# SFX Design — Seek & Destroy V69
+# SFX Design — Seek & Destroy (v70)
 
 *Source: `audio/sfx.js`, `data/audio_DATA.js`, `audio/sounds.js`.*
 

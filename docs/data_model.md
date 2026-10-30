@@ -1,4 +1,4 @@
-# Data Model — Seek & Destroy V69
+# Data Model — Seek & Destroy (v70)
 
 *Source: `core/gameState.js`, `data/beginningGameState_DATA.js`.*
 

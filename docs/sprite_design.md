@@ -1,4 +1,4 @@
-# Sprite Design — Seek & Destroy V69
+# Sprite Design — Seek & Destroy (v70)
 
 *Source: `graphics/objectRenderer.js`, `data/themes_DATA.js`, `data/rules_DATA.js`.*
 

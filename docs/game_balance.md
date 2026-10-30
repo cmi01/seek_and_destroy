@@ -1,4 +1,4 @@
-# Game Balance — Seek & Destroy V69
+# Game Balance — Seek & Destroy (v70)
 
 *Source: `data/rules_DATA.js`, `data/campaign_DATA.js`.*
 
