@@ -610,17 +610,39 @@
     ctx.restore();
   }
 
+  // Deterministic twinkle field — stable per-index positions so the star-chart
+  // backdrop does not jitter between frames (only the alpha gently twinkles).
+  function _hashUnit(seed) {
+    const v = Math.sin(seed) * 43758.5453;
+    return v - Math.floor(v);
+  }
+
+  // Campaign STARMAP — replaces the old 2-column level-select card grid.
+  // One node per campaign level, connected in campaign order like a star
+  // chart. Node geometry comes from the HUD snapshot (uiHud.campaignModal.nodes
+  // / .layout), computed once by hud._computeStarmapLayout, so what is drawn
+  // here exactly matches the clickable hit regions in State.canvasButtons.
+  // Clicking a node fires the same "LEVEL_SELECT:<id>" button the old screen
+  // used, which the input handler routes to the sector-start path.
   function _drawCampaignModal(ctx, state, uiHud, bp, DS, US, drawUnitStatic, fontHelper, TC) {
+    const modal = (uiHud && uiHud.campaignModal) ? uiHud.campaignModal : { cards: [], nodes: [], layout: null };
+    const cards = Array.isArray(modal.cards) ? modal.cards : [];
+    const nodes = Array.isArray(modal.nodes) ? modal.nodes : [];
+    const layout = modal.layout || null;
+
     const pad = Math.max(12, Math.round(20 * US));
-    const mx = pad, my = pad;
-    const mw = DS - pad * 2, mh = DS - pad * 2;
-    const modal = (uiHud && uiHud.campaignModal) ? uiHud.campaignModal : { cards: [] };
-    const buttons = [];
+    const mx = layout ? layout.mx : pad;
+    const my = layout ? layout.my : pad;
+    const mw = layout ? layout.mw : (DS - pad * 2);
+    const mh = layout ? layout.mh : (DS - pad * 2);
+    const hdrH = layout ? layout.hdrH : Math.round(48 * US);
+    const now = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
 
     ctx.save();
     ctx.fillStyle = TC("rgba(3, 5, 10, 0.88)");
     ctx.fillRect(0, 0, DS, DS);
 
+    // Modal frame
     _drawChamferedRect(ctx, mx, my, mw, mh, Math.round(10 * US));
     ctx.fillStyle = TC("#060911");
     ctx.strokeStyle = bp.accent;
@@ -628,7 +650,24 @@
     ctx.fill();
     ctx.stroke();
 
-    const hdrH = Math.round(48 * US);
+    // Star-chart backdrop (clipped to the content area below the header)
+    ctx.save();
+    _drawChamferedRect(ctx, mx + 1, my + hdrH + 1, mw - 2, mh - hdrH - 2, Math.round(8 * US));
+    ctx.clip();
+    const fieldY0 = my + hdrH;
+    const fieldH = mh - hdrH;
+    for (let i = 0; i < 96; i++) {
+      const sx = mx + _hashUnit(i * 12.9898 + 1.3) * mw;
+      const sy = fieldY0 + _hashUnit(i * 78.233 + 4.1) * fieldH;
+      const sz = 0.4 + _hashUnit(i * 4.11 + 9.7) * 1.3;
+      ctx.globalAlpha = 0.18 + ((Math.sin(now * 0.001 + i) + 1) * 0.5) * 0.32;
+      ctx.fillStyle = TC("rgba(148, 163, 184, 0.75)");
+      ctx.fillRect(sx, sy, sz, sz);
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // Header bar
     ctx.fillStyle = TC("rgba(10, 15, 26, 0.95)");
     ctx.fillRect(mx + 1, my + 1, mw - 2, hdrH);
     ctx.strokeStyle = TC("rgba(56, 189, 248, 0.3)");
@@ -637,114 +676,144 @@
     ctx.lineTo(mx + mw, my + hdrH);
     ctx.stroke();
 
-    const closeW = Math.max(82, Math.round(98 * US));
-    const closeH = Math.max(22, Math.round(26 * US));
-    const closeX = mx + mw - closeW - Math.round(10 * US);
-    const closeY = my + Math.round(11 * US);
-    const closeBtn = { id: "CLOSE_MODAL", label: "CLOSE [ESC]", x: closeX, y: closeY, w: closeW, h: closeH, enabled: true, active: false };
-    buttons.push(closeBtn);
+    // Close button (geometry shared with hit-test via layout.closeBtn)
+    const closeBtn = (layout && layout.closeBtn)
+      ? layout.closeBtn
+      : { id: "CLOSE_MODAL", label: "CLOSE [ESC]", x: mx + mw - Math.round(108 * US), y: my + Math.round(11 * US), w: Math.max(82, Math.round(98 * US)), h: Math.max(22, Math.round(26 * US)), enabled: true, active: false };
     _drawButtonWidget(ctx, closeBtn, state.buttonHovered, state.buttonPressed, bp, US, fontHelper, TC);
 
-    const hdrTextW = closeX - (mx + Math.round(20 * US));
+    const hdrTextW = closeBtn.x - (mx + Math.round(20 * US));
     ctx.textBaseline = "top";
+    ctx.textAlign = "left";
     ctx.font = fontHelper("bold", 8.5);
     ctx.fillStyle = bp.accent;
-    ctx.fillText(_fitTextToWidth(ctx, "CAMPAIGN SECTOR OPERATIONS // LEVEL SELECT", hdrTextW), mx + Math.round(12 * US), my + Math.round(8 * US));
+    ctx.fillText(_fitTextToWidth(ctx, "CAMPAIGN STARMAP // SECTOR NAVIGATION", hdrTextW), mx + Math.round(12 * US), my + Math.round(8 * US));
     ctx.font = fontHelper("", 6.5);
     ctx.fillStyle = TC("#94a3b8");
-    ctx.fillText(_fitTextToWidth(ctx, "Procedural Tactical Sectors — Eliminate all Syndicate !flagship vessels to secure the sector.", hdrTextW), mx + Math.round(12 * US), my + Math.round(27 * US));
+    ctx.fillText(_fitTextToWidth(ctx, "Select a sector node to deploy. Eliminate all Syndicate !flagship vessels to secure it.", hdrTextW), mx + Math.round(12 * US), my + Math.round(27 * US));
 
-    const cards = Array.isArray(modal.cards) ? modal.cards : [];
-    const cols = 2;
-    const rows = Math.ceil(Math.max(1, cards.length) / cols);
-    const gridPad = Math.round(12 * US);
-    const gap = Math.round(10 * US);
-    const gridX = mx + gridPad;
-    const gridY = my + hdrH + gridPad;
-    const gridW = mw - gridPad * 2;
-    const gridH = mh - hdrH - gridPad * 2;
-    const cardW = Math.floor((gridW - gap * (cols - 1)) / cols);
-    const cardH = Math.floor((gridH - gap * (rows - 1)) / rows);
-
-    for (let i = 0; i < cards.length; i++) {
-      const c = cards[i];
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const cx = gridX + col * (cardW + gap);
-      const cy = gridY + row * (cardH + gap);
-      const btnId = "LEVEL_SELECT:" + c.id;
-      const isHov = state.buttonHovered === btnId;
-      const isPrs = state.buttonPressed === btnId;
-
-      buttons.push({
-        id: btnId,
-        label: c.title,
-        x: cx, y: cy, w: cardW, h: cardH,
-        enabled: true,
-        active: c.isDone
-      });
-
+    // Route lines between consecutive sectors (campaign order)
+    if (nodes.length > 1) {
       ctx.save();
-      _drawChamferedRect(ctx, cx, cy, cardW, cardH, Math.round(6 * US));
-      ctx.fillStyle = isPrs
-        ? TC("rgba(250, 204, 21, 0.22)")
-        : (isHov ? TC("rgba(2, 132, 199, 0.25)") : TC("rgba(10, 15, 26, 0.90)"));
-      ctx.strokeStyle = isHov ? bp.gold : (c.isDone ? TC("#34d399") : bp.accent);
-      ctx.lineWidth = isHov ? 1.6 : 1.1;
-      ctx.fill();
-      ctx.stroke();
-      ctx.clip();
-
-      if (c.isDone) {
-        ctx.fillStyle = TC("#34d399");
-        ctx.fillRect(cx, cy, Math.round(3 * US), cardH);
+      ctx.setLineDash([Math.round(5 * US), Math.round(5 * US)]);
+      ctx.lineWidth = 1.4;
+      for (let i = 0; i < nodes.length - 1; i++) {
+        const a = nodes[i], b = nodes[i + 1];
+        const aDone = cards[i] && cards[i].isDone;
+        ctx.strokeStyle = aDone ? TC("rgba(250, 204, 21, 0.55)") : TC("rgba(56, 189, 248, 0.28)");
+        ctx.beginPath();
+        ctx.moveTo(a.cx, a.cy);
+        ctx.lineTo(b.cx, b.cy);
+        ctx.stroke();
       }
-
-      const tx = cx + Math.round(10 * US);
-      const innerW = cardW - Math.round(20 * US);
-      let ty = cy + Math.round(8 * US);
-      ctx.textBaseline = "top";
-
-      ctx.font = fontHelper("bold", 6.8);
-      ctx.fillStyle = TC("#c084fc");
-      ctx.fillText(c.tag, tx, ty);
-      if (c.isDone) {
-        ctx.fillStyle = TC("#34d399");
-        ctx.textAlign = "right";
-        ctx.fillText("[SECURED]", cx + cardW - Math.round(10 * US), ty);
-        ctx.textAlign = "left";
-      }
-      ty += Math.round(15 * US);
-
-      ctx.font = fontHelper("bold", 7.8);
-      ctx.fillStyle = TC("#e2e8f0");
-      ctx.fillText(_fitTextToWidth(ctx, c.title, innerW), tx, ty);
-      ty += Math.round(16 * US);
-
-      ctx.font = fontHelper("", 6);
-      ctx.fillStyle = TC("#94a3b8");
-      const descLines = _wrapTextLines(ctx, c.desc, innerW);
-      for (let d = 0; d < Math.min(3, descLines.length); d++) {
-        ctx.fillText(descLines[d], tx, ty);
-        ty += Math.round(12 * US);
-      }
-
-      ty += Math.round(4 * US);
-      ctx.font = fontHelper("bold", 6);
-      ctx.fillStyle = bp.gold;
-      ctx.fillText(_fitTextToWidth(ctx, c.creditsText, innerW), tx, ty);
-
-      // Preview ship sprites at bottom of card
-      if (typeof drawUnitStatic === "function" && Array.isArray(c.previewUnits)) {
-        const iconY = cy + cardH - Math.round(22 * US);
-        for (let p = 0; p < c.previewUnits.length; p++) {
-          drawUnitStatic(ctx, tx + Math.round((18 + p * 38) * US), iconY, Math.round(20 * US), c.previewUnits[p]);
-        }
-      }
-
       ctx.restore();
     }
 
+    // Sector nodes
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      const c = cards[i] || {};
+      const btnId = "LEVEL_SELECT:" + node.id;
+      const isHov = state.buttonHovered === btnId;
+      const isPrs = state.buttonPressed === btnId;
+      const isDone = Boolean(c.isDone);
+      const isNext = Boolean(c.isNext);
+      const ringCol = isDone ? TC("#34d399") : (isNext ? bp.gold : bp.accent);
+      const baseAlpha = (isDone || isNext) ? 1 : 0.74;
+
+      ctx.save();
+
+      // Pulsing "next objective" halo
+      if (isNext && !isDone) {
+        const pulse = 1 + Math.sin(now * 0.005) * 0.08;
+        ctx.strokeStyle = TC("rgba(250, 204, 21, 0.45)");
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(node.cx, node.cy, node.r * 1.25 * pulse, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      if (isHov || isNext) {
+        ctx.shadowColor = isHov ? bp.gold : ringCol;
+        ctx.shadowBlur = Math.round((isHov ? 16 : 10) * US);
+      }
+
+      // Node disc
+      ctx.globalAlpha = baseAlpha;
+      ctx.beginPath();
+      ctx.arc(node.cx, node.cy, node.r, 0, Math.PI * 2);
+      ctx.fillStyle = isPrs
+        ? TC("rgba(250, 204, 21, 0.30)")
+        : (isHov ? TC("rgba(2, 132, 199, 0.35)")
+          : (isDone ? TC("rgba(16, 95, 72, 0.50)") : TC("rgba(10, 15, 26, 0.92)")));
+      ctx.fill();
+      ctx.lineWidth = (isHov || isNext) ? 2.2 : 1.4;
+      ctx.strokeStyle = isHov ? bp.gold : ringCol;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Inner ring
+      ctx.beginPath();
+      ctx.arc(node.cx, node.cy, node.r * 0.62, 0, Math.PI * 2);
+      ctx.strokeStyle = isDone ? TC("rgba(52, 211, 153, 0.6)") : TC("rgba(148, 163, 184, 0.35)");
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Center glyph: ✓ when secured, otherwise sector ordinal
+      ctx.globalAlpha = 1;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      if (isDone) {
+        ctx.font = fontHelper("bold", 12);
+        ctx.fillStyle = TC("#34d399");
+        ctx.fillText("✓", node.cx, node.cy + Math.round(1 * US));
+      } else {
+        ctx.font = fontHelper("bold", 11);
+        ctx.fillStyle = isNext ? bp.gold : TC("#e2e8f0");
+        ctx.fillText(String(i + 1), node.cx, node.cy + Math.round(1 * US));
+      }
+      ctx.restore();
+
+      // Label beneath node: short sector code + status
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      const labelY = node.cy + node.r + Math.round(6 * US);
+      const labelMaxW = Math.max(node.hitW, Math.round(150 * US));
+      const tagRaw = String(c.tag || ("SECTOR " + node.id));
+      const code = tagRaw.split("//")[0].trim() || tagRaw;
+      ctx.font = fontHelper("bold", 6.6);
+      ctx.fillStyle = isDone ? TC("#34d399") : (isNext ? bp.gold : TC("#c084fc"));
+      ctx.fillText(_fitTextToWidth(ctx, code, labelMaxW), node.cx, labelY);
+      ctx.font = fontHelper("", 5.8);
+      ctx.fillStyle = TC("#94a3b8");
+      const status = isDone ? "SECURED" : (isNext ? "NEXT OBJECTIVE" : "AVAILABLE");
+      ctx.fillText(status, node.cx, labelY + Math.round(11 * US));
+      ctx.restore();
+    }
+
+    // Hovered-sector detail strip along the bottom (title + deployment summary)
+    const hovBtn = state.buttonHovered;
+    if (typeof hovBtn === "string" && hovBtn.indexOf("LEVEL_SELECT:") === 0) {
+      const hovId = hovBtn.slice("LEVEL_SELECT:".length);
+      const hc = cards.find(c => String(c.id) === hovId);
+      if (hc) {
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        const stripY = my + mh - Math.round(34 * US);
+        const stripW = mw - Math.round(40 * US);
+        ctx.font = fontHelper("bold", 7.4);
+        ctx.fillStyle = bp.gold;
+        ctx.fillText(_fitTextToWidth(ctx, hc.title, stripW), mx + mw * 0.5, stripY);
+        ctx.font = fontHelper("", 6);
+        ctx.fillStyle = TC("#94a3b8");
+        ctx.fillText(_fitTextToWidth(ctx, hc.creditsText || "", stripW), mx + mw * 0.5, stripY + Math.round(13 * US));
+        ctx.restore();
+      }
+    }
+
+    ctx.textAlign = "left";
     ctx.restore();
   }
 
