@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
+
+# Logs & runtime
+*.log
+server.pid
+
+# Build / temp output
+dist/
+tmp/
+*.bkp.*
+
+# Platform identity file is intentionally NOT ignored — keep it tracked.
