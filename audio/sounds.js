@@ -49,7 +49,7 @@ const SoundEngine = (() => {
 
   function _registerModule(name, mod) {
     if (!_registrationOpen) return;
-    if (name === "data") _audioData = deepFreeze(mod);
+    if (name === "audioData") _audioData = deepFreeze(mod);
     else if (name === "sfx") _sfxFactory = mod;
     else if (name === "music") _musicFactory = mod;
     else if (name === "assets") _bakedSounds = mod;
@@ -297,12 +297,22 @@ const SoundEngine = (() => {
   }
 
   function stopBackgroundLoops() {
-    if (hasMusic()) _music.stopBackgroundLoops(_ctxAdapter);
+    if (hasMusic()) {
+      _ctxAdapter.loopSources.slice().forEach(entry => _music.teardownEntry(entry));
+    }
+    _ctxAdapter.loopSources.length = 0;
   }
 
   function startBackgroundLoops() {
     if (!audioCtx || host.isGameOver()) return;
-    if (hasMusic()) _music.startBackgroundLoops(_ctxAdapter);
+    if (!hasMusic()) return;
+    stopBackgroundLoops();
+    // Loop sources are core-owned state (§3): music.js only plans entries and
+    // builds/tears down single nodes; this registry never leaves sounds.js.
+    _music.getLoopPlan().forEach(plan => {
+      const entry = _music.makeLoopNodes(_ctxAdapter, plan);
+      if (entry) _ctxAdapter.loopSources.push(entry);
+    });
   }
 
   function isReady() {
@@ -364,7 +374,9 @@ const SoundEngine = (() => {
     return true;
   }
 
-  // Audio services handed to SfxEngine / MusicEngine.
+  // Audio services handed to SfxEngine / MusicEngine. hoverState and
+  // loopSources are core-owned state (§3): children get plain data and return
+  // results — only this module writes these fields.
   const _ctxAdapter = {
     hoverState: { lastHoverKey: "", lastHoverTime: 0 },
     loopSources: [],
@@ -565,7 +577,22 @@ const SoundEngine = (() => {
       return true;
     }
     if (!hasSfx()) return false;
+    if (eventName === "unit.hover") return playHover(data);
     return _sfx.dispatchEvent(_ctxAdapter, eventName, data);
+  }
+
+  // Hover debounce state lives here (§3): sfx.js receives the stamp as plain
+  // data on the payload and returns {play, clipKey, nextHoverKey, nextHoverTime};
+  // this core applies the result and performs the playback.
+  function playHover(data) {
+    const res = _sfx.dispatchEvent(_ctxAdapter, "unit.hover", Object.assign({}, data, {
+      lastHoverKey: _ctxAdapter.hoverState.lastHoverKey,
+      lastHoverTime: _ctxAdapter.hoverState.lastHoverTime
+    }));
+    if (!res) return false;
+    _ctxAdapter.hoverState.lastHoverKey = res.nextHoverKey;
+    _ctxAdapter.hoverState.lastHoverTime = res.nextHoverTime;
+    return res.play ? playClip(res.clipKey, data.from, true) : false;
   }
 
   async function load() {

@@ -1,11 +1,11 @@
 "use strict";
 
 // ============================================================
-// AUDIO DATA — clip manifests (offsets into the baked theme buffers), the
-// destruction-sound tier per ship category, and the background loop mix.
+// AUDIO DATA — clip manifests (offsets into the baked theme buffers) and the
+// destruction-sound tier per ship category.
 // Privately registered with SoundEngine (sounds.js); exposes zero globals.
 // ============================================================
-SoundEngine._registerModule("data", {
+SoundEngine._registerModule("audioData", {
   version: "V58-1.0",
   schema: "seek-and-destroy.audio-data",
   // One-shot effects: { offset, duration } in seconds, bus, optional radioMs /
@@ -60,7 +60,7 @@ SoundEngine._registerModule("data", {
   // NOTE: no looping beds remain. The low 55 Hz drone bed ("ambience.base") was
   // removed in v71 — it read as an idle-machine/refrigerator hum under play —
   // and the last bed, the "music.pad0" ambient pad, was removed in v73. All
-  // audio is one-shot clips now; the generic loop machinery in music.js stays.
+  // audio is one-shot clips now; the generic loop machinery stays.
   musicClips: {},
   backgroundLoops: []
 });

@@ -6,7 +6,7 @@
 // Privately registered with SoundEngine (sounds.js); exposes zero globals.
 // ============================================================
 SoundEngine._registerModule("sfx", AUDIO => {
-  if (!AUDIO) console.error("[S&D audio] data/audio_DATA.js is not loaded; sound effects are disabled.");
+  if (!AUDIO) console.error("[S&D audio] audio data manifest is not loaded; sound effects are disabled.");
   const SFX_CLIPS = AUDIO ? AUDIO.sfxClips : {};
 
   const DESTROY_TIER_BY_CATEGORY = AUDIO ? AUDIO.destroyTierByCategory : {};
@@ -81,9 +81,6 @@ SoundEngine._registerModule("sfx", AUDIO => {
 
   function playOneShot(ctxObj, clipKey, cell, isPassiveHover, delaySec = 0, ignoreGameOver = false) {
     if (!ctxObj) return false;
-    if (!ignoreGameOver && typeof ctxObj.isGameOver === "function" && ctxObj.isGameOver()) {
-      // Allow killing-blow combat clips scheduled during the endgame frame.
-    }
     const allClips = ctxObj.allClips || SFX_CLIPS;
     const clip = allClips[clipKey] || SFX_CLIPS[clipKey];
     if (!clip || !ctxObj.ensureReady(isPassiveHover)) return false;
@@ -162,19 +159,18 @@ SoundEngine._registerModule("sfx", AUDIO => {
     return playOneShot(ctxObj, clipKey, cell, false, cfg.delaySec, true);
   }
 
-  function handleHover(ctxObj, p) {
-    if (!p || !p.from) return false;
-    const hs = (ctxObj && ctxObj.hoverState) ? ctxObj.hoverState : { lastHoverKey: "", lastHoverTime: 0 };
+  // Pure hover decision: the debounce stamp arrives as plain data on the
+  // payload and the result ({play, clipKey, nextHoverKey, nextHoverTime}) is
+  // returned the same way — the parent stores it and plays the clip (§3).
+  function handleHover(p) {
+    if (!p || !p.from) return null;
     const now = performance.now();
     const hoverKey = `${p.from.x},${p.from.y}:${p.context || ""}`;
-    if (hoverKey === hs.lastHoverKey || now - hs.lastHoverTime < 90) return false;
-    hs.lastHoverKey = hoverKey;
-    hs.lastHoverTime = now;
-    if (p.context === "hostile") return playOneShot(ctxObj, "hoverHostile", p.from, true);
-    if (p.context === "actionable" || p.context === "occupied") {
-      return playOneShot(ctxObj, "hoverCell", p.from, true);
-    }
-    return false;
+    if (hoverKey === p.lastHoverKey || now - (p.lastHoverTime || 0) < 90) return null;
+    let clipKey = null;
+    if (p.context === "hostile") clipKey = "hoverHostile";
+    else if (p.context === "actionable" || p.context === "occupied") clipKey = "hoverCell";
+    return { play: Boolean(clipKey), clipKey, nextHoverKey: hoverKey, nextHoverTime: now };
   }
 
   function handleDestroy(ctxObj, p) {
@@ -193,7 +189,7 @@ SoundEngine._registerModule("sfx", AUDIO => {
   }
 
   function dispatchEvent(ctxObj, soundName, p) {
-    if (soundName === "unit.hover") return handleHover(ctxObj, p);
+    if (soundName === "unit.hover") return handleHover(p);
     if (soundName === "unit.destroy") return handleDestroy(ctxObj, p);
     if (soundName === "weapon.fire") return handleWeaponFire(ctxObj, p);
     if (soundName === "unit.spotted") {

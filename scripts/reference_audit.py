@@ -8,41 +8,49 @@ hard-coded ownership map below (run with --map to print it).
 
 Checks (each violation printed as 'file:line: message'; exit code 1 if any):
  1. A child's filename must not appear in any .js file other than its parent
-    and itself (plus, by §1.1 construction, its own children).  Both the
-    filename ("uiRenderer.js") and — for CamelCase module names — the bare
-    module name ("uiRenderer") count as naming the file.  Filename mentions
-    in a file's leading header banner are allowed — every child names its
-    owner there by convention; code and mid-file comments naming a
-    sibling/cousin/grandparent are reported.
- 2. Every symbol a child exposes must not appear as a whole word in any .js
-    file other than its parent and itself.  A claimed symbol is ONLY:
-      (a) an object-literal KEY in the registration payload (the object
-          passed to Game._registerModule / SoundEngine._registerModule /
-          Graphics._registerLayer / the transient _register) or in the
-          factory's top-level returned object;
-      (b) a FUNCTION NAME defined in that payload/returned object (method
-          shorthand, `name: function` / `name: () =>`, or `key: fnName`
-          where fnName is a function defined in the same file);
-      (c) the registered factory-global name itself (Game, SoundEngine,
-          Graphics, Inputs, InputInterface, ... — top-level const factories
-          and window./globalThis./g. assignments).
-    Nothing else is ever claimed: JS keywords, literals (true/false/null/
-    undefined/this) and standard builtins (Object/Math/JSON/console/...) are
-    hard-excluded via the STOPWORDS set, and every claimed name must be a
-    valid identifier.  Not reported as references:
-      - transient load registrars (X._register / g.<Name> lines, §1.5);
-      - uses through parent-built pipeline handles — property accesses whose
-        receiver is a parent-injected parameter (env./bridge./cmd./ctxObj./
-        D./AUDIO./deps./state./payload. — or an allowed owner global);
-      - definition positions: object-literal key definitions, method
-        definitions, function/method parameter lists, destructuring
-        patterns, arrow parameters;
-      - bare uses of names the file itself declares as local variables or
-        functions (shadowing);
-      - data/*_DATA.js field names as claims: pure data fields are blessed
-        plain-data names that travel inside DTOs (§2 "interfaces transfer
-        plain data objects"), not referenceable module surface (procedural
-        mirrors, e.g. rules.js getters, still claim their names).
+    and itself (plus, by §1.1 construction, its own children).  Filename
+    mentions in a file's leading header banner are allowed — every child
+    names its owner there by convention; code and mid-file comments naming a
+    sibling/cousin/grandparent are reported.  The bare module name (e.g.
+    `uiRenderer` in "uiRenderer._drawCampaignModal") counts as the filename
+    too when the stem is a module-style mixed-case name.
+ 2. Every symbol a child registers/exposes must not appear as a whole word in
+    any .js file other than its parent and itself.  What a file exposes is
+    read strictly, and ONLY from:
+      - object-literal keys of the object passed to a registration call
+        (Game._registerModule / SoundEngine._registerModule /
+        Graphics._registerLayer / the transient _register);
+      - function names defined in that payload / its returned object
+        (method shorthand, `name: function`, `name: () =>`, and `key: fnName`
+        where fnName is a function actually defined in the file);
+      - the payload factory's top-level return surface (returned object-literal
+        keys, `return api` resolved through the api object literal, and
+        `return Object.freeze({...})`-style wrapped literals);
+      - the registered factory-global name itself (a file-top-level
+        `const NAME = <factory>` binding, or `window.`/`globalThis.`/`g.NAME =`
+        — including the transient load registrars), and the function members
+        of module-scope adapter object literals (`const Selection = {...}`);
+      - NOTHING ELSE.  Keywords, literals and builtins (false, null, Object,
+        Math, …) can never be claims; local variables, parameters and plain
+        data fields are never surface (data/*_DATA.js field names in
+        particular are blessed plain-data names that travel inside DTOs (§2),
+        not referenceable module surface — procedural mirrors, e.g. rules.js
+        getters, still claim their names).
+    Not reported:
+      - transient load registrars (X._register / g.<Name> lines, amended §1.5);
+      - uses through parent-built pipeline handles (the factory / registered
+        function's injected params — AUDIO./D./env./ctxObj./deps./cmd./bridge./
+        state./payload. — or through a global whose owner allows this file,
+        e.g. main.js using Game.*): those names were handed to the file by its
+        parent;
+      - names the file itself binds (a definition or a shadowing local, not a
+        reference), object-literal key positions and method/function
+        parameter lists (definitions, not uses);
+      - ordinary property fields on local objects (`row.color` is a data
+        field, not the themes module's `color`).
+    Pipeline handles destructured from the parent's DTO (`const {drawUnitStatic}
+    = cmd`) are NOT locals: bare uses of those ARE cross-file references (the
+    sibling-closure channel), and are reported.
     When several files claim the same symbol word, a reference is accepted if
     any claimant allows the referencing file.
  3. No 'window.', 'localStorage', 'document.', 'new Image' in child files.
@@ -124,37 +132,49 @@ LOADER_LINE_RE = re.compile(r"createElement\(\s*['\"]script|"
 
 REG_CALL_RE = re.compile(r"\._register(?:Module|Layer)?\s*\(\s*(['\"])([^'\"]*)\1\s*,")
 IDENT_RE = re.compile(r"[A-Za-z_$][\w$]*")
-KEYWORD_NAMES = {"if", "for", "while", "switch", "catch", "return", "do",
-                 "else", "with", "function", "typeof", "new", "delete"}
 
-# Names that can never be claimed symbols: JS keywords, literals, and the
-# standard built-in globals.  A claimed symbol must be a valid identifier and
-# must NOT appear here (requirement: zero builtin/keyword/literal claims).
-STOPWORDS = frozenset("""
-if else for while do switch case default break continue return function const
-let var typeof instanceof new delete void in of this class extends super static
-get set async await yield throw try catch finally with debugger export import
-from as
-true false null undefined NaN Infinity arguments
-Object Array Math JSON console Boolean Number String Symbol Map Set WeakMap
-WeakSet Promise Uint8Array Uint16Array Uint32Array Int8Array Int16Array
-Int32Array Float32Array Float64Array ArrayBuffer SharedArrayBuffer DataView
-Date RegExp Error TypeError RangeError SyntaxError ReferenceError EvalError
-URIError Function Proxy Reflect parseInt parseFloat isNaN isFinite decodeURI
-decodeURIComponent encodeURI encodeURIComponent escape unescape eval globalThis
-window document self top parent navigator location history screen localStorage
-sessionStorage requestAnimationFrame cancelAnimationFrame setTimeout
-clearTimeout setInterval clearInterval queueMicrotask structuredClone
-performance alert confirm prompt fetch Request Response Headers URL
-URLSearchParams TextEncoder TextDecoder atob btoa crypto CustomEvent Event
-EventTarget Image Audio AudioContext XMLHttpRequest MutationObserver
-ResizeObserver IntersectionObserver getComputedStyle matchMedia devicePixelRatio
-addEventListener removeEventListener require module exports
-""".split())
+# Property-access receivers that were parent-injected (pipeline DTOs): a
+# property access on one of these is plumbing, not a cross-file symbol use.
+PIPELINE_RECEIVERS = {"env", "bridge", "cmd", "ctxObj", "D", "AUDIO",
+                      "deps", "state", "payload"}
+
+# Nothing here can ever be a claimed symbol (requirement: ZERO claims about
+# builtins / keywords / literals).
+KEYWORD_NAMES = {
+    "if", "else", "for", "while", "do", "switch", "case", "default", "break",
+    "continue", "return", "function", "const", "let", "var", "typeof",
+    "instanceof", "in", "of", "new", "delete", "void", "this", "class",
+    "extends", "super", "static", "get", "set", "async", "await", "yield",
+    "throw", "try", "catch", "finally", "with", "debugger", "import", "export",
+    "from", "as",
+}
+LITERAL_NAMES = {"true", "false", "null", "undefined", "NaN", "Infinity"}
+BUILTIN_NAMES = {
+    "Object", "Array", "Math", "JSON", "console", "Boolean", "Number",
+    "String", "Map", "Set", "WeakMap", "WeakSet", "Promise", "Symbol",
+    "Proxy", "Reflect", "Function", "Error", "TypeError", "RangeError",
+    "SyntaxError", "ReferenceError", "EvalError", "URIError", "Date",
+    "RegExp", "parseInt", "parseFloat", "isNaN", "isFinite", "decodeURI",
+    "decodeURIComponent", "encodeURI", "encodeURIComponent", "escape",
+    "unescape", "eval", "globalThis", "window", "document", "self", "top",
+    "parent", "navigator", "location", "history", "screen", "localStorage",
+    "sessionStorage", "requestAnimationFrame", "cancelAnimationFrame",
+    "setTimeout", "clearTimeout", "setInterval", "clearInterval",
+    "queueMicrotask", "structuredClone", "performance", "alert", "confirm",
+    "prompt", "fetch", "URL", "URLSearchParams", "TextEncoder", "TextDecoder",
+    "atob", "btoa", "crypto", "CustomEvent", "Event", "EventTarget", "Image",
+    "Audio", "AudioContext", "XMLHttpRequest", "MutationObserver",
+    "ResizeObserver", "IntersectionObserver", "getComputedStyle", "matchMedia",
+    "devicePixelRatio", "addEventListener", "removeEventListener",
+    "Uint8Array", "Uint8ClampedArray", "Uint16Array", "Uint32Array",
+    "Int8Array", "Int16Array", "Int32Array", "Float32Array", "Float64Array",
+    "ArrayBuffer", "SharedArrayBuffer", "DataView", "BigInt",
+}
+STOPWORD_NAMES = KEYWORD_NAMES | LITERAL_NAMES | BUILTIN_NAMES
 
 
-def valid_name(name):
-    return bool(IDENT_RE.fullmatch(name)) and name not in STOPWORDS
+def valid_symbol(name):
+    return bool(IDENT_RE.fullmatch(name or "")) and name not in STOPWORD_NAMES
 
 
 # ---- text plumbing ---------------------------------------------------------
@@ -214,6 +234,7 @@ def header_line_count(lines):
             break
     return n
 
+
 # ---- JS scanning helpers (brace matching on comment-stripped text) ---------
 def skip_string(t, i):
     if t[i] not in "\"'`":
@@ -250,24 +271,21 @@ def match_pair(t, i):
     return i
 
 
-def scan_depths(t, positions):
-    """Bracket depth just before each offset in `positions` (single pass)."""
-    want = set(positions)
-    out, depth, i, n = {}, 0, 0, len(t)
-    while i < n:
+def depth_at(t, idx):
+    """Bracket depth (all of (, [, {) at idx, string-aware."""
+    depth, i = 0, 0
+    while i < idx:
         j = skip_string(t, i)
         if j != i:
             i = j
             continue
-        if i in want:
-            out[i] = depth
         c = t[i]
         if c in "([{":
             depth += 1
         elif c in ")]}":
             depth -= 1
         i += 1
-    return out
+    return depth
 
 
 def split_params(text):
@@ -279,27 +297,39 @@ def split_params(text):
     return out
 
 
-def fn_def_names(text):
-    """Every name the file defines as a function (any scope)."""
+# ---- surface extraction (strict whitelist) ---------------------------------
+FN_DEF_RES = (
+    re.compile(r"\bfunction\s*([A-Za-z_$][\w$]*)\s*\("),
+    re.compile(r"\b([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?function\b"),
+    re.compile(r"\b([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>"),
+    re.compile(r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*\("),  # const f = (...) =>…/(
+)
+
+
+def fn_defined(text, name):
+    if re.search(r"\bfunction\s+" + re.escape(name) + r"\s*\(", text):
+        return True
+    if re.search(r"\b" + re.escape(name) + r"\s*=\s*(?:async\s+)?function\b", text):
+        return True
+    if re.search(r"\b" + re.escape(name) + r"\s*=\s*(?:async\s+)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>", text):
+        return True
+    return False
+
+
+def fn_names_defined(text):
     out = set()
-    for m in re.finditer(r"\bfunction\s+([A-Za-z_$][\w$]*)\s*\(", text):
-        out.add(m.group(1))
-    for m in re.finditer(
-            r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*"
-            r"(?:async\s*)?(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)",
-            text):
-        out.add(m.group(1))
+    for rx in FN_DEF_RES:
+        for m in rx.finditer(text):
+            out.add(m.group(1))
     return out
 
 
-def object_surface(t, open_idx, fn_names):
-    """(keys, fn-keys, fn-params, end) of the object literal at '{' open_idx.
+def object_surface(t, open_idx):
+    """(keys, fn-keys, params, end) of the object literal at '{' open_idx.
 
-    keys: every object-literal key (the exposed field name).
-    fn-keys: keys whose value is a function (method shorthand or
-             `name: function` / `name: () =>`), plus `key: fnName` pairs
-             where fnName is a function defined in this file (the closure
-             function is exposed under that key).
+    fn-keys are members that are functions: method shorthand, `key: function`,
+    `key: () =>`, or `key: fnName` where fnName is a function defined in the
+    file (a key: fnName pair exposes the function's name).
     """
     keys, fn_keys, params, segs = set(), set(), set(), []
     depth, i, seg_start = 1, open_idx + 1, open_idx + 1
@@ -311,7 +341,7 @@ def object_surface(t, open_idx, fn_names):
         c = t[i]
         if c in "{[(":
             depth += 1
-        elif c in "})]":
+        elif c in "}])":
             depth -= 1
             if depth == 0:
                 segs.append(t[seg_start:i])
@@ -321,9 +351,8 @@ def object_surface(t, open_idx, fn_names):
             seg_start = i + 1
         i += 1
     key_re = re.compile(r"\s*(?:\.\.\.)?(?:(?:async|get|set|static)\s+)*\*?\s*"
-                        r"(?:([A-Za-z_$][\w$]*)|(['\"])([^'\"]+)\2)\s*(?::|\(|\)|$)")
+                        r"(?:([A-Za-z_$][\w$]*)|(['\"])([^'\"]+)\2)\s*(?=\s*[:=]|\s*\(|\s*\)|\s*$)")
     val_re = re.compile(r":\s*([A-Za-z_$][\w$]*)\s*$")
-    fn_val_re = re.compile(r":\s*(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)")
     param_res = (re.compile(r"^\s*(?:async\s+)?[\w$]+\s*\(([^)]*)\)"),
                  re.compile(r"^\s*\(([^)]*)\)\s*=>"),
                  re.compile(r"^\s*([A-Za-z_$][\w$]*)\s*=>"))
@@ -331,15 +360,17 @@ def object_surface(t, open_idx, fn_names):
         m = key_re.match(seg)
         if m:
             key = m.group(1) or m.group(3)
-            if valid_name(key):
-                keys.add(key)
-                after_key = seg[m.end(1) or m.end(3):]
-                if after_key.lstrip().startswith("(") or fn_val_re.search(seg):
-                    fn_keys.add(key)          # method shorthand / fn value
-                v = val_re.search(seg)
-                if v and v.group(1) in fn_names and valid_name(v.group(1)):
-                    keys.add(v.group(1))      # key: fnName — the fn is exposed
-                    fn_keys.add(v.group(1))
+            keys.add(key)
+            rest = seg[m.end():]
+            if (re.match(r"\s*\([^)]*\)\s*\{", rest)                    # method shorthand
+                    or re.match(r"\s*[:=]\s*(?:async\s+)?function\b", rest)   # name: function
+                    or re.match(r"\s*[:=]\s*(?:async\s+)?\([^)]*\)\s*=>", rest)  # name: () =>
+                    or re.match(r"\s*[:=]\s*(?:async\s+)?[\w$]+\s*=>", rest)):   # name: x =>
+                fn_keys.add(key)
+            v = val_re.search(seg)
+            if v and fn_defined(t, v.group(1)):
+                keys.add(v.group(1))     # key: fnName pairs expose the fn name
+                fn_keys.add(v.group(1))
         for pre in param_res:
             pm = pre.match(seg)
             if pm:
@@ -348,53 +379,38 @@ def object_surface(t, open_idx, fn_names):
     return keys, fn_keys, params, i + 1
 
 
-def return_surface(t, k, end, fn_names):
-    """Claimable keys of the value returned by `return <value>` at t[k:end]."""
-    keys = set()
-    while k < end and t[k] in " \t\r\n":
-        k += 1
-    if k >= end:
-        return keys
-    if t[k] == "{":
-        kk, _fk, _p, _e = object_surface(t, k, fn_names)
-        return kk
-    if t[k] == "(":
-        close = match_pair(t, k)
-        inner = t[k + 1:close - 1].strip()
-        if IDENT_RE.fullmatch(inner):
-            return return_surface(t, k + 1, close - 1, fn_names)
-        return keys
-    m = IDENT_RE.match(t, k)
-    if not m:
-        return keys
-    name, k2 = m.group(0), m.end()
-    while k2 < end and t[k2] in " \t\r\n":
-        k2 += 1
-    if k2 < end and t[k2] == ".":
-        # e.g. `return Object.freeze({...})` — take the frozen literal's keys
-        paren = t.find("(", k2)
-        if paren > 0:
-            p = paren + 1
-            while p < end and t[p] in " \t\r\n":
-                p += 1
-            if p < end and t[p] == "{":
-                kk, _fk, _p, _e = object_surface(t, p, fn_names)
+def unwrap_returned_literals(t, k, end):
+    """Object literals returned at a `return` — plain or wrapped in
+    Object.freeze / Object.assign / Object.seal / deepFreeze(...)."""
+    keys, fn_keys = set(), set()
+    depth, i = 0, k
+    while i < end:
+        j = skip_string(t, i)
+        if j != i:
+            i = j
+            continue
+        c = t[i]
+        if c in "([{":
+            if c == "{" and depth <= 1:
+                kk, fk, _, nxt = object_surface(t, i)
                 keys |= kk
-        return keys
-    if k2 < end and t[k2] in "([":
-        return keys               # a call / index — returned value unknown
-    if name in fn_names and valid_name(name):
-        keys.add(name)            # `return getAIAction` — fn surface
-    b = re.search(r"\b(?:const|let|var)\s+" + re.escape(name) + r"\s*=\s*\{", t)
-    if b:                         # `return api` — resolve the api literal
-        kk, _fk, _p, _e = object_surface(t, b.end() - 1, fn_names)
-        keys |= kk
-    return keys
+                fn_keys |= fk
+                i = nxt
+                continue
+            depth += 1
+        elif c in ")]}":
+            if depth == 0:
+                break
+            depth -= 1
+        elif c == ";" and depth == 0:
+            break
+        i += 1
+    return keys, fn_keys
 
 
-def top_level_returns(t, body_start, body_end, fn_names):
-    """Keys exposed by `return` statements at the top level of a body."""
-    keys = set()
+def top_level_returns(t, body_start, body_end, fns):
+    """(keys, fn-keys, params, names) returned at the top level of a factory body."""
+    keys, fn_keys, params, names = set(), set(), set(), set()
     depth, i = 1, body_start + 1
     while i < body_end - 1:
         j = skip_string(t, i)
@@ -404,40 +420,68 @@ def top_level_returns(t, body_start, body_end, fn_names):
         c = t[i]
         if c in "{[(":
             depth += 1
-        elif c in "})]":
+        elif c in "}])":
             depth -= 1
         elif depth == 1 and t.startswith("return", i) and \
                 not (i and (t[i - 1].isalnum() or t[i - 1] in "_$")):
             k = i + 6
-            if k >= body_end or not (t[k].isalnum() or t[k] in "_$"):
-                keys |= return_surface(t, k, body_end, fn_names)
+            while k < body_end and t[k] in " \t\r\n":
+                k += 1
+            if k < body_end and t[k] == "{":
+                kk, fk, _, i = object_surface(t, k)
+                keys |= kk
+                fn_keys |= fk
+                continue
+            kk, fk = unwrap_returned_literals(t, k, body_end)
+            if kk or fk:
+                keys |= kk
+                fn_keys |= fk
+                i = k
+                continue
+            m = IDENT_RE.match(t, k)
+            if m:
+                name = m.group(0)
+                if name in fns or fn_defined(t, name):
+                    names.add(name)          # `return getAIAction` — a fn name
+                else:
+                    b = re.search(r"\b(?:const|let|var)\s+" + re.escape(name) + r"\s*=\s*\{", t)
+                    if b:                    # `return api` — resolve the object literal
+                        kk, fk, p, _ = object_surface(t, b.end() - 1)
+                        keys |= kk
+                        fn_keys |= fk
+                        params |= p
+                i = m.end()
+                continue
         i += 1
-    return keys
+    return keys, fn_keys, params, names
 
 
-def find_arrow(t, i, end):
-    depth = 0
-    while i < end - 1:
-        j = skip_string(t, i)
-        if j != i:
-            i = j
-            continue
-        if t[i] in "([{":
-            depth += 1
-        elif t[i] in ")]}":
-            depth -= 1
-        elif depth == 0 and t.startswith("=>", i):
-            return i
-        i += 1
-    return -1
-
-
-def factory_body(t, i):
-    """(body_start, fparams) of the factory expression at i, or (-1, set())."""
+def module_surface(t, i, fns):
+    """(syms, params) exposed by the module expression at registration position."""
     while i < len(t) and t[i] in " \t\r\n":
         i += 1
+    if t.startswith("function", i):
+        m = re.match(r"function\s*(?:([A-Za-z_$][\w$]*)\s*)?\(([^)]*)\)", t[i:])
+        # the payload's own function name is exposed surface (e.g. runTest)
+        return ({m.group(1)} if m and m.group(1) else set()), \
+            (split_params(m.group(2)) if m else set())
+    if t[i] == "{":
+        keys, fn_keys, params, _ = object_surface(t, i)
+        return (keys | fn_keys), params
+    m = IDENT_RE.match(t, i)
+    if m and (m.end() >= len(t) or t[m.end()] in ",);"):
+        name, out, params = m.group(0), set(), set()
+        if name in fns or fn_defined(t, name):
+            out.add(name)                    # _register("unitPlanner", buildUnitPlan)
+        b = re.search(r"\b(?:const|let|var)\s+" + re.escape(name) + r"\s*=\s*\{", t)
+        if b:
+            k, fk, p, _ = object_surface(t, b.end() - 1)
+            out |= k | fk
+            params |= p
+        return out, params
+    # factory form: (params) => {...} | name => {...} | (() => {...})()
     body, fparams = -1, set()
-    if i < len(t) and t[i] == "(":
+    if t[i] == "(":
         close = match_pair(t, i)
         rest = close
         while rest < len(t) and t[rest] in " \t\r\n":
@@ -459,206 +503,169 @@ def factory_body(t, i):
     while body >= 0 and body < len(t) and t[body] in " \t\r\n":
         body += 1
     if body < 0 or body >= len(t) or t[body] != "{":
-        return -1, fparams
-    return body, fparams
-
-
-def module_surface(t, i, fn_names):
-    """(symbols, pipeline params) exposed by the module expression at i."""
-    while i < len(t) and t[i] in " \t\r\n":
-        i += 1
-    if t.startswith("function", i):
-        m = re.match(r"function\s*(?:([A-Za-z_$][\w$]*)\s*)?\(([^)]*)\)", t[i:])
-        out = {m.group(1)} if m and m.group(1) and valid_name(m.group(1)) else set()
-        params = split_params(m.group(2)) if m else set()
-        body = t.find("{", i)
-        if body > 0:
-            out |= top_level_returns(t, body, match_pair(t, body), fn_names)
-        return out, params
-    if t[i] == "{":
-        keys, _fk, params, _ = object_surface(t, i, fn_names)
-        return keys, params
-    m = IDENT_RE.match(t, i)
-    if m and (m.end() >= len(t) or t[m.end()] in ",);"):
-        name, out, params = m.group(0), set(), set()
-        if name in fn_names and valid_name(name):
-            out.add(name)          # the payload IS a function defined here
-        b = re.search(r"\b(?:const|let|var)\s+" + re.escape(name) + r"\s*=\s*\{", t)
-        if b:
-            k, _fk, p, _ = object_surface(t, b.end() - 1, fn_names)
-            out |= k
-            params |= p
-        return out, params
-    # factory form: (params) => {...} | name => {...} | (() => {...})()
-    body, fparams = factory_body(t, i)
-    if body < 0:
         return set(), fparams
-    keys = top_level_returns(t, body, match_pair(t, body), fn_names)
-    return keys, fparams
+    keys, fn_keys, params, names = top_level_returns(t, body, match_pair(t, body), fns)
+    return (keys | fn_keys | names), fparams | params
 
 
-def adapter_fn_keys(t, body_start, body_end, fn_names, want_depth):
-    """Function-valued keys of `const NAME = {...}` adapters at want_depth.
-
-    These are the module-scope adapter objects (MathGrid / Visibility /
-    Selection / Actions in core/game.js, `Renderer` in graphics/graphics.js)
-    whose method names are handed to children through the pipeline.
-    """
-    keys = set()
-    positions, spans = [], []
-    for m in re.finditer(r"\b(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*\{", t):
-        if body_start <= m.start() < body_end:
-            positions.append(m.start())
-            spans.append((m.start(), m.end()))
-    depths = scan_depths(t, positions)
-    for (start, end) in spans:
-        if depths.get(start, -1) != want_depth:
+def find_arrow(t, i, end):
+    depth = 0
+    while i < end - 1:
+        j = skip_string(t, i)
+        if j != i:
+            i = j
             continue
-        _k, fk, _p, _e = object_surface(t, end - 1, fn_names)
-        keys |= {k for k in fk if valid_name(k)}
-    return keys
+        if t[i] in "([{":
+            depth += 1
+        elif t[i] in ")]}":
+            depth -= 1
+        elif depth == 0 and t.startswith("=>", i):
+            return i
+        i += 1
+    return -1
 
 
 def extract_surface(text, is_data=False):
-    """(symbols, pipeline params, factory-globals) exposed by a file.
-
-    Claims are ONLY: registration-payload / returned-object keys, function
-    names defined in those objects, and registered factory-global names.
-    """
-    fn_names = fn_def_names(text)
+    """(symbols, params, factory-globals) exposed by a file."""
     syms, params, globals_ = set(), set(), set()
+    fns = fn_names_defined(text)
     for m in REG_CALL_RE.finditer(text):
-        s, p = module_surface(text, m.end(), fn_names)
-        if not is_data:  # data fields are blessed plain-data names (§2)
+        s, p = module_surface(text, m.end(), fns)
+        if not is_data:      # data fields are blessed plain-data names (§2)
             syms |= s
         params |= p
-    # factory-globals: top-level const NAME = factory, plus transient globals
-    const_re = re.compile(r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*")
-    positions = [m.start() for m in const_re.finditer(text)]
-    depths = scan_depths(text, positions)
-    for m in const_re.finditer(text):
-        name, tail = m.group(1), text[m.end():]
-        depth = depths.get(m.start(), -1)
-        if depth == 0 and re.match(r"\(?function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>",
-                                   tail):
-            if valid_name(name):
-                globals_.add(name)   # top-level const NAME = (() => …) / fn
-            s, p = module_surface(text, m.end(), fn_names)
+    # factory-global names: `const NAME = <factory>` at file top level only
+    for m in re.finditer(r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*", text):
+        tail = text[m.end():]
+        if not re.match(r"\(?function\b|\([^)]*\)\s*=>|[\w$]+\s*=>|\(\s*\(\s*\)\s*=>|\(\s*\(\s*[\w$,\s]*\)\s*=>", tail):
+            continue
+        if depth_at(text, m.start()) != 0:
+            continue          # nested `const helper = () => {...}` is not a global
+        globals_.add(m.group(1))
+        s, p = module_surface(text, m.end(), fns)
+        if not is_data:
             syms |= s
-            params |= p
-            body, _fp = factory_body(text, m.end())
-            if body > 0:
-                # module-scope adapter literals inside the factory body
-                # (MathGrid/Visibility/Selection/Actions in core/game.js)
-                want = scan_depths(text, [body]).get(body, 0) + 1
-                syms |= adapter_fn_keys(text, body, match_pair(text, body),
-                                        fn_names, want)
+        params |= p
     for m in re.finditer(r"\b(?:g|window|globalThis)\.([A-Za-z_$][\w$]*)\s*=", text):
-        if valid_name(m.group(1)):
-            globals_.add(m.group(1))  # transient g.<Name> during load
-    syms |= globals_
-    syms = {s for s in syms if valid_name(s)}
-    params = {p for p in params if valid_name(p)}
-    return syms, params, globals_
+        globals_.add(m.group(1))   # transient g.<Name> during load (§1.5)
+    # module-scope adapter object literals (`const Selection = {...}`): their
+    # function members are exposed surface handed to children via the pipeline
+    for m in re.finditer(r"\b(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*\{", text):
+        _k, fk, _p, _e = object_surface(text, m.end() - 1)
+        if not is_data:
+            syms |= fk
+    if not is_data:
+        syms |= globals_
+    return {s for s in syms if valid_symbol(s)}, params, globals_
 
 
-def declared_locals(text):
-    """Names the file itself binds as local variables / functions (shadowing).
+# ---- declaration info (what the file itself binds / receives) --------------
+def declaration_info(code):
+    """(bound, given, handles, def_spans) for the comment/string-blanked code.
 
-    Deliberately excludes function/method parameters and destructured names:
-    those arrive from the caller across a file boundary (e.g. the sibling
-    closure `drawUnitStatic` threaded through graphics.js), so bare uses of
-    them ARE cross-file references.
+    bound      — names the file itself binds (const/let/var incl. multiple
+                 declarators, for-of/for-in, destructuring, function names,
+                 catch params);
+    given      — parameter names of the file's functions/methods/arrows;
+    handles    — pipeline handles: names destructured from the parent's DTO
+                 (`const {...} = cmd`) or bound to a member access
+                 (`const Rules = deps.Rules`); bare uses of these are real
+                 cross-file references;
+    def_spans  — (start, end) ranges of parameter lists / binding patterns:
+                 occurrences inside them are declarations, not uses.
     """
-    bound = set()
-    for m in re.finditer(r"\bfunction\s+([A-Za-z_$][\w$]*)\s*\(", text):
-        bound.add(m.group(1))
-    for m in re.finditer(r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)", text):
-        bound.add(m.group(1))
-    for m in re.finditer(r",\s*([A-Za-z_$][\w$]*)\s*=(?!=)", text):  # `a = 1, b = 2`
-        bound.add(m.group(1))
-    for m in re.finditer(r"\bcatch\s*\(\s*([A-Za-z_$][\w$]*)", text):
-        bound.add(m.group(1))
-    return bound
+    bound, given, handles, dto_handles, spans = set(), set(), set(), set(), []
 
+    def add_params(text, span):
+        given.update(split_params(text))
+        spans.append(span)
 
-def definition_spans(t):
-    """Spans (start, end) where an identifier is DEFINED, not used:
-    function/method parameter lists, destructuring patterns, catch params.
-    """
-    spans = []
-    for m in re.finditer(r"\b(?:const|let|var)\s*[\{\[]", t):
-        spans.append((m.end() - 1, match_pair(t, m.end() - 1)))
-    for m in re.finditer(r"\bfunction\b\s*[\w$]*\s*\(", t):
-        spans.append((m.end() - 1, match_pair(t, m.end() - 1)))
-    for m in re.finditer(r"\bcatch\s*\(", t):
-        spans.append((m.end() - 1, match_pair(t, m.end() - 1)))
-    # method definitions: NAME(...) { — but not if/for/while/switch heads or
-    # plain calls (a call is never followed by '{').
-    meth_re = re.compile(
-        r"(?<![\w$.])(?!(?:if|for|while|switch|catch|with|do|return|typeof|"
-        r"function|new|else|try|finally|delete|void|in|of|instanceof)\b)"
-        r"([A-Za-z_$][\w$]*)\s*\(")
-    for m in meth_re.finditer(t):
-        open_p = m.end() - 1
-        close = match_pair(t, open_p)
-        rest = t[close:close + 12].lstrip()
-        if rest.startswith("{"):
-            spans.append((open_p, close))
-    # arrow parameters: ( ... ) =>  and bare `name =>`
-    for m in re.finditer(r"\)\s*=>", t):
-        depth, i = 0, m.start()
-        while i >= 0:
-            if t[i] == ")":
-                depth += 1
-            elif t[i] == "(":
-                depth -= 1
-                if depth == 0:
-                    spans.append((i, m.start() + 1))
-                    break
-            i -= 1
-    return spans
+    for m in re.finditer(r"\bfunction\s*[\w$]*\s*\(", code):
+        end = code.index(")", m.end()) if ")" in code[m.end():] else len(code)
+        add_params(code[m.end():end], (m.end(), end + 1))
+    for m in re.finditer(r"(?<![.\w$])(?:async\s+)?[A-Za-z_$][\w$]*\s*\(([^()]*)\)\s*\{", code):
+        if re.match(r"\s*(?:if|for|while|switch|catch|with|function|do|else|return|typeof|new|in|of|await|yield|throw|try|finally|class)\b", m.group(0)):
+            continue
+        add_params(m.group(1), m.span(1))
+    for m in re.finditer(r"\(([^)]*)\)\s*=>", code):
+        add_params(m.group(1), m.span(1))
+    for m in re.finditer(r"(?<![\w$])([A-Za-z_$][\w$]*)\s*=>", code):
+        given.add(m.group(1))
 
-
-def allowed_files(child):
-    return {child, PARENT_OF[child]} | ADJACENT_CORES.get(child, set())
-
-
-# ---- checks ----------------------------------------------------------------
-def check_filenames(raw_by_path):
-    out = []
-    for child in sorted(PARENT_OF):
-        base = os.path.basename(child)
-        stem = base[:-3] if base.endswith(".js") else base
-        # Bare module names count for CamelCase names ("uiRenderer" in a
-        # comment names graphics/uiRenderer.js).  Lowercase stems (ai, rules,
-        # game, themes, ...) are ordinary words — only the filename counts.
-        stem_rx = None
-        if any(c.isupper() for c in stem):
-            stem_rx = re.compile(r"(?<![\w$])" + re.escape(stem) + r"(?![\w$])")
-        ok = allowed_files(child) | {c for c, p in PARENT_OF.items() if p == child}
-        for path, raw in sorted(raw_by_path.items()):
-            if path in ok:
+    # const/let/var: every declarator name (multi-declarator aware)
+    for m in re.finditer(r"\b(?:const|let|var)\b", code):
+        depth, i = 0, m.end()
+        start = i
+        while i < len(code):
+            j = skip_string(code, i)
+            if j != i:
+                i = j
                 continue
-            lines = raw.splitlines()
-            head = header_line_count(lines)
-            for i, line in enumerate(lines):
-                if i < head:
-                    continue  # header comments name owners by convention
-                for _col in find_all(line, base):
-                    out.append((path, i + 1,
-                                "'%s' (file %s) is referenced here; only %s "
-                                "(its parent), its own children and itself may "
-                                "reference it" % (base, child, PARENT_OF[child])))
-                if stem_rx:
-                    for m in stem_rx.finditer(line):
-                        if line[m.end():m.end() + 3] == ".js":
-                            continue  # the filename match above covers it
-                        out.append((path, i + 1,
-                                    "'%s' (file %s) is referenced here; only %s "
-                                    "(its parent), its own children and itself may "
-                                    "reference it" % (stem, child, PARENT_OF[child])))
-    return out
+            c = code[i]
+            if c in "([{":
+                depth += 1
+            elif c in ")]}":
+                if depth == 0:
+                    break
+                depth -= 1
+            elif c == ";" and depth == 0:
+                break
+            elif c == "," and depth == 0:
+                _declarator(code, start, i, bound, handles, spans)
+                start = i + 1
+            i += 1
+        _declarator(code, start, min(i + 1, len(code)), bound, handles, spans)
+
+    for m in re.finditer(r"\b(?:function|class)\s+([A-Za-z_$][\w$]*)", code):
+        bound.add(m.group(1))
+    for m in re.finditer(r"\bcatch\s*\(\s*([A-Za-z_$][\w$]*)", code):
+        bound.add(m.group(1))
+        spans.append(m.span(1))
+    # destructuring binding patterns
+    for m in re.finditer(r"\b(?:const|let|var)\s*([\{\[])", code):
+        end = match_pair(code, m.start(1))
+        names = split_params(code[m.start(1) + 1:end - 1])
+        bound.update(names)
+        spans.append((m.start(1) + 1, end - 1))
+        src = re.match(r"\s*=\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)"
+                       r"\.?\s*([;,)\]}]|$)", code[end:end + 60])
+        if src and (src.group(1).split(".")[0] in given
+                    or src.group(1).split(".")[0] in PIPELINE_RECEIVERS):
+            handles.update(names)  # const {...} = cmd — parent-DTO fields
+            dto_handles.update(names)  # are parent-injected pipeline handles
+            given.update(names)
+    return bound, given, handles, dto_handles, spans
+
+
+def is_handle_init(val):
+    """True when a `const NAME = <init>` binds a module/DTO handle: a pure
+    member read (`deps.Rules`, `(ctx && ctx.rules) || null`) rather than a
+    computed value (`state.maxAp || 4`, `contentRows[i]`, `env.rules.dist(d, e)`
+    — a call returns a value, not a handle)."""
+    v = val.strip().rstrip(";").strip()
+    if not v or "[" in v or re.search(r"\d|['\"]|=>", v):
+        return False
+    if re.search(r"[A-Za-z_$][\w$]*\s*\(", v):
+        return False                     # a call: the binding is the result
+    if not re.search(r"[A-Za-z_$][\w$]*\.[A-Za-z_$]", v):
+        return False                     # needs at least one member read
+    rest = re.sub(r"[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+", " ", v)  # chains
+    rest = re.sub(r"[A-Za-z_$][\w$]*", " ", rest)                      # guards
+    return re.sub(r"[&|!?:().\s]", "", rest) == ""
+
+
+def _declarator(code, start, end, bound, handles, spans):
+    seg = code[start:end]
+    nm = re.match(r"\s*([A-Za-z_$][\w$]*)", seg)
+    if not nm:
+        return
+    name = nm.group(1)
+    bound.add(name)
+    init = seg[nm.end():]
+    if re.match(r"\s*=", init):
+        val = init[init.index("=") + 1:]
+        if is_handle_init(val):
+            handles.add(name)   # const Rules = deps.Rules / ctx.rules || null …
 
 
 def find_all(line, needle):
@@ -669,75 +676,98 @@ def find_all(line, needle):
     return out
 
 
-def check_symbols(code_by_path, claims, params_of, globals_of):
+def allowed_files(child):
+    return {child, PARENT_OF[child]} | ADJACENT_CORES.get(child, set())
+
+
+# ---- checks ----------------------------------------------------------------
+def check_filenames(raw_by_path):
+    out = []
+    for child in sorted(PARENT_OF):
+        base = os.path.basename(child)                 # e.g. uiRenderer.js
+        stem = base[:-3] if base.endswith(".js") else base
+        ok = allowed_files(child) | {c for c, p in PARENT_OF.items() if p == child}
+        # bare module-name mentions count too for module-style names
+        stem_rx = None
+        if any(ch.isupper() for ch in stem):
+            stem_rx = re.compile(r"(?<![\w$])" + re.escape(stem) + r"(?![\w$])")
+        for path, raw in sorted(raw_by_path.items()):
+            if path in ok:
+                continue
+            lines = raw.splitlines()
+            head = header_line_count(lines)
+            for i, line in enumerate(lines):
+                if i < head:
+                    continue  # header comments name owners by convention
+                hits = len(find_all(line, base))
+                if stem_rx:
+                    hits += len(stem_rx.findall(line))
+                for _ in range(hits):
+                    out.append((path, i + 1,
+                                "'%s' (file %s) is referenced here; only %s "
+                                "(its parent), its own children and itself may "
+                                "reference it" % (base, child, PARENT_OF[child])))
+    return out
+
+
+def check_symbols(code_by_path, clean_by_path, claims, params_of, globals_of,
+                  data_fields):
     out = []
     allowed = {s: set().union(*(allowed_files(c) for c in owners))
                for s, owners in claims.items()}
-    decls, spans_of = {}, {}
+    info, code_join = {}, {}
     for p, lines in code_by_path.items():
-        text = "\n".join(lines)
-        decls[p] = declared_locals(text)
-        spans_of[p] = sorted(definition_spans(text))
+        code_join[p] = "\n".join(lines)
+        info[p] = declaration_info(code_join[p])
     for path in sorted(code_by_path):
         lines = code_by_path[path]
-        given = set()
-        for rx in (r"\bfunction\b\s*[\w$]*\s*\(([^)]*)\)", r"\(([^)]*)\)\s*=>"):
-            for m in re.finditer(rx, "\n".join(lines)):
-                given |= split_params(m.group(1))
-        for m in re.finditer(r"^\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*\(([^)]*)\)\s*\{",
-                             "\n".join(lines), re.M):
-            if m.group(1) not in KEYWORD_NAMES:
-                given |= split_params(m.group(2))
-        given |= params_of.get(path, set())
+        bound, given, handles, dto_handles, spans = info[path]
+        given = given | params_of.get(path, set())
         owner_globals = {g for child in PARENT_OF
                          if path in allowed_files(child)
                          for g in globals_of.get(child, set())}
-        spans = spans_of[path]
-        starts = [s for s, _e in spans]
-        line_off = [offset_of(lines, i) for i in range(len(lines) + 1)]
         for sym in sorted(claims):
             if path in allowed[sym]:
                 continue
             rx = re.compile(r"(?<![\w$])%s(?![\w$])" % re.escape(sym))
             for i, line in enumerate(lines):
+                line_off = offset_of(lines, i)
                 for m in rx.finditer(line):
                     after, before = line[m.end():], line[:m.start()]
                     if "._register" in line or re.search(
                             r"\b(?:g|window|globalThis)\.[\w$]+\s*=", line):
                         continue  # sanctioned transient load registrar (§1.5)
-                    off = line_off[i] + m.start()
-                    k = bisect_right(starts, off) - 1
-                    if k >= 0 and spans[k][0] <= off < spans[k][1]:
-                        continue  # parameter/destructuring definition position
                     if re.match(r"['\"]?\s*:(?!=)", after):
                         continue  # object-literal key position: a definition
-                    if re.match(r"\s*\([^)]*\)\s*\{", after) or \
-                            re.match(r"\s*=>", after):
+                    if re.match(r"\s*\([^)]*\)\s*\{", after):
                         continue  # method/function definition position
-                    owner = re.search(r"([A-Za-z_$][\w$]*)\.\s*$", before)
-                    if owner and (owner.group(1) in given
-                                  or owner.group(1) in owner_globals):
-                        continue  # parent-built pipeline handle / allowed API
-                    if not owner and sym in decls[path]:
-                        continue  # the file declares this name locally
+                    off = line_off + m.start()
+                    if any(a <= off < b for a, b in spans):
+                        continue  # parameter list / binding pattern: a declaration
+                    if re.search(r"\.\s*$", before):
+                        # property access `X.sym` (or `f(x).sym`)
+                        owner = re.search(r"([A-Za-z_$][\w$]*)\.\s*$", before)
+                        if not owner:
+                            continue  # computed receiver: a local data field
+                        recv = owner.group(1)
+                        if (recv in given or recv in PIPELINE_RECEIVERS
+                                or recv in owner_globals):
+                            continue  # parent-built pipeline handle (req. 3)
+                        if recv in bound and recv not in handles:
+                            continue  # `row.color` — a data field on a local
+                    else:
+                        # bare occurrence
+                        if sym in dto_handles and sym not in data_fields:
+                            pass      # destructured sibling fn handle: a real use
+                        elif sym in bound or sym in given or sym in handles:
+                            continue  # the file binds this name itself
                     out.append((path, i + 1,
                                 "symbol '%s' (exposed by %s) is referenced "
                                 "here; it may be known only by its parent (%s)"
                                 % (sym, " + ".join(sorted(claims[sym])),
-                                   ", ".join(PARENT_OF[c]
-                                             for c in sorted(claims[sym])))))
+                                   ", ".join(sorted({PARENT_OF[c]
+                                                     for c in sorted(claims[sym])})))))
     return out
-
-
-def bisect_right(a, x):
-    lo, hi = 0, len(a)
-    while lo < hi:
-        mid = (lo + hi) // 2
-        if a[mid] <= x:
-            lo = mid + 1
-        else:
-            hi = mid
-    return lo
 
 
 def check_globals(code_by_path, clean_by_path, parents):
@@ -753,7 +783,7 @@ def check_globals(code_by_path, clean_by_path, parents):
                     continue
                 if loader and tok in ("window.", "document."):
                     continue  # sanctioned §1.4 inline child-loader
-                for _col in find_all(line, tok):
+                for _ in find_all(line, tok):
                     out.append((path, i + 1,
                                 "global use '%s' in child file (§1.5: children "
                                 "expose and touch no globals; document/window "
@@ -789,6 +819,7 @@ def check_data_files(code_by_path, clean_by_path):
 def offset_of(lines, lineno):
     return sum(len(l) + 1 for l in lines[:lineno])
 
+
 # ---- entry point -----------------------------------------------------------
 def print_map():
     print("reference_audit ownership map (child -> parent)")
@@ -805,6 +836,7 @@ def main(argv):
     raw_by_path, clean_by_path = {}, {}
     code_by_path, claims = {}, {}
     params_of, globals_of = {}, {}
+    data_fields = set()   # blessed plain-data names that travel inside DTOs (§2)
     for path in list_js_files():
         raw_by_path[path] = read(path)
         clean = blank_spans(raw_by_path[path], "c")  # comments out, strings kept
@@ -815,12 +847,20 @@ def main(argv):
         syms, params, globals_ = extract_surface(
             "\n".join(clean_by_path[child]), is_data)
         params_of[child], globals_of[child] = params, globals_
+        if is_data:
+            text = "\n".join(clean_by_path[child])
+            for m in REG_CALL_RE.finditer(text):
+                brace = text.find("{", m.end())
+                if brace < 0:
+                    continue
+                keys, fkeys, _p, _e = object_surface(text, brace)
+                data_fields |= {k for k in keys | fkeys if valid_symbol(k)}
         for s in syms:
             claims.setdefault(s, set()).add(child)
     parents = set(PARENT_OF.values()) | {"main.js"}
     viols = (check_filenames(raw_by_path)
-             + check_symbols(code_by_path, claims,
-                             params_of, globals_of)
+             + check_symbols(code_by_path, clean_by_path, claims,
+                             params_of, globals_of, data_fields)
              + check_globals(code_by_path, clean_by_path, parents)
              + check_data_files(code_by_path, clean_by_path))
     viols.sort()
