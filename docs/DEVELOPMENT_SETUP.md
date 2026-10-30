@@ -1,12 +1,12 @@
 # Seek & Destroy — Development Setup
 
-A browser-based tactical fleet-strategy game. Vanilla JavaScript + HTML5 Canvas, **no build step and no framework**. Current version: **v70**.
+A browser-based tactical fleet-strategy game. Vanilla JavaScript + HTML5 Canvas, **no build step and no framework**. Current version: the newest `vNN` tag (see `git tag`).
 
 ## Repository
 
 - **Location on this machine:** `/home/ubuntu/seek-and-destroy/`
 - **Remote:** `https://github.com/cmi01/seek_and_destroy.git` (private), branch `main`.
-- **Versioning:** plain git tags, one per release — `v69` (baseline import), `v70` (current). Commit author is `Seek and Destroy Dev <dev@localhost>`.
+- **Versioning:** plain git tags, one per release (`v69` is the baseline import, then `v70`, `v71`, …; the newest tag is the current version). **Every change lands on `main`**: release commits are pushed to `main` as well as their `vNN` branch/tag, so `main` always carries the newest release. Commit author is `Seek and Destroy Dev <dev@localhost>`.
 
 ## How it runs (must be served over HTTP)
 
@@ -40,7 +40,8 @@ Served **statically from the project root** by nginx on this supercomputer — e
 
 1. Make the change; keep `?test` self-tests green.
 2. Confirm the live URL serves the new build (`curl -sI -H 'Host: seek-and-destroy.vm.internal' http://localhost/`).
-3. `git add -A && git commit`, `git tag vNN`, `git push origin main && git push origin vNN`.
+3. `git add -A && git commit`, `git tag vNN`.
+4. **Always get the new changes into `main`** — `main` must never be left behind at an older release. From the `vNN` branch: `git push origin HEAD:main`, then `git push origin refs/heads/vNN && git push origin refs/tags/vNN`. (Use explicit refs — a bare `git push origin vNN` is ambiguous when the branch and tag share a name.)
 
 > Note: the repo must **not** contain `.github/workflows/*` — the connected GitHub App lacks `workflows` permission and the push is rejected. Deployment is via nginx, not GitHub Pages.
 
