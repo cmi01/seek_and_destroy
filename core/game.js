@@ -23,8 +23,11 @@ const _modules = {
 };
 let _registrationOpen = true;
 const _stateBox = { current: null };
-const _themeState = { active: "default", caches: {} };
-let _hudStore = null;
+// Game-owned HUD view-model + priority-banner memo (state lives in the core,
+// §3): core/hud.js is pure — it computes replacements as plain data and Game
+// applies them (see the RESULT SHAPE documented at the top of core/hud.js).
+let _hudView = null;
+let _hudCache = { priorityKey: "", priorityLabel: null, hoveredSpotted: false };
 
 let RULES_DATA = null;
 let CAMPAIGN_DATA = null;
@@ -43,7 +46,7 @@ let Rules = null;
 // snapshot DTO instead of the Rules module identity (built once in load()).
 let PURE_RULES = null;
 let Themes = null;
-let Hud = null;
+let HudLib = null;   // the pure hud function library (core/hud.js)
 let getAIAction = null;
 
 // ---- Constants: views onto the single source of truth (data/*_DATA.js) ----
@@ -228,9 +231,6 @@ const GameAudio = (() => {
     },
     getTheme(){
       return State.theme || "default";
-    },
-    getAnalyser(){
-      return null;
     },
     getRadioActiveUntil(){
       return _radioActiveUntil;
@@ -699,6 +699,175 @@ const Actions = {
     Hud.showIntelOverlay(`TURN ${String(State.turnNumber).padStart(2,"0")} // OPERATIONAL REPORT`,State.turnReportQueue);
     State.turnReportQueue=[];
     Hud.updateAll();
+  }
+};
+
+// ======================== HUD RUNNER (game-owned) ========================
+// core/hud.js is a pure child: every operation receives the game-owned HUD
+// view (_hudView), a plain-data input, and RETURNS a plain result (the RESULT
+// SHAPE documented at the top of core/hud.js). The runner below is Game's own
+// orchestrator: it builds the plain input, invokes the pure operation, and
+// applies the returned data to Game state — State.canvasButtons /
+// buttonHovered / buttonPressed / theme, Selection, sound commands routed
+// through GameAudio, and render requests / the warp-anomaly CSS pulse through
+// the host. The hud child never sees a module handle or live state.
+function _unitDTO(u){
+  if (!u) return null;
+  return {
+    id: u.id,
+    type: u.type,
+    team: u.team,
+    x: u.x,
+    y: u.y,
+    hp: u.hp,
+    maxHp: u.maxHp,
+    move: u.move,
+    firepower: u.firepower,
+    range: u.range,
+    scan: u.scan,
+    cost: u.cost,
+    flags: new Set(u.flags)
+  };
+}
+
+// Plain-data input for one hud operation (see core/hud.js INPUT contract).
+function _hudInput(){
+  const m = (_host && _host.metrics) ? _host.metrics : null;
+  const DS = m ? m.displaySize : 768;
+  const viewSpan = State.viewSpan;
+  return {
+    now: (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now(),
+    state: {
+      levelId: State.levelId,
+      turnNumber: State.turnNumber,
+      activeTeam: State.activeTeam,
+      gameOver: Boolean(State.gameOver),
+      ap: State.ap,
+      credits: { 1: State.credits ? State.credits[1] : 0, 2: State.credits ? State.credits[2] : 0 },
+      theme: State.theme || "default",
+      viewX: State.viewX,
+      viewY: State.viewY,
+      viewSpan,
+      mousePx: State.mousePx ? { x: State.mousePx.x, y: State.mousePx.y } : { x: 0, y: 0 },
+      hoveredCell: State.hoveredCell ? { x: State.hoveredCell.x, y: State.hoveredCell.y } : null,
+      selectedCell: State.selectedCell ? { x: State.selectedCell.x, y: State.selectedCell.y } : null,
+      inspectMode: Boolean(State.inspectMode),
+      audioMuted: Boolean(State.audioSettings && State.audioSettings.muted),
+      completedLevels: State.completedLevels ? Array.from(State.completedLevels) : []
+    },
+    metrics: {
+      displaySize: DS,
+      uiScale: (m && m.uiScale) ? m.uiScale : 1,
+      minimapSize: (m && m.minimapSize) ? m.minimapSize : 120,
+      cellPx: (m && m.cellPx) ? m.cellPx : (DS / viewSpan)
+    },
+    units: Array.isArray(State.units) ? State.units.filter(u => u.hp > 0).map(_unitDTO) : [],
+    selectedUnit: _unitDTO(Selection.getUnit()),
+    cache: {
+      priorityKey: _hudCache.priorityKey,
+      priorityLabel: _hudCache.priorityLabel,
+      hoveredSpotted: _hudCache.hoveredSpotted
+    }
+  };
+}
+
+// Apply one hud result to Game state. This is the ONLY place the state
+// writes the hud used to perform live now (State.theme/canvasButtons/
+// buttonHovered/buttonPressed, Selection, sounds, renders, warp anomaly).
+function _applyHudResult(res){
+  if (!res) return;
+  if (res.theme !== undefined){
+    State.theme = res.theme;
+    if (typeof document !== "undefined" && document.body){
+      document.body.setAttribute("data-theme", res.theme);
+    }
+    GameAudio.setTheme(res.theme);
+  }
+  if (res.selection){
+    if (res.selection.sync){
+      Selection.sync();
+    } else {
+      const id = res.selection.unitId;
+      const unit = (id === null || id === undefined)
+        ? null
+        : (State.units.find(u => u.id === id && u.hp > 0) || null);
+      Selection.select(unit);
+    }
+  }
+  if (res.view) _hudView = res.view;
+  if (res.buttons) State.canvasButtons = res.buttons;
+  if (res.flags && res.flags.clearInteraction){
+    if (State.buttonHovered !== null) State.buttonHovered = null;
+    if (State.buttonPressed !== null) State.buttonPressed = null;
+  }
+  if (res.cache) _hudCache = res.cache;
+  if (res.sounds){
+    for (let i = 0; i < res.sounds.length; i++){
+      GameAudio.play(res.sounds[i].kind, res.sounds[i].payload);
+    }
+  }
+  if (res.flags && res.flags.warpAnomaly){
+    const canvas = _host ? _host.getBattleCanvas() : null;
+    if (canvas){
+      canvas.classList.add("warp-anomaly");
+      setTimeout(() => canvas.classList.remove("warp-anomaly"), 300);
+    }
+  }
+  if (res.flags && res.flags.renderRequests){
+    for (let i = 0; i < res.flags.renderRequests.length; i++){
+      if (_host && typeof _host.requestRender === "function"){
+        _host.requestRender(res.flags.renderRequests[i]);
+      }
+    }
+  }
+}
+
+const Hud = {
+  // Pure reads over the game-owned view.
+  isModalOpen(){ return HudLib.isModalOpen(_hudView); },
+  getActiveModal(){ return HudLib.getActiveModal(_hudView); },
+  isIntelVisible(){ return HudLib.isIntelVisible(_hudView); },
+  getPanelRects(){ return HudLib.panelRects(_hudView); },
+  getSnapshot(){ return HudLib.snapshot(_hudView); },
+  getTheme(){ return State.theme || "default"; },
+
+  // Game writes its own view fields directly (state lives in the core).
+  setAudioReady(ready){ _hudView.audioReady = Boolean(ready); },
+
+  // Data-returning operations: plain data in, plain data out, Game applies.
+  refreshMinimapLabel(){ _applyHudResult(HudLib.refreshMinimapLabel(_hudView, _hudInput())); },
+  setMinimapLabel(lbl){ _applyHudResult(HudLib.setMinimapLabel(_hudView, _hudInput(), lbl)); },
+  syncLayout(){ _applyHudResult(HudLib.syncLayout(_hudView, _hudInput())); },
+  updateLeftWing(){ _applyHudResult(HudLib.updateLeftWing(_hudView, _hudInput())); },
+  updateRightWing(){ _applyHudResult(HudLib.updateRightWing(_hudView, _hudInput())); },
+  updatePriorityBanner(recomputeAction = true){
+    _applyHudResult(HudLib.updatePriorityBanner(_hudView, _hudInput(), recomputeAction));
+  },
+  showIntelOverlay(title, lines){ _applyHudResult(HudLib.showIntelOverlay(_hudView, _hudInput(), title, lines)); },
+  hideIntelOverlay(){ _applyHudResult(HudLib.hideIntelOverlay(_hudView, _hudInput())); },
+  toggleBridgeModal(forceState = null){ _applyHudResult(HudLib.toggleBridgeModal(_hudView, _hudInput(), forceState)); },
+  renderBridgeShop(silent = false){ _applyHudResult(HudLib.renderBridgeShop(_hudView, _hudInput(), silent)); },
+  toggleCampaignModal(forceState = null){ _applyHudResult(HudLib.toggleCampaignModal(_hudView, _hudInput(), forceState)); },
+  renderCampaignCards(silent = false){ _applyHudResult(HudLib.renderCampaignCards(_hudView, _hudInput(), silent)); },
+  showEndgameModal(isVictory){ _applyHudResult(HudLib.showEndgameModal(_hudView, _hudInput(), isVictory)); },
+  hideEndgameModal(){ _applyHudResult(HudLib.hideEndgameModal(_hudView, _hudInput())); },
+  sampleOscilloscope(now){
+    const input = _hudInput();
+    input.now = now;
+    input.radioActive = now < (GameAudio.getRadioActiveUntil() || 0);
+    _applyHudResult(HudLib.sampleOscilloscope(_hudView, input));
+  },
+  triggerWarpAnomaly(){ _applyHudResult(HudLib.triggerWarpAnomaly()); },
+  updateAll(){ _applyHudResult(HudLib.updateAll(_hudView, _hudInput())); },
+  setTheme(theme){
+    // Game owns the active theme: it resolves the key and passes it down as
+    // plain data; the child returns the requested theme in its result and
+    // _applyHudResult applies State.theme / body attribute / audio SET_THEME.
+    const key = Themes.normalize(theme);
+    const input = _hudInput();
+    input.state.theme = key;
+    _applyHudResult(HudLib.applyTheme(_hudView, input, key));
+    return key;
   }
 };
 
@@ -1635,7 +1804,9 @@ const api = {
       SerializeGameState = () => stateLib.SerializeGameState(_stateBox);
       DeserializeGameState = data => stateLib.DeserializeGameState(_stateBox, data);
 
-      Themes = _modules.themes(THEME_DATA, _themeState);
+      // Pure-function theme library: Game owns the active theme (State.theme)
+      // and passes the key explicitly to every call.
+      Themes = _modules.themes(THEME_DATA);
 
       const pureRules = _modules.rules(RULES_DATA);
       Rules = Object.defineProperties({}, Object.getOwnPropertyDescriptors(pureRules));
@@ -1671,20 +1842,30 @@ const api = {
         getPriorityActionAt(ctx, unitA, gx, gy, opts){ return Rules.getPriorityActionAt(ctx, unitA, gx, gy, opts); }
       });
 
-      _hudStore = _modules.hud.createInitialHudStore();
-      Hud = _modules.hud.createHud({
-        hudStore: _hudStore,
-        State,
-        MathGrid,
-        Visibility,
-        Actions,
-        Selection,
-        Rules,
-        Themes,
-        GameAudio,
-        getHost: () => _host,
-        getCampaignLevels: () => CAMPAIGN_LEVELS,
-        getShipSpecs: () => SHIP_SPECS
+      // Pure hud child: plain data + pure closure queries only (no module
+      // identities cross the boundary). _hudView/_hudCache stay game-owned.
+      _hudView = _modules.hud.createInitialView();
+      HudLib = _modules.hud.createHud({
+        campaignLevels: deepCopy(CAMPAIGN_LEVELS),
+        shipSpecs: deepCopy(SHIP_SPECS),
+        flagDescriptions: deepCopy(Rules.flagDescriptions || {}),
+        getUnitAt(gx, gy){ return _unitDTO(MathGrid.getUnitAt(gx, gy)); },
+        terrainAt(gx, gy){
+          const st = GetGameState();
+          return st.terrain && st.terrain[gx] ? st.terrain[gx][gy] : "EMPTY";
+        },
+        isSpotted(unit){ return Visibility.isUnitSpottedByTeam(unit, 1); },
+        cellVisible(gx, gy){ return Visibility.isCellVisibleToTeam(gx, gy, 1); },
+        effectiveScan(unit){ return Visibility.getEffectiveScan(unit); },
+        validWarpCells(unit){ return Actions.getValidWarpCells(unit).map(c => ({ x: c.x, y: c.y })); },
+        canShield(unit, pos){ return Actions.canShield(unit, pos); },
+        canCapture(unit, pos){ return Actions.canCapture(unit, pos); },
+        canShoot(unit, pos){ return Actions.canShoot(unit, pos); },
+        priorityAction(unit, gx, gy){ return Actions.getPriorityActionAt(unit, gx, gy); },
+        renderedViewport(){
+          const vp = MathGrid.getRenderedViewport();
+          return { viewX: vp.viewX, viewY: vp.viewY, cellPx: vp.cellPx };
+        }
       });
 
       const rawAI = _modules.ai;
@@ -1990,8 +2171,19 @@ const api = {
   },
 
   createDebugHandle(){
+    // Frozen plain-data snapshot of the theme table (order + palettes) — the
+    // live themes module identity never leaves game.js. Switching themes goes
+    // through setTheme()/getTheme() below.
+    const themeSnapshot = deepFreeze({
+      order: Themes.ORDER.slice(),
+      palettes: (() => {
+        const p = {};
+        Themes.ORDER.forEach(t => { p[t] = deepCopy(Themes.palette(t)); });
+        return p;
+      })()
+    });
     return {
-      State, AI, Actions, Hud, Visibility, MathGrid, SectorGenerator, Rules, Themes, Selection,
+      State, AI, Actions, Hud, Visibility, MathGrid, SectorGenerator, Rules, Themes: themeSnapshot, Selection,
       SHIP_SPECS, CAMPAIGN_LEVELS, DIFFICULTY_TABLE,
       playSound(kind, payload){ return GameAudio.play(kind, payload); },
       setTheme(t){ return Hud.setTheme(t); },
@@ -2014,7 +2206,7 @@ const api = {
         console.log("%cSEEK & DESTROY DEBUG HANDLE","color:#38bdf8;font-size:14px;");
         console.log("SD.State            — the whole game memory");
         console.log("SD.saveState() / SD.loadState(obj) — JSON-safe snapshot of profile/match/AI/camera state");
-        console.log("SD.Themes           — theme ids, palettes, normalize()/next(); SD.Selection.getUnit()");
+        console.log("SD.Themes           — frozen snapshot of theme ids + palettes (switch via SD.setTheme/getTheme); SD.Selection.getUnit()");
         console.log("SD.AI               — the enemy turn runner (game.js)");
         console.log("SD.Hud              — HUD / modal view-model (hud.js)");
         console.log("SD.Graphics / SD.Sound — renderer and audio engine modules");

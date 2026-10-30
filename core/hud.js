@@ -3,88 +3,70 @@
 // ============================================================
 // HUD — Stateless pure view-model & layout/hitbox calculator for the canvas
 // HUD: top bar, telemetry cards, priority banner, intel overlay,
-// Bridge / Campaign / Endgame modals, oscilloscope sampling, theme switching &
-// warp-anomaly frame effect.
-// Privately registered with Game (core/game.js); holds zero module-scoped
-// mutable state and exposes zero globals.
-// ============================================================
+// Bridge / Campaign / Endgame modals, oscilloscope waveform, theme switching
+// requests & warp-anomaly frame effect.
+// Privately registered with Game (core/game.js); holds zero state, mutates
+// nothing, and exposes zero globals (§3: pure-function child).
+//
+// ============================ CONTRACT ============================
+// DEPS (built once by Game, plain data + pure closures — never modules):
+//   deps.campaignLevels   plain copy of the campaign level specs
+//   deps.shipSpecs        plain copy of the ship spec table
+//   deps.flagDescriptions plain copy of the rules flag descriptions
+//   deps.getUnitAt(gx, gy)        -> unit DTO (plain copy) | null
+//   deps.terrainAt(gx, gy)        -> terrain string ("EMPTY"/"NEBULA"/…)
+//   deps.isSpotted(unit)          -> bool (spotted by the player)
+//   deps.cellVisible(gx, gy)      -> bool (visible to the player)
+//   deps.effectiveScan(unit)      -> number
+//   deps.validWarpCells(unit)     -> [{x, y}, …]
+//   deps.canShield(unit, pos)     -> bool
+//   deps.canCapture(unit, pos)    -> bool
+//   deps.canShoot(unit, pos)      -> bool
+//   deps.priorityAction(unit, gx, gy) -> "MOVE"/"CAPTURE"/"SHOOT"/"SHIELD"|null
+//   deps.renderedViewport()       -> {viewX, viewY, cellPx}
+//
+// INPUT (per call, plain data only):
+//   input.now       numeric timestamp (ms)
+//   input.state     read-only plain snapshot of the game state fields the HUD
+//                   may see: levelId, turnNumber, activeTeam, gameOver, ap,
+//                   credits {1,2}, theme (already resolved by Game), viewX,
+//                   viewY, viewSpan, mousePx {x,y}, hoveredCell {x,y}|null,
+//                   selectedCell {x,y}|null, inspectMode, audioMuted,
+//                   completedLevels [ids]
+//   input.metrics   {displaySize, uiScale, minimapSize, cellPx}
+//   input.units     plain copies of the living units
+//   input.selectedUnit  plain copy of the selected unit | null
+//   input.cache     {priorityKey, priorityLabel, hoveredSpotted} — the
+//                   priority-banner memo Game stores between calls
+//   input.radioActive  bool (oscilloscope only)
+//
+// RESULT SHAPE — every operation returns one plain object (fields appear
+// only when the operation produces them):
+//   {
+//     view:        the FULL next HUD view-model (Game replaces its stored
+//                  view with it). telemetry/banner/panelRects below are
+//                  named aliases into the same objects, kept for consumers:
+//     telemetry:   { hovered, selected }   (view.hoveredTelemetry/selectedTelemetry)
+//     banner:      priority banner         (view.priorityBanner)
+//     panelRects:  hit-test rects          (view.panelRects)
+//     buttons:     canvas button descriptors -> the canvasButtons state field
+//     theme:       requested theme key -> Game applies the theme state field,
+//                  the body data-theme attribute and the audio theme command
+//     selection:   { unitId } — request Game to select that unit;
+//                  { sync: true } — request Game to re-sync the selection mirror
+//     sounds:      [{ kind, payload }] sound commands -> Game routes them to
+//                  its audio producer
+//     cache:       updated priority-banner memo -> Game stores it
+//     flags:       { clearInteraction, warpAnomaly, renderRequests } —
+//                  clearInteraction: clear the button-hovered/button-pressed
+//                  state fields;
+//                  warpAnomaly: pulse the canvas warp-anomaly CSS class;
+//                  renderRequests: [overrides, …] frame publishes for Game/
+//                  main.js to run through the host render entry point
+//   }
+// Game applies every field; this child touches no state of its own.
+// =================================================================
 Game._registerModule("hud", (() => {
-  function createInitialHudStore() {
-    return {
-      scopeBuf: null,
-      cachedPriorityKey: "",
-      cachedPriorityLabel: null,
-      cachedHoveredSpotted: false,
-      hudState: {
-        levelTag: "SECTOR // INITIALIZING",
-        minimapLabel: "MINIMAP 32×32 · VIEW 32×32",
-        audioReady: false,
-        radioActive: false,
-        scopeWave: new Float32Array(64),
-        hoveredTelemetry: {
-          coordTag: "[-- , --]",
-          kind: "none",
-          isHostile: false,
-          title: "AWAITING SENSOR CURSOR...",
-          subtitle: "",
-          hp: 0,
-          maxHp: 0,
-          stats: "",
-          flags: [],
-          lines: []
-        },
-        selectedTelemetry: {
-          coordTag: "[-- , --]",
-          kind: "none",
-          title: "NO FRIENDLY VESSEL SELECTED",
-          subtitle: "Click any Blue Fleet vessel to inspect or issue orders.",
-          locusTag: "",
-          hp: 0,
-          maxHp: 0,
-          stats: "",
-          flags: []
-        },
-        priorityBanner: {
-          visible: false,
-          label: "",
-          x: 0,
-          y: 0,
-          hoveredSpotted: false
-        },
-        intelOverlay: {
-          visible: false,
-          title: "OPERATIONAL TURN REPORT",
-          lines: []
-        },
-        activeModal: null,
-        bridgeModal: {
-          locusText: "",
-          protocolText: "WARP PROTOCOL: Deployed vessels arrive exhausted (ready next turn).",
-          locusOk: false,
-          credits: 35,
-          cards: []
-        },
-        campaignModal: {
-          cards: [],
-          nodes: [],
-          layout: null
-        },
-        endgameModal: {
-          isVictory: true,
-          title: "SECTOR SECURED // VICTORY",
-          body: ""
-        },
-        panelRects: {
-          topBar: null,
-          minimap: null,
-          selectedCard: null,
-          hoveredCard: null,
-          intelOverlay: null
-        }
-      }
-    };
-  }
-
   function _estimateTelemetryCardHeight(model, inspectMode, US) {
     if (!model || model.kind === "none") return 0;
     const padY = Math.round(6 * US);
@@ -151,738 +133,883 @@ Game._registerModule("hud", (() => {
     return { mx, my, mw, mh, hdrH, closeBtn, nodes };
   }
 
-  function createHud(deps) {
-    const store = deps.hudStore;
-    const _hudState = store.hudState;
-    const State = deps.State;
-    const MathGrid = deps.MathGrid;
-    const Visibility = deps.Visibility;
-    const Actions = deps.Actions;
-    const Selection = deps.Selection;
-    const Rules = deps.Rules;
-    const Themes = deps.Themes;
-    const GameAudio = deps.GameAudio;
-    const getHost = deps.getHost;
-    const getCampaignLevels = deps.getCampaignLevels;
-    const getShipSpecs = deps.getShipSpecs;
-
-    function _getCanvas() {
-      const h = getHost();
-      return h ? h.getBattleCanvas() : null;
+  // ---- pure plumbing ------------------------------------------------------
+  // Deep copy of a HUD view-model / DTO (plain objects, arrays, Sets and
+  // typed arrays) so no live reference ever crosses back to Game's frame.
+  function _clone(v) {
+    if (v instanceof Set) return new Set(v);
+    if (ArrayBuffer.isView(v)) return v.slice();
+    if (Array.isArray(v)) return v.map(_clone);
+    if (v && typeof v === "object") {
+      const out = {};
+      const ks = Object.keys(v);
+      for (let i = 0; i < ks.length; i++) out[ks[i]] = _clone(v[ks[i]]);
+      return out;
     }
+    return v;
+  }
 
-    function _clearButtonInteraction() {
-      if (State.buttonHovered !== null) State.buttonHovered = null;
-      if (State.buttonPressed !== null) State.buttonPressed = null;
-    }
-
-    function _buildUnitTelemetryModel(unit, coordStr) {
-      const effScan = Visibility.getEffectiveScan(unit);
-      const inNebula = State.terrain[unit.x] && State.terrain[unit.x][unit.y] === "NEBULA";
-      const teamLabel = unit.team === 1 ? "BLUE FLEET [T1]" : "SYNDICATE [T2]";
-
-      let locusTag = "";
-      if (unit.team === 1 && unit.flags.has("#capital ship")) {
-        const openCells = Actions.getValidWarpCells(unit).length;
-        locusTag = `WARP LOCUS [R:6]: ${openCells} VACANT — [SPACE]`;
+  // Compose two results: b runs after a. b's view/buttons/theme/selection/
+  // cache win; sounds concat; flags OR (renderRequests lists concat).
+  function _compose(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    const fa = a.flags || {};
+    const fb = b.flags || {};
+    return {
+      view: b.view !== undefined ? b.view : a.view,
+      buttons: b.buttons !== undefined ? b.buttons : a.buttons,
+      theme: b.theme !== undefined ? b.theme : a.theme,
+      selection: b.selection !== undefined ? b.selection : a.selection,
+      cache: b.cache !== undefined ? b.cache : a.cache,
+      sounds: (a.sounds || []).concat(b.sounds || []),
+      flags: {
+        clearInteraction: Boolean(fa.clearInteraction || fb.clearInteraction),
+        warpAnomaly: Boolean(fa.warpAnomaly || fb.warpAnomaly),
+        renderRequests: (fa.renderRequests || []).concat(fb.renderRequests || [])
       }
+    };
+  }
 
-      const flagDescs = Rules.get ? Rules.get().flagDescriptions : Rules.flagDescriptions;
-      const flags = Array.from(unit.flags).filter(f => f !== "buyable").map(flag => {
-        let category = "abil";
-        if (flag.startsWith("!")) category = "crit";
-        else if (flag.startsWith("+")) category = "buff";
-        else if (flag.startsWith("-")) category = "exh";
-        return {
-          flag,
-          category,
-          desc: (flagDescs && flagDescs[flag]) || ""
-        };
-      });
+  // Add the documented named aliases (telemetry/banner/panelRects) that the
+  // result shape exposes alongside `view`.
+  function _finalize(r) {
+    if (r && r.view) {
+      r.telemetry = { hovered: r.view.hoveredTelemetry, selected: r.view.selectedTelemetry };
+      r.banner = r.view.priorityBanner;
+      r.panelRects = r.view.panelRects;
+    }
+    return r;
+  }
 
+  function _buildUnitTelemetryModel(deps, unit, coordStr) {
+    const effScan = deps.effectiveScan(unit);
+    const inNebula = deps.terrainAt(unit.x, unit.y) === "NEBULA";
+    const teamLabel = unit.team === 1 ? "BLUE FLEET [T1]" : "SYNDICATE [T2]";
+
+    let locusTag = "";
+    if (unit.team === 1 && unit.flags.has("#capital ship")) {
+      const openCells = deps.validWarpCells(unit).length;
+      locusTag = `WARP LOCUS [R:6]: ${openCells} VACANT — [SPACE]`;
+    }
+
+    const flagDescs = deps.flagDescriptions;
+    const flags = Array.from(unit.flags).filter(f => f !== "buyable").map(flag => {
+      let category = "abil";
+      if (flag.startsWith("!")) category = "crit";
+      else if (flag.startsWith("+")) category = "buff";
+      else if (flag.startsWith("-")) category = "exh";
       return {
-        coordTag: coordStr,
-        kind: "unit",
-        isHostile: unit.team === 2,
-        title: unit.type.toUpperCase(),
-        subtitle: `${teamLabel} // ${unit.cost} ⒸB`,
-        locusTag,
-        hp: unit.hp,
-        maxHp: unit.maxHp,
-        stats: `MOV:${unit.move}  SCN:${effScan}${inNebula ? "(N)" : ""}  FP:${unit.firepower}  RNG:${unit.range}`,
-        flags,
-        lines: []
+        flag,
+        category,
+        desc: (flagDescs && flagDescs[flag]) || ""
       };
-    }
+    });
 
-    function _buildTerrainTelemetryModel(gx, gy, coordStr) {
-      const isVis = Visibility.isCellVisibleToTeam(gx, gy, 1);
-      if (!isVis) {
-        return {
-          coordTag: coordStr,
-          kind: "terrain",
-          isHostile: false,
-          title: "UNSCANNED FOG OF WAR",
-          subtitle: "Outside friendly sensor envelope",
-          locusTag: "",
-          hp: 0,
-          maxHp: 0,
-          stats: "",
-          flags: [],
-          lines: ["Move a sensor vessel within scan range to unmask."]
-        };
-      }
-      const t = State.terrain[gx] ? State.terrain[gx][gy] : "EMPTY";
-      if (t === "ASTEROID") {
-        return {
-          coordTag: coordStr,
-          kind: "terrain",
-          isHostile: false,
-          title: "SOLID ASTEROID CLUSTER",
-          subtitle: "Impassable planetoid mass",
-          locusTag: "",
-          hp: 0,
-          maxHp: 0,
-          stats: "",
-          flags: [],
-          lines: ["Blocks helm movement and weapon fire rays."]
-        };
-      }
-      if (t === "NEBULA") {
-        return {
-          coordTag: coordStr,
-          kind: "terrain",
-          isHostile: false,
-          title: "PURPLE FOG NEBULA",
-          subtitle: "Ionized plasma cloud (effectiveScan = 1)",
-          locusTag: "",
-          hp: 0,
-          maxHp: 0,
-          stats: "",
-          flags: [],
-          lines: ["Cloaks occupant unless enemy is within d <= 1.0."]
-        };
-      }
+    return {
+      coordTag: coordStr,
+      kind: "unit",
+      isHostile: unit.team === 2,
+      title: unit.type.toUpperCase(),
+      subtitle: `${teamLabel} // ${unit.cost} ⒸB`,
+      locusTag,
+      hp: unit.hp,
+      maxHp: unit.maxHp,
+      stats: `MOV:${unit.move}  SCN:${effScan}${inNebula ? "(N)" : ""}  FP:${unit.firepower}  RNG:${unit.range}`,
+      flags,
+      lines: []
+    };
+  }
+
+  function _buildTerrainTelemetryModel(deps, gx, gy, coordStr) {
+    const isVis = deps.cellVisible(gx, gy);
+    if (!isVis) {
       return {
         coordTag: coordStr,
         kind: "terrain",
         isHostile: false,
-        title: "OPEN DEEP SPACE",
-        subtitle: "Clear sector vacuum",
+        title: "UNSCANNED FOG OF WAR",
+        subtitle: "Outside friendly sensor envelope",
         locusTag: "",
         hp: 0,
         maxHp: 0,
         stats: "",
         flags: [],
-        lines: ["Unobstructed movement, fire LOS, and sensors."]
+        lines: ["Move a sensor vessel within scan range to unmask."]
       };
     }
-
+    const t = deps.terrainAt(gx, gy);
+    if (t === "ASTEROID") {
+      return {
+        coordTag: coordStr,
+        kind: "terrain",
+        isHostile: false,
+        title: "SOLID ASTEROID CLUSTER",
+        subtitle: "Impassable planetoid mass",
+        locusTag: "",
+        hp: 0,
+        maxHp: 0,
+        stats: "",
+        flags: [],
+        lines: ["Blocks helm movement and weapon fire rays."]
+      };
+    }
+    if (t === "NEBULA") {
+      return {
+        coordTag: coordStr,
+        kind: "terrain",
+        isHostile: false,
+        title: "PURPLE FOG NEBULA",
+        subtitle: "Ionized plasma cloud (effectiveScan = 1)",
+        locusTag: "",
+        hp: 0,
+        maxHp: 0,
+        stats: "",
+        flags: [],
+        lines: ["Cloaks occupant unless enemy is within d <= 1.0."]
+      };
+    }
     return {
-      refreshMinimapLabel() {
-        const span = State.viewSpan;
-        _hudState.minimapLabel = `MINIMAP 32×32 · VIEW ${span}×${span}`;
+      coordTag: coordStr,
+      kind: "terrain",
+      isHostile: false,
+      title: "OPEN DEEP SPACE",
+      subtitle: "Clear sector vacuum",
+      locusTag: "",
+      hp: 0,
+      maxHp: 0,
+      stats: "",
+      flags: [],
+      lines: ["Unobstructed movement, fire LOS, and sensors."]
+    };
+  }
+
+  // ---- the game-owned HUD view-model (created and stored by Game) ---------
+  function createInitialView() {
+    return {
+      levelTag: "SECTOR // INITIALIZING",
+      minimapLabel: "MINIMAP 32×32 · VIEW 32×32",
+      audioReady: false,
+      radioActive: false,
+      scopeWave: new Float32Array(64),
+      hoveredTelemetry: {
+        coordTag: "[-- , --]",
+        kind: "none",
+        isHostile: false,
+        title: "AWAITING SENSOR CURSOR...",
+        subtitle: "",
+        hp: 0,
+        maxHp: 0,
+        stats: "",
+        flags: [],
+        lines: []
       },
-
-      isModalOpen() {
-        return _hudState.activeModal !== null;
+      selectedTelemetry: {
+        coordTag: "[-- , --]",
+        kind: "none",
+        title: "NO FRIENDLY VESSEL SELECTED",
+        subtitle: "Click any Blue Fleet vessel to inspect or issue orders.",
+        locusTag: "",
+        hp: 0,
+        maxHp: 0,
+        stats: "",
+        flags: []
       },
-
-      getActiveModal() {
-        return _hudState.activeModal;
+      priorityBanner: {
+        visible: false,
+        label: "",
+        x: 0,
+        y: 0,
+        hoveredSpotted: false
       },
-
-      isIntelVisible() {
-        return Boolean(_hudState.intelOverlay && _hudState.intelOverlay.visible && _hudState.activeModal === null);
+      intelOverlay: {
+        visible: false,
+        title: "OPERATIONAL TURN REPORT",
+        lines: []
       },
-
-      getPanelRects() {
-        return _hudState.panelRects;
+      activeModal: null,
+      bridgeModal: {
+        locusText: "",
+        protocolText: "WARP PROTOCOL: Deployed vessels arrive exhausted (ready next turn).",
+        locusOk: false,
+        credits: 35,
+        cards: []
       },
-
-      setMinimapLabel(lbl) {
-        _hudState.minimapLabel = String(lbl || "MINIMAP 32×32");
+      campaignModal: {
+        cards: [],
+        nodes: [],
+        layout: null
       },
-
-      setAudioReady(ready) {
-        _hudState.audioReady = Boolean(ready);
+      endgameModal: {
+        isVictory: true,
+        title: "SECTOR SECURED // VICTORY",
+        body: ""
       },
-
-      getSnapshot() {
-        return _hudState;
-      },
-
-      syncLayout() {
-        const host = getHost();
-        const DS = host ? host.getDisplaySize() : 768;
-        const US = (host && host.getUiScale) ? host.getUiScale() : 1;
-        const mmSize = (host && host.metrics && host.metrics.minimapSize) ? host.metrics.minimapSize : 120;
-
-        if (_hudState.activeModal === "bridge") {
-          const pad = Math.max(12, Math.round(18 * US));
-          const mx = pad, my = pad;
-          const mw = DS - pad * 2, mh = DS - pad * 2;
-          const hdrH = Math.round(48 * US);
-          const closeW = Math.max(88, Math.round(106 * US));
-          const closeH = Math.max(22, Math.round(26 * US));
-          const closeX = mx + mw - closeW - Math.round(10 * US);
-          const closeY = my + Math.round(11 * US);
-          const buttons = [
-            { id: "CLOSE_MODAL", label: "RESUME [SPC]", x: closeX, y: closeY, w: closeW, h: closeH, enabled: true, active: false }
-          ];
-          const cards = Array.isArray(_hudState.bridgeModal.cards) ? _hudState.bridgeModal.cards : [];
-          const cols = 3;
-          const rows = Math.ceil(Math.max(1, cards.length) / cols);
-          const gridPad = Math.round(10 * US);
-          const gap = Math.round(7 * US);
-          const gridX = mx + gridPad;
-          const gridY = my + hdrH + gridPad;
-          const gridW = mw - gridPad * 2;
-          const gridH = mh - hdrH - gridPad * 2;
-          const cardW = Math.floor((gridW - gap * (cols - 1)) / cols);
-          const cardH = Math.floor((gridH - gap * (rows - 1)) / rows);
-          for (let i = 0; i < cards.length; i++) {
-            const c = cards[i];
-            const col = i % cols;
-            const row = Math.floor(i / cols);
-            buttons.push({
-              id: "SHOP_BUY:" + c.shipName,
-              label: c.shipName,
-              x: gridX + col * (cardW + gap),
-              y: gridY + row * (cardH + gap),
-              w: cardW,
-              h: cardH,
-              enabled: c.affordable,
-              active: false
-            });
-          }
-          State.canvasButtons = buttons;
-          _hudState.panelRects = { topBar: null, minimap: null, selectedCard: null, hoveredCard: null, intelOverlay: null };
-          return;
-        }
-
-        if (_hudState.activeModal === "campaign") {
-          // Starmap: one clickable node per campaign level. Node geometry is
-          // computed by the shared _computeStarmapLayout so the hit regions
-          // stored here exactly match what uiRenderer draws (it reads the same
-          // nodes/layout from the HUD snapshot).
-          const cards = Array.isArray(_hudState.campaignModal.cards) ? _hudState.campaignModal.cards : [];
-          const layout = _computeStarmapLayout(cards, DS, US);
-          const buttons = [layout.closeBtn];
-          for (let i = 0; i < layout.nodes.length; i++) {
-            const node = layout.nodes[i];
-            const c = cards[i] || {};
-            buttons.push({
-              id: "LEVEL_SELECT:" + node.id,
-              label: c.title,
-              x: node.hitX,
-              y: node.hitY,
-              w: node.hitW,
-              h: node.hitH,
-              enabled: true,
-              active: c.isDone
-            });
-          }
-          State.canvasButtons = buttons;
-          _hudState.campaignModal.nodes = layout.nodes;
-          _hudState.campaignModal.layout = {
-            mx: layout.mx, my: layout.my, mw: layout.mw, mh: layout.mh,
-            hdrH: layout.hdrH, closeBtn: layout.closeBtn
-          };
-          _hudState.panelRects = { topBar: null, minimap: null, selectedCard: null, hoveredCard: null, intelOverlay: null };
-          return;
-        }
-
-        const mmPad = Math.max(8, Math.round(10 * US));
-        const mmRect = { x: mmPad, y: DS - mmSize - mmPad, w: mmSize, h: mmSize };
-
-        if (_hudState.activeModal === "endgame") {
-          const modal = _hudState.endgameModal;
-          const mw = Math.min(DS - Math.round(36 * US), Math.round(430 * US));
-          const mh = Math.round(172 * US);
-          const mx = Math.round((DS - mw) * 0.5);
-          const my = Math.round((DS - mh) * 0.5);
-          const btnW = Math.round(156 * US);
-          const btnH = Math.max(24, Math.round(28 * US));
-          const gap = Math.round(12 * US);
-          const b1X = Math.round(mx + (mw - (btnW * 2 + gap)) * 0.5);
-          const b2X = b1X + btnW + gap;
-          const btnY = my + mh - btnH - Math.round(16 * US);
-          State.canvasButtons = [
-            { id: "ENDGAME_RETRY", label: "REDEPLOY SECTOR", x: b1X, y: btnY, w: btnW, h: btnH, enabled: true, active: !modal.isVictory },
-            { id: "ENDGAME_MAP",   label: "SECTOR MAP",      x: b2X, y: btnY, w: btnW, h: btnH, enabled: true, active: Boolean(modal.isVictory) }
-          ];
-          _hudState.panelRects = { topBar: null, minimap: mmRect, selectedCard: null, hoveredCard: null, intelOverlay: null };
-          return;
-        }
-
-        const selUnit = Selection.getUnit();
-        const isPlayerTurn = State.activeTeam === 1 && !State.gameOver;
-        const isCapitalSelected = Boolean(selUnit && selUnit.team === 1 && selUnit.flags.has("#capital ship"));
-        const canShieldSelected = Boolean(
-          isPlayerTurn &&
-          selUnit &&
-          selUnit.team === 1 &&
-          State.ap > 0 &&
-          Actions.canShield(selUnit, { x: selUnit.x, y: selUnit.y })
-        );
-        const audioMuted = Boolean(State.audioSettings && State.audioSettings.muted);
-        const audioReady = Boolean(_hudState.audioReady);
-        const audioLabel = !audioReady ? "AUD:OFF" : (audioMuted ? "AUD:MUTE" : "AUD:ON");
-        const themeLabel = String(State.theme || "default").toUpperCase();
-
-        const btnH = Math.max(22, Math.round(25 * US));
-        const gap = Math.max(5, Math.round(6 * US));
-        const padRight = Math.max(8, Math.round(10 * US));
-        const topY = Math.max(8, Math.round(10 * US));
-        const botY = DS - btnH - Math.max(8, Math.round(10 * US));
-
-        const topDefs = [
-          { id: "BRIDGE", label: "[SPC] BRIDGE",      w: Math.round(108 * US), enabled: isPlayerTurn, active: isCapitalSelected },
-          { id: "MAP",    label: "SECTOR MAP",        w: Math.round(94 * US),  enabled: true,         active: false },
-          { id: "THEME",  label: `THM:${themeLabel}`, w: Math.round(96 * US),  enabled: true,         active: false },
-          { id: "AUDIO",  label: audioLabel,          w: Math.round(80 * US),  enabled: true,         active: audioReady && !audioMuted }
-        ];
-
-        const botDefs = [
-          { id: "SHIELD",   label: "REGEN SHIELD", w: Math.round(108 * US), enabled: canShieldSelected, active: canShieldSelected },
-          { id: "END_TURN", label: "END TURN >>",  w: Math.round(98 * US),  enabled: isPlayerTurn,      active: false }
-        ];
-
-        const layout = [];
-        let curRight = DS - padRight;
-        for (let i = topDefs.length - 1; i >= 0; i--) {
-          const d = topDefs[i];
-          const w = Math.max(58, d.w);
-          const x = curRight - w;
-          layout.unshift({ id: d.id, label: d.label, x, y: topY, w, h: btnH, enabled: d.enabled, active: d.active });
-          curRight = x - gap;
-        }
-        const topButtonsLeftEdge = layout.length > 0 ? layout[0].x : (DS - padRight);
-
-        let botRight = DS - padRight;
-        for (let i = botDefs.length - 1; i >= 0; i--) {
-          const d = botDefs[i];
-          const w = Math.max(66, d.w);
-          const x = botRight - w;
-          layout.push({ id: d.id, label: d.label, x, y: botY, w, h: btnH, enabled: d.enabled, active: d.active });
-          botRight = x - gap;
-        }
-        State.canvasButtons = layout;
-
-        const pad = Math.max(8, Math.round(10 * US));
-        const leftAvailW = Math.max(160, topButtonsLeftEdge - Math.round(18 * US));
-        const barW = Math.max(180, Math.min(Math.round(334 * US), leftAvailW));
-        const barH = Math.max(44, Math.round(50 * US));
-        const topBarRect = { x: pad, y: pad, w: barW, h: barH };
-
-        const cardW = Math.min(Math.round(308 * US), Math.max(190, DS - (mmRect.x + mmRect.w) - Math.round(24 * US)));
-        const cardX = DS - padRight - cardW;
-        let nextCardBottom = botY - Math.round(7 * US);
-        let selRect = null;
-        let hovRect = null;
-
-        if (_hudState.selectedTelemetry && _hudState.selectedTelemetry.kind === "unit") {
-          const sh = (_hudState.panelRects.selectedCard && _hudState.panelRects.selectedCard.h)
-            ? _hudState.panelRects.selectedCard.h
-            : _estimateTelemetryCardHeight(_hudState.selectedTelemetry, State.inspectMode, US);
-          const sy = Math.max(Math.round(8 * US), nextCardBottom - sh);
-          selRect = { x: cardX, y: sy, w: cardW, h: sh };
-          nextCardBottom = sy - Math.round(6 * US);
-        }
-
-        const hoverSameAsSelected = Boolean(
-          selRect &&
-          State.selectedCell &&
-          State.hoveredCell &&
-          State.hoveredCell.x === State.selectedCell.x &&
-          State.hoveredCell.y === State.selectedCell.y
-        );
-        if (State.hoveredCell && !hoverSameAsSelected && _hudState.hoveredTelemetry && _hudState.hoveredTelemetry.kind !== "none") {
-          const hh = (_hudState.panelRects.hoveredCard && _hudState.panelRects.hoveredCard.h)
-            ? _hudState.panelRects.hoveredCard.h
-            : _estimateTelemetryCardHeight(_hudState.hoveredTelemetry, State.inspectMode, US);
-          const hy = Math.max(Math.round(8 * US), nextCardBottom - hh);
-          hovRect = { x: cardX, y: hy, w: cardW, h: hh };
-        }
-
-        let intelRect = null;
-        if (_hudState.intelOverlay && _hudState.intelOverlay.visible) {
-          const ix = pad;
-          const iy = topBarRect.y + topBarRect.h + Math.round(8 * US);
-          const iw = Math.min(DS - pad * 2, Math.round(410 * US));
-          const linesCount = Math.max(1, Array.isArray(_hudState.intelOverlay.lines) ? _hudState.intelOverlay.lines.length * 2 : 2);
-          const ih = (_hudState.panelRects.intelOverlay && _hudState.panelRects.intelOverlay.h)
-            ? _hudState.panelRects.intelOverlay.h
-            : (Math.round(38 * US) + linesCount * Math.max(11, Math.round(12 * US)));
-          intelRect = { x: ix, y: iy, w: iw, h: ih };
-        }
-
-        _hudState.panelRects = {
-          topBar: topBarRect,
-          minimap: mmRect,
-          selectedCard: selRect,
-          hoveredCard: hovRect,
-          intelOverlay: intelRect
-        };
-      },
-
-      updateLeftWing() {
-        const levels = getCampaignLevels();
-        const spec = levels.find(l => l.id === State.levelId) || levels[0];
-        _hudState.levelTag = spec.tag;
-      },
-
-      updateRightWing() {
-        if (!State.hoveredCell) {
-          _hudState.hoveredTelemetry = {
-            coordTag: "[-- , --]",
-            kind: "none",
-            isHostile: false,
-            title: "AWAITING SENSOR CURSOR...",
-            subtitle: "",
-            hp: 0,
-            maxHp: 0,
-            stats: "",
-            flags: [],
-            lines: []
-          };
-        } else {
-          const { x, y } = State.hoveredCell;
-          const coordStr = `[${String(x).padStart(2, "0")} , ${String(y).padStart(2, "0")}]`;
-          const unit = MathGrid.getUnitAt(x, y);
-          const spotted = unit && Visibility.isUnitSpottedByTeam(unit, 1);
-          if (spotted) {
-            _hudState.hoveredTelemetry = _buildUnitTelemetryModel(unit, coordStr);
-          } else {
-            _hudState.hoveredTelemetry = _buildTerrainTelemetryModel(x, y, coordStr);
-          }
-        }
-
-        const selUnit = Selection.getUnit();
-        if (!selUnit || selUnit.team !== 1) {
-          _hudState.selectedTelemetry = {
-            coordTag: "[-- , --]",
-            kind: "none",
-            title: "NO FRIENDLY VESSEL SELECTED",
-            subtitle: "Click any Blue Fleet vessel to inspect or issue orders.",
-            locusTag: "",
-            hp: 0,
-            maxHp: 0,
-            stats: "",
-            flags: []
-          };
-        } else {
-          const coordStr = `[${String(selUnit.x).padStart(2, "0")} , ${String(selUnit.y).padStart(2, "0")}]`;
-          _hudState.selectedTelemetry = _buildUnitTelemetryModel(selUnit, coordStr);
-        }
-        this.syncLayout();
-      },
-
-      updatePriorityBanner(recomputeAction = true) {
-        if (_hudState.activeModal !== null || State.activeTeam !== 1 || !State.hoveredCell) {
-          _hudState.priorityBanner.visible = false;
-          _hudState.priorityBanner.hoveredSpotted = false;
-          store.cachedPriorityKey = "";
-          store.cachedPriorityLabel = null;
-          store.cachedHoveredSpotted = false;
-          return;
-        }
-
-        const { x, y } = State.hoveredCell;
-        const selUnit = Selection.getUnit();
-        const key = `${State.activeTeam}|${selUnit ? selUnit.id : -1}|${selUnit ? selUnit.x : -1},${selUnit ? selUnit.y : -1}|${x},${y}|${State.ap}`;
-
-        if (recomputeAction || key !== store.cachedPriorityKey) {
-          store.cachedPriorityKey = key;
-          const hoveredUnit = MathGrid.getUnitAt(x, y);
-          const hoveredSpotted = Boolean(hoveredUnit && Visibility.isUnitSpottedByTeam(hoveredUnit, 1));
-          store.cachedHoveredSpotted = hoveredSpotted;
-
-          let label = null;
-          if (selUnit && selUnit.team === 1) {
-            const B = { x, y };
-            const bothCapAndShoot = Actions.canCapture(selUnit, B) && Actions.canShoot(selUnit, B);
-            if (bothCapAndShoot) {
-              const vp = MathGrid.getRenderedViewport();
-              const lx = (State.mousePx.x / vp.cellPx + vp.viewX) - x;
-              const ly = (State.mousePx.y / vp.cellPx + vp.viewY) - y;
-              if (lx >= 0 && lx <= 0.45 && ly >= 0 && ly <= 0.45) {
-                label = "PRIORITY 2: MARINE BOARDING [1 AP] (HULL: FIRE)";
-              } else {
-                label = "PRIORITY 3: ENGAGE WEAPONS [1 AP] ('C'/SHIFT: BOARD)";
-              }
-            } else {
-              const act = Actions.getPriorityActionAt(selUnit, x, y);
-              if (act === "MOVE") label = "PRIORITY 1: HELM MOVE [1 AP]";
-              else if (act === "CAPTURE") label = "PRIORITY 2: MARINE BOARDING [1 AP]";
-              else if (act === "SHOOT") label = "PRIORITY 3: ENGAGE WEAPONS [1 AP]";
-              else if (act === "SHIELD") label = "PRIORITY 4: REGEN SHIELD [1 AP]";
-            }
-          }
-
-          if (!label && hoveredSpotted && hoveredUnit.team === 1 && (!selUnit || selUnit.id !== hoveredUnit.id)) {
-            label = `SELECT ${hoveredUnit.type.toUpperCase()}`;
-          }
-          store.cachedPriorityLabel = label;
-        }
-
-        _hudState.priorityBanner.hoveredSpotted = store.cachedHoveredSpotted;
-        if (store.cachedPriorityLabel) {
-          const host = getHost();
-          const DS = host ? host.getDisplaySize() : 768;
-          const US = (host && host.getUiScale) ? host.getUiScale() : 1;
-          const cp = host ? host.getCellPx() : (DS / State.viewSpan);
-          const mx = (State.mousePx.x > 0 || State.mousePx.y > 0) ? State.mousePx.x : ((x - State.viewX + 0.5) * cp);
-          const my = (State.mousePx.x > 0 || State.mousePx.y > 0) ? State.mousePx.y : ((y - State.viewY + 0.5) * cp);
-          _hudState.priorityBanner.visible = true;
-          _hudState.priorityBanner.label = store.cachedPriorityLabel;
-          _hudState.priorityBanner.x = Math.min(DS - 210 * US, mx + 16 * US);
-          _hudState.priorityBanner.y = Math.max(64 * US, my - 24 * US);
-        } else {
-          _hudState.priorityBanner.visible = false;
-        }
-      },
-
-      showIntelOverlay(title, lines) {
-        _hudState.intelOverlay.visible = true;
-        _hudState.intelOverlay.title = String(title || "OPERATIONAL TURN REPORT");
-        _hudState.intelOverlay.lines = Array.isArray(lines) ? lines.slice() : [];
-        if (_hudState.activeModal === "endgame" && !State.gameOver) {
-          _hudState.activeModal = null;
-        }
-        this.syncLayout();
-      },
-
-      hideIntelOverlay() {
-        if (_hudState.intelOverlay.visible) {
-          _hudState.intelOverlay.visible = false;
-          if (_hudState.panelRects) _hudState.panelRects.intelOverlay = null;
-          this.syncLayout();
-        }
-      },
-
-      toggleBridgeModal(forceState = null) {
-        if (_hudState.activeModal !== null && _hudState.activeModal !== "bridge") {
-          if (forceState === false) return;
-          return;
-        }
-        const isOpen = _hudState.activeModal === "bridge";
-        const nextState = forceState !== null ? Boolean(forceState) : !isOpen;
-
-        if (nextState) {
-          if (State.activeTeam !== 1 || State.gameOver) { GameAudio.play("ui.invalid"); return; }
-          const curSel = Selection.getUnit();
-          if (!curSel || curSel.team !== 1 || !curSel.flags.has("#capital ship")) {
-            const autoCap = State.units.find(u => u.hp > 0 && u.team === 1 && u.flags.has("!flagship") && u.flags.has("#capital ship"))
-              || State.units.find(u => u.hp > 0 && u.team === 1 && u.flags.has("#capital ship"));
-            if (autoCap) {
-              Selection.select(autoCap);
-              this.updateRightWing();
-            }
-          }
-          GameAudio.play("ui.modal.open");
-          _clearButtonInteraction();
-          _hudState.activeModal = "bridge";
-          this.renderBridgeShop();
-        } else if (isOpen) {
-          GameAudio.play("ui.modal.close");
-          _clearButtonInteraction();
-          _hudState.activeModal = null;
-          this.syncLayout();
-        }
-      },
-
-      renderBridgeShop(silent = false) {
-        const selUnit = Selection.getUnit();
-        const isCapitalSelected = Boolean(selUnit && selUnit.team === 1 && selUnit.flags.has("#capital ship"));
-        const validCells = isCapitalSelected ? Actions.getValidWarpCells(selUnit) : [];
-        const canDeployLocus = isCapitalSelected && validCells.length > 0 && State.ap > 0;
-
-        _hudState.bridgeModal.credits = State.credits[1];
-        _hudState.bridgeModal.locusOk = canDeployLocus;
-
-        if (!isCapitalSelected) {
-          _hudState.bridgeModal.locusText = "LOCUS OFFLINE: Select a friendly #capital ship on the board first to warp reinforcements!";
-        } else if (validCells.length === 0) {
-          _hudState.bridgeModal.locusText = `LOCUS OBSTRUCTED: ${selUnit.type} at [${selUnit.x},${selUnit.y}] has 0 vacant R:6 cells!`;
-        } else {
-          _hudState.bridgeModal.locusText = `ACTIVE LOCUS: ${selUnit.type.toUpperCase()} AT [${selUnit.x},${selUnit.y}] (${validCells.length} VACANT R:6 CELLS READY)`;
-        }
-
-        const shipSpecs = getShipSpecs();
-        const cards = [];
-        Object.entries(shipSpecs).forEach(([shipName, spec]) => {
-          if (!spec.flags.includes("buyable")) return;
-          const priceOk = Boolean(State.credits[1] >= spec.cost);
-          const affordable = Boolean(canDeployLocus && priceOk);
-          cards.push({
-            shipName,
-            cost: spec.cost,
-            flagsText: spec.flags.filter(f => f !== "buyable").join(" ") || "STANDARD",
-            hp: spec.hp,
-            move: spec.move,
-            fp: spec.firepower,
-            range: spec.range,
-            scan: spec.scan,
-            priceOk,
-            affordable,
-            dummyUnit: { type: shipName, team: 1, hp: spec.hp, maxHp: spec.hp, flags: new Set(spec.flags) }
-          });
-        });
-        _hudState.bridgeModal.cards = cards;
-        this.syncLayout();
-
-        const host = getHost();
-        if (!silent && host) {
-          host.requestRender({ skipBoard: false });
-        }
-      },
-
-      toggleCampaignModal(forceState = null) {
-        const isOpen = _hudState.activeModal === "campaign";
-        const nextState = forceState !== null ? Boolean(forceState) : !isOpen;
-
-        if (nextState) {
-          GameAudio.play("ui.modal.open");
-          _clearButtonInteraction();
-          _hudState.activeModal = "campaign";
-          this.renderCampaignCards();
-        } else if (isOpen) {
-          GameAudio.play("ui.modal.close");
-          _clearButtonInteraction();
-          _hudState.activeModal = State.gameOver ? "endgame" : null;
-          this.syncLayout();
-        }
-      },
-
-      renderCampaignCards(silent = false) {
-        const levels = getCampaignLevels();
-        const shipSpecs = getShipSpecs();
-        const cards = levels.map(lvl => {
-          const isDone = State.completedLevels.has(lvl.id);
-          const previewUnits = (lvl.previewArchetypes || []).slice(0, 4).map(archName => {
-            const spec = shipSpecs[archName];
-            if (!spec) return null;
-            return { type: archName, team: 2, hp: spec.hp, maxHp: spec.hp, flags: new Set(spec.flags) };
-          }).filter(Boolean);
-          return {
-            id: lvl.id,
-            tag: lvl.tag,
-            title: lvl.title,
-            desc: lvl.desc,
-            creditsText: `T1: ${lvl.t1StartingCredits} ⒸB (+${lvl.t1Income}/turn) // DOCTRINE: ${lvl.aiDoctrine}`,
-            isDone,
-            isNext: false,
-            previewUnits
-          };
-        });
-        // Mark the first not-yet-completed sector (in campaign order) as the
-        // "next available" node for distinct starmap styling. Purely visual —
-        // every node stays selectable, matching the old level-select screen.
-        const nextIdx = cards.findIndex(c => !c.isDone);
-        if (nextIdx >= 0) cards[nextIdx].isNext = true;
-        _hudState.campaignModal.cards = cards;
-        this.syncLayout();
-        const host = getHost();
-        if (!silent && host) {
-          host.requestRender({ skipBoard: false });
-        }
-      },
-
-      showEndgameModal(isVictory) {
-        _clearButtonInteraction();
-        _hudState.endgameModal.isVictory = Boolean(isVictory);
-        if (isVictory) {
-          _hudState.endgameModal.title = "SECTOR SECURED // !FLAGSHIP ELIMINATED";
-          _hudState.endgameModal.body = `All hostile Syndicate !flagship command vessels in Sector ${State.levelId} have been destroyed in ${State.turnNumber} turns.`;
-        } else {
-          _hudState.endgameModal.title = "CRITICAL DEFEAT // !FLAGSHIP LOST";
-          _hudState.endgameModal.body = "All friendly !flagship command vessels have been destroyed. Command locus severed.";
-        }
-        _hudState.activeModal = "endgame";
-        this.syncLayout();
-      },
-
-      hideEndgameModal() {
-        if (_hudState.activeModal === "endgame") {
-          _clearButtonInteraction();
-          _hudState.activeModal = null;
-          this.syncLayout();
-        }
-      },
-
-      sampleOscilloscope(now) {
-        const analyser = GameAudio.getAnalyser();
-        const radioUntil = GameAudio.getRadioActiveUntil();
-        const radioActive = now < (radioUntil || 0);
-        _hudState.radioActive = radioActive;
-        const wave = _hudState.scopeWave;
-        const n = wave.length;
-
-        if (analyser && !store.scopeBuf) store.scopeBuf = new Uint8Array(analyser.fftSize);
-        if (analyser && store.scopeBuf) {
-          analyser.getByteTimeDomainData(store.scopeBuf);
-          const step = Math.max(1, Math.floor(store.scopeBuf.length / n));
-          for (let i = 0; i < n; i++) {
-            const idx = Math.min(store.scopeBuf.length - 1, i * step);
-            wave[i] = (store.scopeBuf[idx] - 128) / 128;
-          }
-        } else {
-          const freq = radioActive ? 0.35 : 0.12;
-          const amp = radioActive ? 0.78 : 0.14;
-          for (let i = 0; i < n; i++) {
-            wave[i] = Math.sin(i * freq + now * 0.012) * amp * Math.sin(now * 0.003 + i * 0.06);
-          }
-        }
-      },
-
-      setTheme(theme) {
-        const key = Themes.setActive(theme);
-        State.theme = key;
-        if (typeof document !== "undefined" && document.body) {
-          document.body.setAttribute("data-theme", key);
-        }
-        GameAudio.setTheme(key);
-        this.updateAll();
-        if (_hudState.activeModal === "bridge") {
-          this.renderBridgeShop();
-        } else if (_hudState.activeModal === "campaign") {
-          this.renderCampaignCards();
-        }
-        const host = getHost();
-        if (host) {
-          host.requestRender({ now: performance.now(), theme: key });
-        }
-        return key;
-      },
-
-      getTheme() {
-        return State.theme || "default";
-      },
-
-      triggerWarpAnomaly() {
-        const canvas = _getCanvas();
-        if (!canvas) return;
-        canvas.classList.add("warp-anomaly");
-        setTimeout(() => canvas.classList.remove("warp-anomaly"), 300);
-      },
-
-      updateAll() {
-        Selection.sync();
-        this.updateLeftWing();
-        this.updateRightWing();
-        this.updatePriorityBanner(true);
-        if (_hudState.activeModal === "bridge") {
-          this.renderBridgeShop(true);
-        }
-        this.syncLayout();
+      panelRects: {
+        topBar: null,
+        minimap: null,
+        selectedCard: null,
+        hoveredCard: null,
+        intelOverlay: null
       }
     };
   }
 
+  function createHud(deps) {
+
+    // ---- internal ops: (view, input) -> result (see RESULT SHAPE) ----------
+    function _syncLayout(view, input) {
+      const w = _clone(view);
+      const DS = input.metrics.displaySize;
+      const US = input.metrics.uiScale;
+      const mmSize = input.metrics.minimapSize;
+
+      if (w.activeModal === "bridge") {
+        const pad = Math.max(12, Math.round(18 * US));
+        const mx = pad, my = pad;
+        const mw = DS - pad * 2, mh = DS - pad * 2;
+        const hdrH = Math.round(48 * US);
+        const closeW = Math.max(88, Math.round(106 * US));
+        const closeH = Math.max(22, Math.round(26 * US));
+        const closeX = mx + mw - closeW - Math.round(10 * US);
+        const closeY = my + Math.round(11 * US);
+        const buttons = [
+          { id: "CLOSE_MODAL", label: "RESUME [SPC]", x: closeX, y: closeY, w: closeW, h: closeH, enabled: true, active: false }
+        ];
+        const cards = Array.isArray(w.bridgeModal.cards) ? w.bridgeModal.cards : [];
+        const cols = 3;
+        const rows = Math.ceil(Math.max(1, cards.length) / cols);
+        const gridPad = Math.round(10 * US);
+        const gap = Math.round(7 * US);
+        const gridX = mx + gridPad;
+        const gridY = my + hdrH + gridPad;
+        const gridW = mw - gridPad * 2;
+        const gridH = mh - hdrH - gridPad * 2;
+        const cardW = Math.floor((gridW - gap * (cols - 1)) / cols);
+        const cardH = Math.floor((gridH - gap * (rows - 1)) / rows);
+        for (let i = 0; i < cards.length; i++) {
+          const c = cards[i];
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          buttons.push({
+            id: "SHOP_BUY:" + c.shipName,
+            label: c.shipName,
+            x: gridX + col * (cardW + gap),
+            y: gridY + row * (cardH + gap),
+            w: cardW,
+            h: cardH,
+            enabled: c.affordable,
+            active: false
+          });
+        }
+        w.panelRects = { topBar: null, minimap: null, selectedCard: null, hoveredCard: null, intelOverlay: null };
+        return { view: w, buttons };
+      }
+
+      if (w.activeModal === "campaign") {
+        // Starmap: one clickable node per campaign level. Node geometry is
+        // computed by the shared _computeStarmapLayout so the hit regions
+        // stored here exactly match what uiRenderer draws (it reads the same
+        // nodes/layout from the HUD snapshot).
+        const cards = Array.isArray(w.campaignModal.cards) ? w.campaignModal.cards : [];
+        const layout = _computeStarmapLayout(cards, DS, US);
+        const buttons = [layout.closeBtn];
+        for (let i = 0; i < layout.nodes.length; i++) {
+          const node = layout.nodes[i];
+          const c = cards[i] || {};
+          buttons.push({
+            id: "LEVEL_SELECT:" + node.id,
+            label: c.title,
+            x: node.hitX,
+            y: node.hitY,
+            w: node.hitW,
+            h: node.hitH,
+            enabled: true,
+            active: c.isDone
+          });
+        }
+        w.campaignModal.nodes = layout.nodes;
+        w.campaignModal.layout = {
+          mx: layout.mx, my: layout.my, mw: layout.mw, mh: layout.mh,
+          hdrH: layout.hdrH, closeBtn: layout.closeBtn
+        };
+        w.panelRects = { topBar: null, minimap: null, selectedCard: null, hoveredCard: null, intelOverlay: null };
+        return { view: w, buttons };
+      }
+
+      const mmPad = Math.max(8, Math.round(10 * US));
+      const mmRect = { x: mmPad, y: DS - mmSize - mmPad, w: mmSize, h: mmSize };
+
+      if (w.activeModal === "endgame") {
+        const modal = w.endgameModal;
+        const mw = Math.min(DS - Math.round(36 * US), Math.round(430 * US));
+        const mh = Math.round(172 * US);
+        const mx = Math.round((DS - mw) * 0.5);
+        const my = Math.round((DS - mh) * 0.5);
+        const btnW = Math.round(156 * US);
+        const btnH = Math.max(24, Math.round(28 * US));
+        const gap = Math.round(12 * US);
+        const b1X = Math.round(mx + (mw - (btnW * 2 + gap)) * 0.5);
+        const b2X = b1X + btnW + gap;
+        const btnY = my + mh - btnH - Math.round(16 * US);
+        const buttons = [
+          { id: "ENDGAME_RETRY", label: "REDEPLOY SECTOR", x: b1X, y: btnY, w: btnW, h: btnH, enabled: true, active: !modal.isVictory },
+          { id: "ENDGAME_MAP",   label: "SECTOR MAP",      x: b2X, y: btnY, w: btnW, h: btnH, enabled: true, active: Boolean(modal.isVictory) }
+        ];
+        w.panelRects = { topBar: null, minimap: mmRect, selectedCard: null, hoveredCard: null, intelOverlay: null };
+        return { view: w, buttons };
+      }
+
+      const selUnit = input.selectedUnit;
+      const isPlayerTurn = input.state.activeTeam === 1 && !input.state.gameOver;
+      const isCapitalSelected = Boolean(selUnit && selUnit.team === 1 && selUnit.flags.has("#capital ship"));
+      const canShieldSelected = Boolean(
+        isPlayerTurn &&
+        selUnit &&
+        selUnit.team === 1 &&
+        input.state.ap > 0 &&
+        deps.canShield(selUnit, { x: selUnit.x, y: selUnit.y })
+      );
+      const audioMuted = Boolean(input.state.audioMuted);
+      const audioReady = Boolean(w.audioReady);
+      const audioLabel = !audioReady ? "AUD:OFF" : (audioMuted ? "AUD:MUTE" : "AUD:ON");
+      const themeLabel = String(input.state.theme || "default").toUpperCase();
+
+      const btnH = Math.max(22, Math.round(25 * US));
+      const gap = Math.max(5, Math.round(6 * US));
+      const padRight = Math.max(8, Math.round(10 * US));
+      const topY = Math.max(8, Math.round(10 * US));
+      const botY = DS - btnH - Math.max(8, Math.round(10 * US));
+
+      const topDefs = [
+        { id: "BRIDGE", label: "[SPC] BRIDGE",      w: Math.round(108 * US), enabled: isPlayerTurn, active: isCapitalSelected },
+        { id: "MAP",    label: "SECTOR MAP",        w: Math.round(94 * US),  enabled: true,         active: false },
+        { id: "THEME",  label: `THM:${themeLabel}`, w: Math.round(96 * US),  enabled: true,         active: false },
+        { id: "AUDIO",  label: audioLabel,          w: Math.round(80 * US),  enabled: true,         active: audioReady && !audioMuted }
+      ];
+
+      const botDefs = [
+        { id: "SHIELD",   label: "REGEN SHIELD", w: Math.round(108 * US), enabled: canShieldSelected, active: canShieldSelected },
+        { id: "END_TURN", label: "END TURN >>",  w: Math.round(98 * US),  enabled: isPlayerTurn,      active: false }
+      ];
+
+      const layout = [];
+      let curRight = DS - padRight;
+      for (let i = topDefs.length - 1; i >= 0; i--) {
+        const d = topDefs[i];
+        const bw = Math.max(58, d.w);
+        const x = curRight - bw;
+        layout.unshift({ id: d.id, label: d.label, x, y: topY, w: bw, h: btnH, enabled: d.enabled, active: d.active });
+        curRight = x - gap;
+      }
+      const topButtonsLeftEdge = layout.length > 0 ? layout[0].x : (DS - padRight);
+
+      let botRight = DS - padRight;
+      for (let i = botDefs.length - 1; i >= 0; i--) {
+        const d = botDefs[i];
+        const bw = Math.max(66, d.w);
+        const x = botRight - bw;
+        layout.push({ id: d.id, label: d.label, x, y: botY, w: bw, h: btnH, enabled: d.enabled, active: d.active });
+        botRight = x - gap;
+      }
+      const buttons = layout;
+
+      const pad = Math.max(8, Math.round(10 * US));
+      const leftAvailW = Math.max(160, topButtonsLeftEdge - Math.round(18 * US));
+      const barW = Math.max(180, Math.min(Math.round(334 * US), leftAvailW));
+      const barH = Math.max(44, Math.round(50 * US));
+      const topBarRect = { x: pad, y: pad, w: barW, h: barH };
+
+      const cardW = Math.min(Math.round(308 * US), Math.max(190, DS - (mmRect.x + mmRect.w) - Math.round(24 * US)));
+      const cardX = DS - padRight - cardW;
+      let nextCardBottom = botY - Math.round(7 * US);
+      let selRect = null;
+      let hovRect = null;
+
+      if (w.selectedTelemetry && w.selectedTelemetry.kind === "unit") {
+        const sh = (w.panelRects.selectedCard && w.panelRects.selectedCard.h)
+          ? w.panelRects.selectedCard.h
+          : _estimateTelemetryCardHeight(w.selectedTelemetry, input.state.inspectMode, US);
+        const sy = Math.max(Math.round(8 * US), nextCardBottom - sh);
+        selRect = { x: cardX, y: sy, w: cardW, h: sh };
+        nextCardBottom = sy - Math.round(6 * US);
+      }
+
+      const hoverSameAsSelected = Boolean(
+        selRect &&
+        input.state.selectedCell &&
+        input.state.hoveredCell &&
+        input.state.hoveredCell.x === input.state.selectedCell.x &&
+        input.state.hoveredCell.y === input.state.selectedCell.y
+      );
+      if (input.state.hoveredCell && !hoverSameAsSelected && w.hoveredTelemetry && w.hoveredTelemetry.kind !== "none") {
+        const hh = (w.panelRects.hoveredCard && w.panelRects.hoveredCard.h)
+          ? w.panelRects.hoveredCard.h
+          : _estimateTelemetryCardHeight(w.hoveredTelemetry, input.state.inspectMode, US);
+        const hy = Math.max(Math.round(8 * US), nextCardBottom - hh);
+        hovRect = { x: cardX, y: hy, w: cardW, h: hh };
+      }
+
+      let intelRect = null;
+      if (w.intelOverlay && w.intelOverlay.visible) {
+        const ix = pad;
+        const iy = topBarRect.y + topBarRect.h + Math.round(8 * US);
+        const iw = Math.min(DS - pad * 2, Math.round(410 * US));
+        const linesCount = Math.max(1, Array.isArray(w.intelOverlay.lines) ? w.intelOverlay.lines.length * 2 : 2);
+        const ih = (w.panelRects.intelOverlay && w.panelRects.intelOverlay.h)
+          ? w.panelRects.intelOverlay.h
+          : (Math.round(38 * US) + linesCount * Math.max(11, Math.round(12 * US)));
+        intelRect = { x: ix, y: iy, w: iw, h: ih };
+      }
+
+      w.panelRects = {
+        topBar: topBarRect,
+        minimap: mmRect,
+        selectedCard: selRect,
+        hoveredCard: hovRect,
+        intelOverlay: intelRect
+      };
+      return { view: w, buttons };
+    }
+
+    function _updateLeftWing(view, input) {
+      const w = _clone(view);
+      const levels = deps.campaignLevels;
+      const spec = levels.find(l => l.id === input.state.levelId) || levels[0];
+      w.levelTag = spec.tag;
+      return { view: w };
+    }
+
+    function _updateRightWing(view, input) {
+      const w = _clone(view);
+      if (!input.state.hoveredCell) {
+        w.hoveredTelemetry = {
+          coordTag: "[-- , --]",
+          kind: "none",
+          isHostile: false,
+          title: "AWAITING SENSOR CURSOR...",
+          subtitle: "",
+          hp: 0,
+          maxHp: 0,
+          stats: "",
+          flags: [],
+          lines: []
+        };
+      } else {
+        const { x, y } = input.state.hoveredCell;
+        const coordStr = `[${String(x).padStart(2, "0")} , ${String(y).padStart(2, "0")}]`;
+        const unit = deps.getUnitAt(x, y);
+        const spotted = unit && deps.isSpotted(unit);
+        if (spotted) {
+          w.hoveredTelemetry = _buildUnitTelemetryModel(deps, unit, coordStr);
+        } else {
+          w.hoveredTelemetry = _buildTerrainTelemetryModel(deps, x, y, coordStr);
+        }
+      }
+
+      const selUnit = input.selectedUnit;
+      if (!selUnit || selUnit.team !== 1) {
+        w.selectedTelemetry = {
+          coordTag: "[-- , --]",
+          kind: "none",
+          title: "NO FRIENDLY VESSEL SELECTED",
+          subtitle: "Click any Blue Fleet vessel to inspect or issue orders.",
+          locusTag: "",
+          hp: 0,
+          maxHp: 0,
+          stats: "",
+          flags: []
+        };
+      } else {
+        const coordStr = `[${String(selUnit.x).padStart(2, "0")} , ${String(selUnit.y).padStart(2, "0")}]`;
+        w.selectedTelemetry = _buildUnitTelemetryModel(deps, selUnit, coordStr);
+      }
+      return _compose({ view: w }, _syncLayout(w, input));
+    }
+
+    function _updatePriorityBanner(view, input, recomputeAction) {
+      const w = _clone(view);
+      const cache = {
+        priorityKey: input.cache ? input.cache.priorityKey : "",
+        priorityLabel: input.cache ? input.cache.priorityLabel : null,
+        hoveredSpotted: input.cache ? input.cache.hoveredSpotted : false
+      };
+      const hoveredCell = input.state.hoveredCell;
+      if (w.activeModal !== null || input.state.activeTeam !== 1 || !hoveredCell) {
+        w.priorityBanner.visible = false;
+        w.priorityBanner.hoveredSpotted = false;
+        cache.priorityKey = "";
+        cache.priorityLabel = null;
+        cache.hoveredSpotted = false;
+        return { view: w, banner: w.priorityBanner, cache };
+      }
+
+      const { x, y } = hoveredCell;
+      const selUnit = input.selectedUnit;
+      const key = `${input.state.activeTeam}|${selUnit ? selUnit.id : -1}|${selUnit ? selUnit.x : -1},${selUnit ? selUnit.y : -1}|${x},${y}|${input.state.ap}`;
+
+      if (recomputeAction || key !== cache.priorityKey) {
+        cache.priorityKey = key;
+        const hoveredUnit = deps.getUnitAt(x, y);
+        const hoveredSpotted = Boolean(hoveredUnit && deps.isSpotted(hoveredUnit));
+        cache.hoveredSpotted = hoveredSpotted;
+
+        let label = null;
+        if (selUnit && selUnit.team === 1) {
+          const B = { x, y };
+          const bothCapAndShoot = deps.canCapture(selUnit, B) && deps.canShoot(selUnit, B);
+          if (bothCapAndShoot) {
+            const vp = deps.renderedViewport();
+            const lx = (input.state.mousePx.x / vp.cellPx + vp.viewX) - x;
+            const ly = (input.state.mousePx.y / vp.cellPx + vp.viewY) - y;
+            if (lx >= 0 && lx <= 0.45 && ly >= 0 && ly <= 0.45) {
+              label = "PRIORITY 2: MARINE BOARDING [1 AP] (HULL: FIRE)";
+            } else {
+              label = "PRIORITY 3: ENGAGE WEAPONS [1 AP] ('C'/SHIFT: BOARD)";
+            }
+          } else {
+            const act = deps.priorityAction(selUnit, x, y);
+            if (act === "MOVE") label = "PRIORITY 1: HELM MOVE [1 AP]";
+            else if (act === "CAPTURE") label = "PRIORITY 2: MARINE BOARDING [1 AP]";
+            else if (act === "SHOOT") label = "PRIORITY 3: ENGAGE WEAPONS [1 AP]";
+            else if (act === "SHIELD") label = "PRIORITY 4: REGEN SHIELD [1 AP]";
+          }
+        }
+
+        if (!label && hoveredSpotted && hoveredUnit.team === 1 && (!selUnit || selUnit.id !== hoveredUnit.id)) {
+          label = `SELECT ${hoveredUnit.type.toUpperCase()}`;
+        }
+        cache.priorityLabel = label;
+      }
+
+      w.priorityBanner.hoveredSpotted = cache.hoveredSpotted;
+      if (cache.priorityLabel) {
+        const DS = input.metrics.displaySize;
+        const US = input.metrics.uiScale;
+        const cp = input.metrics.cellPx;
+        const mx = (input.state.mousePx.x > 0 || input.state.mousePx.y > 0) ? input.state.mousePx.x : ((x - input.state.viewX + 0.5) * cp);
+        const my = (input.state.mousePx.x > 0 || input.state.mousePx.y > 0) ? input.state.mousePx.y : ((y - input.state.viewY + 0.5) * cp);
+        w.priorityBanner.visible = true;
+        w.priorityBanner.label = cache.priorityLabel;
+        w.priorityBanner.x = Math.min(DS - 210 * US, mx + 16 * US);
+        w.priorityBanner.y = Math.max(64 * US, my - 24 * US);
+      } else {
+        w.priorityBanner.visible = false;
+      }
+      return { view: w, banner: w.priorityBanner, cache };
+    }
+
+    function _showIntelOverlay(view, input, title, lines) {
+      const w = _clone(view);
+      w.intelOverlay.visible = true;
+      w.intelOverlay.title = String(title || "OPERATIONAL TURN REPORT");
+      w.intelOverlay.lines = Array.isArray(lines) ? lines.slice() : [];
+      if (w.activeModal === "endgame" && !input.state.gameOver) {
+        w.activeModal = null;
+      }
+      return _syncLayout(w, input);
+    }
+
+    function _hideIntelOverlay(view, input) {
+      const w = _clone(view);
+      if (w.intelOverlay.visible) {
+        w.intelOverlay.visible = false;
+        if (w.panelRects) w.panelRects.intelOverlay = null;
+        return _syncLayout(w, input);
+      }
+      return { view: w };
+    }
+
+    function _toggleBridgeModal(view, input, forceState) {
+      const w = _clone(view);
+      if (w.activeModal !== null && w.activeModal !== "bridge") {
+        return { view: w };
+      }
+      const isOpen = w.activeModal === "bridge";
+      const nextState = forceState !== null ? Boolean(forceState) : !isOpen;
+
+      if (nextState) {
+        if (input.state.activeTeam !== 1 || input.state.gameOver) {
+          return { view: w, sounds: [{ kind: "ui.invalid", payload: {} }] };
+        }
+        let effInput = input;
+        let r = { view: w };
+        const curSel = input.selectedUnit;
+        if (!curSel || curSel.team !== 1 || !curSel.flags.has("#capital ship")) {
+          const autoCap = input.units.find(u => u.hp > 0 && u.team === 1 && u.flags.has("!flagship") && u.flags.has("#capital ship"))
+            || input.units.find(u => u.hp > 0 && u.team === 1 && u.flags.has("#capital ship"));
+          if (autoCap) {
+            // Game applies the selection from the returned `selection` data;
+            // the recomputed telemetry below is computed as-if already applied.
+            r.selection = { unitId: autoCap.id };
+            effInput = Object.assign({}, input, { selectedUnit: autoCap });
+            r = _compose(r, _updateRightWing(r.view, effInput));
+          }
+        }
+        r.view.activeModal = "bridge";
+        r = _compose(r, {
+          sounds: [{ kind: "ui.modal.open", payload: {} }],
+          flags: { clearInteraction: true }
+        });
+        return _compose(r, _renderBridgeShop(r.view, effInput, false));
+      } else if (isOpen) {
+        w.activeModal = null;
+        return _compose({
+          view: w,
+          sounds: [{ kind: "ui.modal.close", payload: {} }],
+          flags: { clearInteraction: true }
+        }, _syncLayout(w, input));
+      }
+      return { view: w };
+    }
+
+    function _renderBridgeShop(view, input, silent) {
+      const w = _clone(view);
+      const selUnit = input.selectedUnit;
+      const isCapitalSelected = Boolean(selUnit && selUnit.team === 1 && selUnit.flags.has("#capital ship"));
+      const validCells = isCapitalSelected ? deps.validWarpCells(selUnit) : [];
+      const canDeployLocus = isCapitalSelected && validCells.length > 0 && input.state.ap > 0;
+
+      w.bridgeModal.credits = input.state.credits[1];
+      w.bridgeModal.locusOk = canDeployLocus;
+
+      if (!isCapitalSelected) {
+        w.bridgeModal.locusText = "LOCUS OFFLINE: Select a friendly #capital ship on the board first to warp reinforcements!";
+      } else if (validCells.length === 0) {
+        w.bridgeModal.locusText = `LOCUS OBSTRUCTED: ${selUnit.type} at [${selUnit.x},${selUnit.y}] has 0 vacant R:6 cells!`;
+      } else {
+        w.bridgeModal.locusText = `ACTIVE LOCUS: ${selUnit.type.toUpperCase()} AT [${selUnit.x},${selUnit.y}] (${validCells.length} VACANT R:6 CELLS READY)`;
+      }
+
+      const shipSpecs = deps.shipSpecs;
+      const cards = [];
+      Object.entries(shipSpecs).forEach(([shipName, spec]) => {
+        if (!spec.flags.includes("buyable")) return;
+        const priceOk = Boolean(input.state.credits[1] >= spec.cost);
+        const affordable = Boolean(canDeployLocus && priceOk);
+        cards.push({
+          shipName,
+          cost: spec.cost,
+          flagsText: spec.flags.filter(f => f !== "buyable").join(" ") || "STANDARD",
+          hp: spec.hp,
+          move: spec.move,
+          fp: spec.firepower,
+          range: spec.range,
+          scan: spec.scan,
+          priceOk,
+          affordable,
+          dummyUnit: { type: shipName, team: 1, hp: spec.hp, maxHp: spec.hp, flags: new Set(spec.flags) }
+        });
+      });
+      w.bridgeModal.cards = cards;
+      const r = _syncLayout(w, input);
+      if (!silent) {
+        r.flags = Object.assign({}, r.flags, { renderRequests: [{ skipBoard: false }] });
+      }
+      return r;
+    }
+
+    function _toggleCampaignModal(view, input, forceState) {
+      const w = _clone(view);
+      const isOpen = w.activeModal === "campaign";
+      const nextState = forceState !== null ? Boolean(forceState) : !isOpen;
+
+      if (nextState) {
+        w.activeModal = "campaign";
+        return _compose({
+          view: w,
+          sounds: [{ kind: "ui.modal.open", payload: {} }],
+          flags: { clearInteraction: true }
+        }, _renderCampaignCards(w, input, false));
+      } else if (isOpen) {
+        w.activeModal = input.state.gameOver ? "endgame" : null;
+        return _compose({
+          view: w,
+          sounds: [{ kind: "ui.modal.close", payload: {} }],
+          flags: { clearInteraction: true }
+        }, _syncLayout(w, input));
+      }
+      return { view: w };
+    }
+
+    function _renderCampaignCards(view, input, silent) {
+      const w = _clone(view);
+      const levels = deps.campaignLevels;
+      const shipSpecs = deps.shipSpecs;
+      const cards = levels.map(lvl => {
+        const isDone = input.state.completedLevels.includes(lvl.id);
+        const previewUnits = (lvl.previewArchetypes || []).slice(0, 4).map(archName => {
+          const spec = shipSpecs[archName];
+          if (!spec) return null;
+          return { type: archName, team: 2, hp: spec.hp, maxHp: spec.hp, flags: new Set(spec.flags) };
+        }).filter(Boolean);
+        return {
+          id: lvl.id,
+          tag: lvl.tag,
+          title: lvl.title,
+          desc: lvl.desc,
+          creditsText: `T1: ${lvl.t1StartingCredits} ⒸB (+${lvl.t1Income}/turn) // DOCTRINE: ${lvl.aiDoctrine}`,
+          isDone,
+          isNext: false,
+          previewUnits
+        };
+      });
+      // Mark the first not-yet-completed sector (in campaign order) as the
+      // "next available" node for distinct starmap styling. Purely visual —
+      // every node stays selectable, matching the old level-select screen.
+      const nextIdx = cards.findIndex(c => !c.isDone);
+      if (nextIdx >= 0) cards[nextIdx].isNext = true;
+      w.campaignModal.cards = cards;
+      const r = _syncLayout(w, input);
+      if (!silent) {
+        r.flags = Object.assign({}, r.flags, { renderRequests: [{ skipBoard: false }] });
+      }
+      return r;
+    }
+
+    function _showEndgameModal(view, input, isVictory) {
+      const w = _clone(view);
+      w.endgameModal.isVictory = Boolean(isVictory);
+      if (isVictory) {
+        w.endgameModal.title = "SECTOR SECURED // !FLAGSHIP ELIMINATED";
+        w.endgameModal.body = `All hostile Syndicate !flagship command vessels in Sector ${input.state.levelId} have been destroyed in ${input.state.turnNumber} turns.`;
+      } else {
+        w.endgameModal.title = "CRITICAL DEFEAT // !FLAGSHIP LOST";
+        w.endgameModal.body = "All friendly !flagship command vessels have been destroyed. Command locus severed.";
+      }
+      w.activeModal = "endgame";
+      return _compose({ view: w, flags: { clearInteraction: true } }, _syncLayout(w, input));
+    }
+
+    function _hideEndgameModal(view, input) {
+      const w = _clone(view);
+      if (w.activeModal === "endgame") {
+        w.activeModal = null;
+        return _compose({ view: w, flags: { clearInteraction: true } }, _syncLayout(w, input));
+      }
+      return { view: w };
+    }
+
+    // Oscilloscope: decorative waveform synthesized from the timestamp and
+    // the radio-active flag Game passes in (option (a) of the remediation —
+    // no audio reads). The former analyser branch was dead code anyway
+    // (Game's audio surface returns no analyser) and is gone.
+    function _sampleOscilloscope(view, input) {
+      const w = _clone(view);
+      w.radioActive = Boolean(input.radioActive);
+      const n = w.scopeWave.length;
+      const wave = new Float32Array(n);
+      const now = input.now;
+      const freq = w.radioActive ? 0.35 : 0.12;
+      const amp = w.radioActive ? 0.78 : 0.14;
+      for (let i = 0; i < n; i++) {
+        wave[i] = Math.sin(i * freq + now * 0.012) * amp * Math.sin(now * 0.003 + i * 0.06);
+      }
+      w.scopeWave = wave;
+      return { view: w };
+    }
+
+    // Theme switch: recomputes the whole view and RETURNS the requested
+    // theme key as data; Game applies the theme state field / body attribute /
+    // audio theme command.
+    function _applyTheme(view, input, key) {
+      let r = _updateAll(view, input);
+      if (r.view.activeModal === "bridge") {
+        r = _compose(r, _renderBridgeShop(r.view, input, false));
+      } else if (r.view.activeModal === "campaign") {
+        r = _compose(r, _renderCampaignCards(r.view, input, false));
+      }
+      r.theme = key;
+      const reqs = (r.flags && r.flags.renderRequests) ? r.flags.renderRequests : [];
+      r.flags = Object.assign({}, r.flags, { renderRequests: reqs.concat([{ now: input.now, theme: key }]) });
+      return r;
+    }
+
+    function _updateAll(view, input) {
+      let r = _compose({ selection: { sync: true } }, _updateLeftWing(view, input));
+      r = _compose(r, _updateRightWing(r.view, input));
+      r = _compose(r, _updatePriorityBanner(r.view, input, true));
+      if (r.view.activeModal === "bridge") {
+        r = _compose(r, _renderBridgeShop(r.view, input, true));
+      }
+      r = _compose(r, _syncLayout(r.view, input));
+      return r;
+    }
+
+    // ---- public surface: pure functions, plain data out -------------------
+    return {
+      createInitialView,
+
+      // deep-copied DTOs — never the live view (which reaches Graphics
+      // through the render frame)
+      snapshot(view) { return _clone(view); },
+      panelRects(view) { return _clone(view.panelRects); },
+
+      isModalOpen(view) { return view.activeModal !== null; },
+      getActiveModal(view) { return view.activeModal; },
+      isIntelVisible(view) {
+        return Boolean(view.intelOverlay && view.intelOverlay.visible && view.activeModal === null);
+      },
+
+      refreshMinimapLabel(view, input) {
+        const w = _clone(view);
+        const span = input.state.viewSpan;
+        w.minimapLabel = `MINIMAP 32×32 · VIEW ${span}×${span}`;
+        return _finalize({ view: w });
+      },
+      setMinimapLabel(view, input, lbl) {
+        const w = _clone(view);
+        w.minimapLabel = String(lbl || "MINIMAP 32×32");
+        return _finalize({ view: w });
+      },
+      setAudioReady(view, input, ready) {
+        const w = _clone(view);
+        w.audioReady = Boolean(ready);
+        return _finalize({ view: w });
+      },
+
+      syncLayout(view, input) { return _finalize(_syncLayout(view, input)); },
+      updateLeftWing(view, input) { return _finalize(_updateLeftWing(view, input)); },
+      updateRightWing(view, input) { return _finalize(_updateRightWing(view, input)); },
+      updatePriorityBanner(view, input, recomputeAction = true) {
+        return _finalize(_updatePriorityBanner(view, input, recomputeAction));
+      },
+
+      showIntelOverlay(view, input, title, lines) {
+        return _finalize(_showIntelOverlay(view, input, title, lines));
+      },
+      hideIntelOverlay(view, input) { return _finalize(_hideIntelOverlay(view, input)); },
+
+      toggleBridgeModal(view, input, forceState = null) {
+        return _finalize(_toggleBridgeModal(view, input, forceState));
+      },
+      renderBridgeShop(view, input, silent = false) {
+        return _finalize(_renderBridgeShop(view, input, silent));
+      },
+      toggleCampaignModal(view, input, forceState = null) {
+        return _finalize(_toggleCampaignModal(view, input, forceState));
+      },
+      renderCampaignCards(view, input, silent = false) {
+        return _finalize(_renderCampaignCards(view, input, silent));
+      },
+
+      showEndgameModal(view, input, isVictory) {
+        return _finalize(_showEndgameModal(view, input, isVictory));
+      },
+      hideEndgameModal(view, input) { return _finalize(_hideEndgameModal(view, input)); },
+
+      sampleOscilloscope(view, input) { return _finalize(_sampleOscilloscope(view, input)); },
+      applyTheme(view, input, key) { return _finalize(_applyTheme(view, input, key)); },
+      updateAll(view, input) { return _finalize(_updateAll(view, input)); },
+
+      // The warp anomaly is a canvas CSS effect applied by Game (or its
+      // host); the HUD only requests it as data.
+      triggerWarpAnomaly() { return { flags: { warpAnomaly: true } }; }
+    };
+  }
+
   return {
-    createInitialHudStore,
+    createInitialView,
     createHud
   };
 })());

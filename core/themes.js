@@ -4,8 +4,13 @@
 // THEMES — stateless pure theme normalizer and colour remapper.
 // Privately registered with Game (core/game.js); holds zero mutable state
 // and exposes zero globals.
+//
+// Pure-function child (§3): every function takes the theme EXPLICITLY.
+// Game owns the active theme (State.theme) and resolves/passes the key as
+// plain data. There is no setActive/getActive and no memoization cache —
+// ORDER / ALIASES / PALETTES are frozen derived data.
 // ============================================================
-Game._registerModule("themes", (THEME_DATA, themeState) => {
+Game._registerModule("themes", THEME_DATA => {
   const ORDER = Object.freeze(THEME_DATA.order.slice());
   const ALIASES = THEME_DATA.aliases || {};
 
@@ -15,9 +20,6 @@ Game._registerModule("themes", (THEME_DATA, themeState) => {
   }
   const PALETTES = {};
   ORDER.forEach(t => { PALETTES[t] = deepFreeze(JSON.parse(JSON.stringify(THEME_DATA.palettes[t]))); });
-
-  if (themeState && !themeState.active) themeState.active = ORDER[0];
-  if (themeState && !themeState.caches) themeState.caches = {};
 
   function normalize(raw){
     const key = String(raw == null ? "" : raw).trim().toLowerCase();
@@ -31,18 +33,9 @@ Game._registerModule("themes", (THEME_DATA, themeState) => {
     return ORDER[(i + 1) % ORDER.length];
   }
 
-  function getActive(){
-    return (themeState && themeState.active) ? themeState.active : ORDER[0];
-  }
-
-  function setActive(theme){
-    const nextTheme = normalize(theme);
-    if (themeState) themeState.active = nextTheme;
-    return nextTheme;
-  }
-
+  // `theme` is REQUIRED: Game owns the active theme and passes it explicitly.
   function palette(theme){
-    return PALETTES[theme === undefined ? getActive() : normalize(theme)];
+    return PALETTES[normalize(theme)];
   }
 
   // ---- Colour remap -------------------------------------------------------
@@ -61,20 +54,13 @@ Game._registerModule("themes", (THEME_DATA, themeState) => {
     return m[4] !== undefined ? `rgba(${hit.split(",").join(", ")}, ${m[4]})` : `rgb(${hit.split(",").join(", ")})`;
   }
 
-  function color(lit){
-    const active = getActive();
-    if (active === ORDER[0]) return lit;
-    const map = (THEME_DATA.colorRemap || {})[active];
+  // `theme` is REQUIRED. No memo cache: the remap is a cheap pure lookup.
+  function color(lit, theme){
+    const key = normalize(theme);
+    if (key === ORDER[0]) return lit;
+    const map = (THEME_DATA.colorRemap || {})[key];
     if (!map) return lit;
-    const caches = (themeState && themeState.caches) ? themeState.caches : null;
-    if (!caches) return remapLiteral(lit, map);
-    const cache = caches[active] || (caches[active] = new Map());
-    let out = cache.get(lit);
-    if (out === undefined) {
-      out = remapLiteral(lit, map);
-      cache.set(lit, out);
-    }
-    return out;
+    return remapLiteral(lit, map);
   }
 
   return {
@@ -82,8 +68,6 @@ Game._registerModule("themes", (THEME_DATA, themeState) => {
     normalize,
     next,
     palette,
-    setActive,
-    getActive,
     color,
     spriteAtlas: deepFreeze(JSON.parse(JSON.stringify(THEME_DATA.spriteAtlas)))
   };
