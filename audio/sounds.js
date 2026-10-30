@@ -144,6 +144,10 @@ const SoundEngine = (() => {
   function acquireVoice(busName, startTime, duration) {
     const cap = MAX_BUS_VOICES[busName];
     if (!cap || !audioCtx) return true;
+    // Slots expire against the audio clock; while that clock is frozen
+    // (suspended context) bookkeeping would leak and permanently exhaust
+    // the bus. Nothing is audible then, so consume no slots.
+    if (audioCtx.state !== "running") return true;
     const now = audioCtx.currentTime;
     const list = activeBusEndTimes[busName] || (activeBusEndTimes[busName] = []);
     for (let i = list.length - 1; i >= 0; i--) {
@@ -371,7 +375,11 @@ const SoundEngine = (() => {
       audioCtx.resume().then(syncEnableButton).catch(() => {});
     }
     syncEnableButton();
-    return true;
+    // Ready only when the context can actually produce sound. While it is
+    // suspended its clock is frozen: scheduling would queue an inaudible
+    // backlog that bursts at resume, and every attempt would permanently
+    // burn a polyphony slot (slots expire against the frozen clock).
+    return audioCtx.state === "running";
   }
 
   // Audio services handed to SfxEngine / MusicEngine. hoverState and
@@ -537,7 +545,33 @@ const SoundEngine = (() => {
     applyGainSettings();
     saveSettings();
     syncEnableButton();
-    return playClip("ui.enableAudio");
+    playEnableConfirm();
+    return true;
+  }
+
+  // The enable confirmation plays once the AudioContext is actually running.
+  // unlock() arrives via the command queue (drained outside the enabling
+  // gesture), so resume() can resolve later — or be refused by strict
+  // autoplay policies, which then need a gesture handler to start the
+  // context. Either way the confirmation is never scheduled into a
+  // suspended context.
+  function playEnableConfirm() {
+    if (!audioCtx) return;
+    if (audioCtx.state === "running") { playClip("ui.enableAudio"); return; }
+    const onGesture = () => {
+      document.removeEventListener("pointerdown", onGesture, true);
+      document.removeEventListener("keydown", onGesture, true);
+      playEnableConfirm();
+    };
+    const armGesture = () => {
+      document.addEventListener("pointerdown", onGesture, true);
+      document.addEventListener("keydown", onGesture, true);
+    };
+    if (typeof audioCtx.resume === "function") {
+      audioCtx.resume().then(() => playClip("ui.enableAudio")).catch(armGesture);
+    } else {
+      armGesture();
+    }
   }
 
   function setMaster(value) {
