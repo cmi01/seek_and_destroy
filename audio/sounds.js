@@ -76,8 +76,7 @@ const SoundEngine = (() => {
     UI: 0.40,
     TELEMETRY: 0.65,
     SYSTEMS: 0.80,
-    COMBAT: 0.95,
-    MUSIC: 0.22
+    COMBAT: 0.95
   };
 
   // Per-bus concurrent voice limits to prevent clipping & voice spam (ISS-056).
@@ -409,8 +408,11 @@ const SoundEngine = (() => {
     const loopKeys = hasMusic() ? _music.getBackgroundLoopKeys() : [];
     const badLoops = loopKeys.filter(k => !musicClips[k] || !musicClips[k].loop);
     const unusedMusic = Object.keys(musicClips).filter(k => !loopKeys.includes(k));
-    record("A-3 BACKGROUND LOOPS", hasMusic() && loopKeys.length > 0 && badLoops.length === 0 && unusedMusic.length === 0,
-      `${loopKeys.length} loops; invalid: ${badLoops.length ? badLoops.join(", ") : "none"}; unused: ${unusedMusic.length ? unusedMusic.join(", ") : "none"}`);
+    // Manifest consistency only (no magic loop count): every scheduled loop must
+    // be a real looping clip and every music clip must be scheduled. Since v73
+    // there are no looping beds at all, so both lists are legitimately empty.
+    record("A-3 BACKGROUND LOOPS", hasMusic() && badLoops.length === 0 && unusedMusic.length === 0,
+      `${loopKeys.length} loops (none since v73); invalid: ${badLoops.length ? badLoops.join(", ") : "none"}; unused: ${unusedMusic.length ? unusedMusic.join(", ") : "none"}`);
 
     const baked = _bakedSounds || {};
     const isBakedWav = v => {

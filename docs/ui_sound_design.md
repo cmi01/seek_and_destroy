@@ -12,7 +12,6 @@ All audio runs through a single WebAudio `AudioContext` into a bus graph, then a
 | TELEMETRY | 0.65 | 4 |
 | SYSTEMS | 0.80 | 6 |
 | COMBAT | 0.95 | 8 |
-| MUSIC | 0.22 | — |
 
 Master defaults to 0.75. Settings persist to `localStorage` under `sd.audio.settings.v2`. Audio needs a user gesture to unlock the context (handled by the enable-audio control), which plays `ui.enableAudio`.
 

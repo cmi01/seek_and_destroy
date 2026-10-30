@@ -31,4 +31,4 @@ Actions by a hidden team-2 ship (not visible to the player) are suppressed or re
 
 ## Looping beds
 
-Two background loops once ran under everything. Since v71 only `music.pad0` (MUSIC bus, gain 0.55) remains: the low 55 Hz `ambience.base` drone bed was removed because it read as an idle-machine/refrigerator hum under play. The remaining loop stops on the victory/defeat stingers.
+None — all audio is one-shot clips now. Two background loops once ran under everything: the low 55 Hz `ambience.base` drone bed was removed in v71 because it read as an idle-machine/refrigerator hum under play, and the last bed, the `music.pad0` ambient pad (MUSIC bus, gain 0.55), was removed in v73. The dead MUSIC bus went with it. `audio/music.js` keeps the generic loop machinery (clip manifest plus `startBackgroundLoops`/`stopBackgroundLoops`, still stopped at the victory/defeat stingers) with an empty `backgroundLoops` list.

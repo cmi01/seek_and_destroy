@@ -66,7 +66,7 @@ function _ensureAudioSettingsObject(st){
   if (!st.audioSettings || typeof st.audioSettings !== "object"){
     st.audioSettings = {
       master: 0.75,
-      buses: { UI: 0.40, TELEMETRY: 0.65, SYSTEMS: 0.80, COMBAT: 0.95, MUSIC: 0.22 },
+      buses: { UI: 0.40, TELEMETRY: 0.65, SYSTEMS: 0.80, COMBAT: 0.95 },
       muted: false,
       reduced: false
     };

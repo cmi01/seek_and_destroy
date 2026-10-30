@@ -57,12 +57,10 @@ SoundEngine._registerModule("data", {
     Cruiser: "heavy"
   },
   // Looping beds (only clips that are actually played).
-  // NOTE: the low 55 Hz drone bed ("ambience.base", formerly mixed in here) was
-  // removed in v71 — it read as an idle-machine/refrigerator hum under play.
-  musicClips: {
-    "music.pad0":    { offset: 19.08, duration: 2.00, bus: "MUSIC",    loop: true }
-  },
-  backgroundLoops: [
-    { clipKey: "music.pad0",    gain: 0.55 }
-  ]
+  // NOTE: no looping beds remain. The low 55 Hz drone bed ("ambience.base") was
+  // removed in v71 — it read as an idle-machine/refrigerator hum under play —
+  // and the last bed, the "music.pad0" ambient pad, was removed in v73. All
+  // audio is one-shot clips now; the generic loop machinery in music.js stays.
+  musicClips: {},
+  backgroundLoops: []
 });
