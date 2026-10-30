@@ -12,7 +12,7 @@
     if (!enemy || !myUnit) return 0;
     const te = (env.priorities(ctx) && env.priorities(ctx).threatEvaluation) || {};
     let t = 0;
-    if (enemy.firepower > 0 && !enemy.flags.has("-attacked") && env.rules.canShoot(ctx, enemy, myUnit)){
+    if (enemy.firepower > 0 && !enemy.flags.has("-attacked") && env.canShoot(ctx, enemy, myUnit)){
       t += enemy.firepower * (te.directFirepowerMultiplier !== undefined ? te.directFirepowerMultiplier : 14);
     }
     if (enemy.flags.has("#railgun") && myUnit.flags.has("+shield")) t += (te.railgunVsShieldBonus !== undefined ? te.railgunVsShieldBonus : 60);
@@ -37,17 +37,17 @@
     for (let i = 0; i < sp.length; i++){
       const p = sp[i];
       if (p.firepower <= 0 || p.flags.has("-attacked")) continue;
-      if (env.rules.inRange(p, dest, Math.max(1, p.range)) && env.rules.hasLineOfSight(ctx, p.x, p.y, dest.x, dest.y, "WEAPON")){
+      if (env.inRange(p, dest, Math.max(1, p.range)) && env.hasLineOfSight(ctx, p.x, p.y, dest.x, dest.y, "WEAPON")){
         t += p.firepower * directMult;
         if (p.flags.has("#railgun") && u.flags.has("+shield")) t += rgShield;
-      } else if (env.rules.inRange(p, dest, p.move + Math.max(1, p.range))){
+      } else if (env.inRange(p, dest, p.move + Math.max(1, p.range))){
         t += p.firepower * projMult * projDisc;
         if (p.flags.has("#railgun")) t += rgProj;
       }
     }
     const bs = env.activeBeliefs(ctx);
     for (let i = 0; i < bs.length; i++){
-      if (env.rules.dist(dest, bs[i]) <= bDist) t += bMult * bs[i].confidence;
+      if (env.dist(dest, bs[i]) <= bDist) t += bMult * bs[i].confidence;
     }
     return t;
   }
@@ -61,7 +61,7 @@
     let t = 0;
     for (let i = 0; i < sp.length; i++){
       const p = sp[i];
-      if (p.firepower > 0 && env.rules.dist(dest, p) <= p.move + Math.max(1, p.range)){
+      if (p.firepower > 0 && env.dist(dest, p) <= p.move + Math.max(1, p.range)){
         t += p.firepower * projMult * projDisc;
         if (p.flags.has("#railgun")) t += rgProj;
       }
@@ -87,7 +87,7 @@
     v = v * hf * uf;
     if (target.flags.has("#space marines")){
       const maxD = rv.boardingCounterProximityMaxDist !== undefined ? rv.boardingCounterProximityMaxDist : 1.5;
-      if (env.myUnits(ctx).some(a => !a.flags.has("!flagship") && env.rules.dist(target, a) <= maxD)){
+      if (env.myUnits(ctx).some(a => !a.flags.has("!flagship") && env.dist(target, a) <= maxD)){
         v += (rv.boardingCounterUrgencyBonus !== undefined ? rv.boardingCounterUrgencyBonus : 300);
       }
     }
@@ -102,12 +102,12 @@
     const adjR = te.nebulaAdjacentSearchRadius !== undefined ? te.nebulaAdjacentSearchRadius : 1;
     let p = 0;
     for (let i = 0; i < bs.length; i++){
-      if (env.rules.dist(dest, bs[i]) <= proxR) p += bs[i].confidence * confW;
+      if (env.dist(dest, bs[i]) <= proxR) p += bs[i].confidence * confW;
     }
     for (let dx = -adjR; dx <= adjR; dx++){
       for (let dy = -adjR; dy <= adjR; dy++){
         const nx = dest.x + dx, ny = dest.y + dy;
-        if (env.rules.inBounds(ctx, nx, ny) && env.rules.terrainAt(ctx, nx, ny) === "NEBULA" && !env.rules.isCellVisibleToTeam(ctx, nx, ny, 2)){
+        if (env.inBounds(ctx, nx, ny) && env.terrainAt(ctx, nx, ny) === "NEBULA" && !env.isCellVisibleToTeam(ctx, nx, ny, 2)){
           p += tn.nebulaBaseP + tn.nebulaVectorP;
         }
       }
@@ -118,7 +118,7 @@
   function railgunKillPriority(env, enemy, myFlag){
     if (!enemy || !enemy.flags.has("#railgun") || !myFlag) return 0;
     const tp = (env.priorities() && env.priorities().targetPriorities && env.priorities().targetPriorities.railgunKillPriorityBands) || {};
-    const d = env.rules.dist(enemy, myFlag), dd = enemy.move + Math.max(1, enemy.range);
+    const d = env.dist(enemy, myFlag), dd = enemy.move + Math.max(1, enemy.range);
     if (d <= dd) return tp.inDangerRadiusBonus !== undefined ? tp.inDangerRadiusBonus : 1000;
     if (d <= dd + (tp.nearBandOffset !== undefined ? tp.nearBandOffset : 4)) return tp.nearBandBonus !== undefined ? tp.nearBandBonus : 600;
     if (d <= dd + (tp.midBandOffset !== undefined ? tp.midBandOffset : 8)) return tp.midBandBonus !== undefined ? tp.midBandBonus : 300;
@@ -140,7 +140,7 @@
     if (actionKind === "CAPTURE"){
       sc += target.cost * (capCfg.costMultiplier !== undefined ? capCfg.costMultiplier : 4.0) + (capCfg.baseBonus !== undefined ? capCfg.baseBonus : 40);
       const pf = us.find(x => x.hp > 0 && x.team === 1 && x.flags.has("!flagship"));
-      if (pf) sc -= (capCfg.enemyFlagshipProximityPenaltyPerCell !== undefined ? capCfg.enemyFlagshipProximityPenaltyPerCell : 60) * Math.min(capCfg.enemyFlagshipDistanceCap !== undefined ? capCfg.enemyFlagshipDistanceCap : 6, env.rules.dist(target, pf));
+      if (pf) sc -= (capCfg.enemyFlagshipProximityPenaltyPerCell !== undefined ? capCfg.enemyFlagshipProximityPenaltyPerCell : 60) * Math.min(capCfg.enemyFlagshipDistanceCap !== undefined ? capCfg.enemyFlagshipDistanceCap : 6, env.dist(target, pf));
       return sc;
     }
     const sh = target.flags.has("+shield"), rg = attacker && attacker.flags.has("#railgun");
@@ -162,7 +162,7 @@
       if (rg) sc += (shCfg.railgunBypassBonus !== undefined ? shCfg.railgunBypassBonus : 110);
       else if (attacker && attacker.firepower <= stripMaxFp) sc += (shCfg.lowFirepowerStripperBonus !== undefined ? shCfg.lowFirepowerStripperBonus : 160);
       else {
-        const hs = mine.some(a => attacker && a.id !== attacker.id && !a.flags.has("-attacked") && a.firepower > 0 && a.firepower <= stripMaxFp && !a.flags.has("#railgun") && env.rules.canShoot(ctx, a, target));
+        const hs = mine.some(a => attacker && a.id !== attacker.id && !a.flags.has("-attacked") && a.firepower > 0 && a.firepower <= stripMaxFp && !a.flags.has("#railgun") && env.canShoot(ctx, a, target));
         if (hs && ((ctx && ctx.ap) || 0) >= (shCfg.comboStripperMinAp !== undefined ? shCfg.comboStripperMinAp : 2)){
           sc += (shCfg.comboWithStripperAvailableBonus !== undefined ? shCfg.comboWithStripperAvailableBonus : 200);
         } else if (hs){
@@ -174,13 +174,13 @@
     if (mf) sc += threatValue(env, ctx, target, mf) * (fdCfg.threatToFlagshipWeight !== undefined ? fdCfg.threatToFlagshipWeight : 0.6);
     if (mf && target.flags.has("#railgun")) sc += railgunKillPriority(env, target, mf);
     if (mf && env.railgunDangerZones(ctx).length === 0){
-      const es = env.rules.effectiveScan(ctx, target);
-      if (env.rules.dist(target, mf) <= es){
+      const es = env.effectiveScan(ctx, target);
+      if (env.dist(target, mf) <= es){
         sc += (seCfg.baseSpottingBonus !== undefined ? seCfg.baseSpottingBonus : 200) + es * (seCfg.perEffectiveScanBonus !== undefined ? seCfg.perEffectiveScanBonus : 30);
         if (target.type === (seCfg.probeTypeName || "Probe")) sc += (seCfg.probeExtraBonus !== undefined ? seCfg.probeExtraBonus : 250);
       }
     }
-    if (mf && env.rules.canShoot(ctx, target, mf)){
+    if (mf && env.canShoot(ctx, target, mf)){
       const shHp = fdCfg.flagshipShieldEffectiveHpBonus !== undefined ? fdCfg.flagshipShieldEffectiveHpBonus : 1;
       if (target.firepower >= mf.hp + (mf.flags.has("+shield") ? shHp : 0)){
         sc += (fdCfg.lethalToFlagshipOverrideBonus !== undefined ? fdCfg.lethalToFlagshipOverrideBonus : 500);
@@ -207,7 +207,7 @@
   function scoreShield(env, ctx, u){
     const spCfg = (env.priorities(ctx) && env.priorities(ctx).shieldPriorities) || {};
     const buf = spCfg.threatRangeBuffer !== undefined ? spCfg.threatRangeBuffer : 1.0;
-    const th = env.spottedEnemies(ctx).some(p => p.firepower > 0 && !p.flags.has("-attacked") && env.rules.inRange(p, u, Math.max(1, p.range + buf)) && env.rules.hasLineOfSight(ctx, p.x, p.y, u.x, u.y, "WEAPON"));
+    const th = env.spottedEnemies(ctx).some(p => p.firepower > 0 && !p.flags.has("-attacked") && env.inRange(p, u, Math.max(1, p.range + buf)) && env.hasLineOfSight(ctx, p.x, p.y, u.x, u.y, "WEAPON"));
     const base = u.flags.has("!flagship")
       ? (spCfg.flagshipBaseScore !== undefined ? spCfg.flagshipBaseScore : 580)
       : u.cost * (spCfg.hullCostMultiplier !== undefined ? spCfg.hullCostMultiplier : 3.2);
@@ -222,11 +222,11 @@
     const wgCfg = mp.warpLocusGuard || {}, hzCfg = mp.hazardsAndConstraints || {};
     const sacCfg = (env.priorities(ctx) && env.priorities(ctx).preservation && env.priorities(ctx).preservation.sacrificeOrdering) || {};
     const sp = env.spottedEnemies(ctx), mine = env.myUnits(ctx);
-    const sr = (ctx && ctx.spawnRadius !== undefined) ? ctx.spawnRadius : env.rules.spawnRadius;
+    const sr = (ctx && ctx.spawnRadius !== undefined) ? ctx.spawnRadius : env.spawnRadius;
     let s = 0;
     if (!u.flags.has("-attacked") && u.firepower > 0){
       for (let i = 0; i < sp.length; i++){
-        if (env.rules.shootableFrom(ctx, u, dest, sp[i])){
+        if (env.shootableFrom(ctx, u, dest, sp[i])){
           s += (kb.baseBonus !== undefined ? kb.baseBonus : 95) * W.aggression;
           break;
         }
@@ -242,7 +242,7 @@
     if (objs.length){
       let ba = Infinity, bb = Infinity, bf = false;
       for (let i = 0; i < objs.length; i++){
-        const ob = objs[i], da = env.rules.dist(dest, ob) * ob.w, db = env.rules.dist(u, ob) * ob.w;
+        const ob = objs[i], da = env.dist(dest, ob) * ob.w, db = env.dist(u, ob) * ob.w;
         if (da < ba){ ba = da; bb = db; bf = ob.flag; }
       }
       const distMult = apCfg.distanceDeltaMultiplier !== undefined ? apCfg.distanceDeltaMultiplier : 22;
@@ -254,7 +254,7 @@
     if (mf && mf.id !== u.id && u.firepower > 0 && !u.flags.has("-attacked")){
       for (let i = 0; i < sp.length; i++){
         const th = sp[i];
-        if (th.firepower > 0 && env.rules.inRange(th, mf, th.move + Math.max(1, th.range)) && env.rules.shootableFrom(ctx, u, dest, th)){
+        if (th.firepower > 0 && env.inRange(th, mf, th.move + Math.max(1, th.range)) && env.shootableFrom(ctx, u, dest, th)){
           s += (aeCfg.baseBonus !== undefined ? aeCfg.baseBonus : 60) * W.screen;
           break;
         }
@@ -264,7 +264,7 @@
     if (hr <= (trCfg.triggerHpRatioMax !== undefined ? trCfg.triggerHpRatioMax : 0.75) && sp.length){
       let nb = Infinity, na = Infinity;
       for (let i = 0; i < sp.length; i++){
-        const db = env.rules.dist(u, sp[i]), da = env.rules.dist(dest, sp[i]);
+        const db = env.dist(u, sp[i]), da = env.dist(dest, sp[i]);
         if (db < nb) nb = db;
         if (da < na) na = da;
       }
@@ -282,7 +282,7 @@
       const idl = Math.max(sbCfg.minIdealRange !== undefined ? sbCfg.minIdealRange : 1, u.range - (sbCfg.idealRangeInset !== undefined ? sbCfg.idealRangeInset : 0.5));
       let nr = Infinity;
       for (let i = 0; i < sp.length; i++){
-        const d = env.rules.dist(dest, sp[i]);
+        const d = env.dist(dest, sp[i]);
         if (d < nr) nr = d;
       }
       if (Math.abs(nr - idl) < (sbCfg.bandTolerance !== undefined ? sbCfg.bandTolerance : 1)){
@@ -293,23 +293,23 @@
     for (let dx = -1; dx <= 1; dx++){
       for (let dy = -1; dy <= 1; dy++){
         const nx = dest.x + dx, ny = dest.y + dy;
-        if (env.rules.inBounds(ctx, nx, ny) && env.rules.terrainAt(ctx, nx, ny) === "NEBULA" && !env.rules.isCellVisibleToTeam(ctx, nx, ny, 2)) an++;
+        if (env.inBounds(ctx, nx, ny) && env.terrainAt(ctx, nx, ny) === "NEBULA" && !env.isCellVisibleToTeam(ctx, nx, ny, 2)) an++;
       }
     }
     s += an * (nbCfg.unspottedAdjacentNebulaBonus !== undefined ? nbCfg.unspottedAdjacentNebulaBonus : 20);
     const mc = mine.find(x => x.flags.has("#capital ship"));
-    if (mc && env.rules.dist(dest, mc) <= sr) s += (wgCfg.baseBonus !== undefined ? wgCfg.baseBonus : 15) * W.screen;
-    if (env.rules.terrainAt(ctx, dest.x, dest.y) === "NEBULA") s += (nbCfg.destinationInNebulaBonus !== undefined ? nbCfg.destinationInNebulaBonus : 12);
+    if (mc && env.dist(dest, mc) <= sr) s += (wgCfg.baseBonus !== undefined ? wgCfg.baseBonus : 15) * W.screen;
+    if (env.terrainAt(ctx, dest.x, dest.y) === "NEBULA") s += (nbCfg.destinationInNebulaBonus !== undefined ? nbCfg.destinationInNebulaBonus : 12);
     const ht = threatAt(env, ctx, u, dest);
     s -= ht * (hzCfg.threatPenaltyWeight !== undefined ? hzCfg.threatPenaltyWeight : 0.5);
     s -= tn.nebulaRiskPenalty * nebulaRiskAt(env, ctx, dest);
-    if (W.leash !== Infinity && sp.length === 0 && mc && env.rules.dist(dest, mc) > W.leash){
+    if (W.leash !== Infinity && sp.length === 0 && mc && env.dist(dest, mc) > W.leash){
       s -= (hzCfg.leashViolationPenalty !== undefined ? hzCfg.leashViolationPenalty : 60);
     }
     if (u.flags.has("!flagship")){
       const zs = env.railgunDangerZones(ctx);
       for (let i = 0; i < zs.length; i++){
-        if (env.rules.dist(dest, zs[i].enemy) <= zs[i].radius){
+        if (env.dist(dest, zs[i].enemy) <= zs[i].radius){
           s -= (hzCfg.flagshipRailgunDangerZonePenalty !== undefined ? hzCfg.flagshipRailgunDangerZonePenalty : 500);
         }
       }
@@ -336,10 +336,10 @@
       const d = cs[i];
       let sc = 0;
       for (let j = 0; j < sp.length; j++){
-        const e = sp[j], es = env.rules.effectiveScan(ctx, e), dist = env.rules.dist(d, e);
+        const e = sp[j], es = env.effectiveScan(ctx, e), dist = env.dist(d, e);
         sc += dist > es ? outBonus : -inPen * (es - dist);
       }
-      for (let z = 0; z < zs.length; z++) sc += Math.min(rgCap, env.rules.dist(d, zs[z].enemy) * rgMult);
+      for (let z = 0; z < zs.length; z++) sc += Math.min(rgCap, env.dist(d, zs[z].enemy) * rgMult);
       sc -= threatAt(env, ctx, flag, d) * thWeight;
       if (sc > bs){ bs = sc; best = d; }
     }
@@ -352,7 +352,7 @@
     for (let i = 0; i < plan.steps.length; i++){
       if (plan.steps[i].kind === "MOVE"){ d = plan.steps[i].to; break; }
     }
-    if (env.spottedEnemies(ctx).some(p => env.rules.inRange(d, p, u.range) && env.rules.hasLineOfSight(ctx, d.x, d.y, p.x, p.y, "WEAPON"))){
+    if (env.spottedEnemies(ctx).some(p => env.inRange(d, p, u.range) && env.hasLineOfSight(ctx, d.x, d.y, p.x, p.y, "WEAPON"))){
       b += (ep.canStillShootNextTurnBonus !== undefined ? ep.canStillShootNextTurnBonus : 25);
     }
     if (threatAt(env, ctx, u, d) < u.hp){

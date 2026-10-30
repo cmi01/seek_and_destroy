@@ -23,14 +23,14 @@
 
   function selectFleetActionPlan(env, ctx) {
     const sCtx = ctx;
-    const nb = (sCtx && sCtx.lastSeenEnemies) || new Map();
+    const nb = (sCtx && sCtx.lastSeenEnemies) ? new Map(sCtx.lastSeenEnemies) : new Map();
     const mp = (env.priorities(sCtx) && env.priorities(sCtx).masterPreChecks) || {};
     const fsCfg = mp.flagshield || {}, asCfg = mp.alphaStrikeDetection || {}, flCfg = mp.fleeWhenOutgunned || {};
     const pg = (env.priorities(sCtx) && env.priorities(sCtx).planGeneration) || {};
     const rf = (env.priorities(sCtx) && env.priorities(sCtx).reinforcement) || {};
     const mine = env.myUnits(sCtx), fl = mine.find(u => u.flags.has("!flagship"));
     const ap = (sCtx && sCtx.ap !== undefined) ? sCtx.ap : 0;
-    const pt = (sCtx && sCtx.aiScoreTrace) ? sCtx.aiScoreTrace : [];
+    const pt = (sCtx && sCtx.aiScoreTrace) ? sCtx.aiScoreTrace.slice() : [];
     if (fsCfg.enabled !== false && fl && !fl.flags.has("+shield") && !fl.flags.has("-shielded") && fl.flags.has("#shield generator") && ap > 0){
       if (env.threatAt(sCtx, fl, { x: fl.x, y: fl.y }) > 0 || env.projectedThreatAt(sCtx, fl, { x: fl.x, y: fl.y }) > 0){
         return {
@@ -50,7 +50,7 @@
     if (asCfg.enabled !== false && fl){
       const shHp = asCfg.shieldEffectiveHpBonus !== undefined ? asCfg.shieldEffectiveHpBonus : 1;
       const inc = env.spottedEnemies(sCtx)
-        .filter(p => !p.flags.has("-attacked") && p.firepower > 0 && env.rules.canShoot(sCtx, p, fl))
+        .filter(p => !p.flags.has("-attacked") && p.firepower > 0 && env.canShoot(sCtx, p, fl))
         .reduce((s, p) => s + p.firepower, 0);
       if (inc >= fl.hp + (fl.flags.has("+shield") ? shHp : 0)) em = true;
     }
@@ -61,7 +61,7 @@
       if (rc){
         if (ap >= minShotAp && !fl.flags.has("-attacked") && fl.firepower > 0){
           const ts = env.spottedEnemies(sCtx)
-            .filter(e => !e.flags.has("+shield") && env.rules.canShoot(sCtx, fl, e))
+            .filter(e => !e.flags.has("+shield") && env.canShoot(sCtx, fl, e))
             .slice()
             .sort((a, b) => env.roleBaseValue(sCtx, b) - env.roleBaseValue(sCtx, a));
           if (ts.length > 0){
@@ -70,7 +70,7 @@
                 unitId: fl.id,
                 apCost: flCfg.shootThenMoveApCost !== undefined ? flCfg.shootThenMoveApCost : 2,
                 score: retScore,
-                steps: [{ kind: "SHOOT", target: ts[0] }, { kind: "MOVE", to: rc }]
+                steps: [{ kind: "SHOOT", target: { id: ts[0].id, x: ts[0].x, y: ts[0].y } }, { kind: "MOVE", to: rc }]
               },
               nextBeliefs: nb,
               aiEmergencyMode: em,
@@ -105,7 +105,7 @@
     const st = tr.slice(0, maxTrace);
     const loci = env.warpLoci(sCtx), ft = env.fleetGap(sCtx).flagshipThreatened;
     const cr2 = (sCtx && sCtx.credits && sCtx.credits[2]) || 0;
-    const sp = (sCtx && sCtx.shipSpecs) || env.rules.shipSpecs || {};
+    const sp = (sCtx && sCtx.shipSpecs) || env.shipSpecs || {};
     const minCr = rf.minCreditsForWarpCheck !== undefined ? rf.minCreditsForWarpCheck : 15;
     const minAp = rf.minApForWarpCheck !== undefined ? rf.minApForWarpCheck : 1;
     const compThresh = rf.competingPlanScoreThreshold !== undefined ? rf.competingPlanScoreThreshold : 350;
@@ -113,7 +113,7 @@
       const pick = chooseReinforcement(env, sCtx);
       if (pick && sp[pick]){
         const spec = sp[pick];
-        const bl = loci.slice().sort((a, b) => env.rules.getValidWarpCells(sCtx, b.unit, b.radius).length - env.rules.getValidWarpCells(sCtx, a.unit, a.radius).length)[0];
+        const bl = loci.slice().sort((a, b) => env.getValidWarpCells(sCtx, b.unit, b.radius).length - env.getValidWarpCells(sCtx, a.unit, a.radius).length)[0];
         const hasCapitalLocus = Boolean(bl && bl.unit && bl.unit.flags && bl.unit.flags.has("#capital ship"));
         if ((hasCapitalLocus || !best) && cr2 >= Math.ceil(spec.cost * bl.costMult)){
           const ftScore = rf.flagshipThreatenedWarpScore !== undefined ? rf.flagshipThreatenedWarpScore : 400;
@@ -121,7 +121,7 @@
           const stdMult = rf.standardWarpCostMultiplier !== undefined ? rf.standardWarpCostMultiplier : 2.0;
           const ws = ft ? ftScore : stdBase + spec.cost * stdMult;
           if (!best || ws > best.score){
-            best = { unitId: bl.unit.id, apCost: 1, score: ws, steps: [{ kind: "WARP", locus: bl.unit, shipType: pick, radius: bl.radius, costMult: bl.costMult }] };
+            best = { unitId: bl.unit.id, apCost: 1, score: ws, steps: [{ kind: "WARP", locus: { id: bl.unit.id, x: bl.unit.x, y: bl.unit.y }, shipType: pick, radius: bl.radius, costMult: bl.costMult }] };
           }
         }
       }

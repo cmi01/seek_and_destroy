@@ -2,8 +2,8 @@
 
 // ============================================================
 // AI STATE QUERIES — unit filtering, belief memory & threat queries.
-// BASE LAYER of the AI: depends only on the rules/config services passed in
-// `env` (env.rules, env.tuning, env.cfg, env.priorities).
+// BASE LAYER of the AI: depends only on the rules queries and config services
+// passed in the flat `env` (env.dist, env.tuning, env.cfg, env.priorities).
 // Privately registered with its parent (aiLogic.js); exposes zero globals.
 // ============================================================
 (() => {
@@ -12,7 +12,7 @@
   }
 
   function spottedEnemies(env, ctx){
-    return ((ctx && ctx.units) || []).filter(u => u.hp > 0 && u.team === 1 && env.rules.isUnitSpottedByTeam(ctx, u, 2));
+    return ((ctx && ctx.units) || []).filter(u => u.hp > 0 && u.team === 1 && env.isUnitSpottedByTeam(ctx, u, 2));
   }
 
   function activeBeliefs(env, ctx){
@@ -32,7 +32,7 @@
     if (!objs.length) return 0;
     let best = Infinity;
     for (let i = 0; i < objs.length; i++){
-      const d = env.rules.dist(dest, objs[i]);
+      const d = env.dist(dest, objs[i]);
       if (d < best) best = d;
     }
     return -best;
@@ -42,13 +42,13 @@
     const pg = (env.priorities(ctx) && env.priorities(ctx).planGeneration) || {};
     const cap = (maxCells === undefined) ? (pg.defaultReachableCap || 48) : maxCells;
     if (!u || u.hp <= 0 || u.flags.has("-moved") || u.move <= 0) return [];
-    const s = (ctx && ctx.gridSize) || env.rules.gridSize;
+    const s = (ctx && ctx.gridSize) || env.gridSize;
     const r = Math.ceil(u.move);
     const out = [];
     for (let gx = Math.max(0, u.x - r); gx <= Math.min(s - 1, u.x + r); gx++){
       for (let gy = Math.max(0, u.y - r); gy <= Math.min(s - 1, u.y + r); gy++){
         const d = { x: gx, y: gy };
-        if (env.rules.canMove(ctx, u, d)) out.push(d);
+        if (env.canMove(ctx, u, d)) out.push(d);
       }
     }
     out.sort((a, b) => moveHeuristic(env, ctx, u, b) - moveHeuristic(env, ctx, u, a));
@@ -61,7 +61,7 @@
     const maxStep = (mi.maxHeadingStep !== undefined) ? mi.maxHeadingStep : 3;
     const emptyMaxConf = (mi.emptyVisibleCellMaxConfidence !== undefined) ? mi.emptyVisibleCellMaxConfidence : 0.5;
     const dec = env.cfg(ctx).beliefDecay;
-    const s = (ctx && ctx.gridSize) || env.rules.gridSize;
+    const s = (ctx && ctx.gridSize) || env.gridSize;
     const turn = (ctx && ctx.turnNumber) || 1;
     const us = (ctx && ctx.units) || [];
     const pm = (ctx && ctx.lastSeenEnemies) || new Map();
@@ -70,7 +70,7 @@
     for (let i = 0; i < pe.length; i++) nm.set(pe[i][0], { ...pe[i][1] });
     for (let i = 0; i < us.length; i++){
       const u = us[i];
-      if (u.hp > 0 && u.team === 1 && env.rules.isUnitSpottedByTeam(ctx, u, 2)){
+      if (u.hp > 0 && u.team === 1 && env.isUnitSpottedByTeam(ctx, u, 2)){
         const pv = nm.get(u.id), dx = pv ? (u.x - pv.x) : 0, dy = pv ? (u.y - pv.y) : 0;
         nm.set(u.id, {
           id: u.id, x: u.x, y: u.y,
@@ -88,11 +88,11 @@
     for (let i = 0; i < es.length; i++){
       const id = es[i][0], m = es[i][1], act = us.find(u => u.id === id && u.hp > 0);
       if (!act){ nm.delete(id); continue; }
-      if (m.advancedTurn === turn || env.rules.isUnitSpottedByTeam(ctx, act, 2)) continue;
+      if (m.advancedTurn === turn || env.isUnitSpottedByTeam(ctx, act, 2)) continue;
       const nx = Math.max(0, Math.min(s - 1, Math.round(m.x + m.dx)));
       const ny = Math.max(0, Math.min(s - 1, Math.round(m.y + m.dy)));
       const nc = m.confidence * dec, age = turn - m.turnSeen;
-      const empty = env.rules.isCellVisibleToTeam(ctx, nx, ny, 2) && !env.rules.getUnitAt(ctx, nx, ny);
+      const empty = env.isCellVisibleToTeam(ctx, nx, ny, 2) && !env.getUnitAt(ctx, nx, ny);
       if (nc < tn.beliefMinConfidence || age > tn.beliefMaxAgeTurns || (empty && nc < emptyMaxConf)){
         nm.delete(id);
       } else {
@@ -140,7 +140,7 @@
     const lrMin = (rf.longRangeMinRange !== undefined) ? rf.longRangeMinRange : 6;
     const aaMin = (rf.aaMinFirepower !== undefined) ? rf.aaMinFirepower : 4;
     const mine = myUnits(env, ctx), sp = spottedEnemies(env, ctx), fl = mine.find(u => u.flags.has("!flagship"));
-    const ft = !!fl && sp.some(p => p.firepower > 0 && !p.flags.has("-attacked") && env.rules.inRange(p, fl, Math.max(1, p.range + buf)) && env.rules.hasLineOfSight(ctx, p.x, p.y, fl.x, fl.y, "WEAPON"));
+    const ft = !!fl && sp.some(p => p.firepower > 0 && !p.flags.has("-attacked") && env.inRange(p, fl, Math.max(1, p.range + buf)) && env.hasLineOfSight(ctx, p.x, p.y, fl.x, fl.y, "WEAPON"));
     return {
       flagshipThreatened: ft,
       lacksScout: !mine.some(u => u.scan >= scoutScan && u.type !== exclScout),
@@ -155,17 +155,17 @@
     const capMult = (rf.capitalLocusCostMultiplier !== undefined) ? rf.capitalLocusCostMultiplier : 1;
     const emRad = (rf.emergencyLocusRadius !== undefined) ? rf.emergencyLocusRadius : 3;
     const emMult = (rf.emergencyLocusCostMultiplier !== undefined) ? rf.emergencyLocusCostMultiplier : 1.5;
-    const sr = (ctx && ctx.spawnRadius !== undefined) ? ctx.spawnRadius : env.rules.spawnRadius;
+    const sr = (ctx && ctx.spawnRadius !== undefined) ? ctx.spawnRadius : env.spawnRadius;
     const mine = myUnits(env, ctx);
-    const caps = mine.filter(u => u.flags.has("#capital ship") && env.rules.getValidWarpCells(ctx, u, sr).length > 0);
+    const caps = mine.filter(u => u.flags.has("#capital ship") && env.getValidWarpCells(ctx, u, sr).length > 0);
     if (caps.length > 0) return caps.map(u => ({ unit: u, radius: sr, costMult: capMult }));
-    return mine.filter(u => env.rules.getValidWarpCells(ctx, u, emRad).length > 0).map(u => ({ unit: u, radius: emRad, costMult: emMult }));
+    return mine.filter(u => env.getValidWarpCells(ctx, u, emRad).length > 0).map(u => ({ unit: u, radius: emRad, costMult: emMult }));
   }
 
   function canEliminateAllFlagshipThreats(env, ctx){
     const mine = myUnits(env, ctx), mf = mine.find(u => u.flags.has("!flagship"));
     if (!mf) return true;
-    const ths = spottedEnemies(env, ctx).filter(e => e.firepower > 0 && !e.flags.has("-attacked") && env.rules.inRange(e, mf, e.move + Math.max(1, e.range)));
+    const ths = spottedEnemies(env, ctx).filter(e => e.firepower > 0 && !e.flags.has("-attacked") && env.inRange(e, mf, e.move + Math.max(1, e.range)));
     let ap = (ctx && ctx.ap !== undefined) ? ctx.ap : 0;
     for (let t = 0; t < ths.length; t++){
       const th = ths[t];

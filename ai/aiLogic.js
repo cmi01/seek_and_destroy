@@ -58,20 +58,19 @@
     selectFleetActionPlan = kids.fleetCommander;
   }
 
-  function resolvePrioritiesObject(stateVisibleToAI, aiPriorities){
+  function resolvePrioritiesObject(aiPriorities){
     if (aiPriorities && typeof aiPriorities === "object" && !Array.isArray(aiPriorities)){
       return aiPriorities;
-    }
-    if (stateVisibleToAI && stateVisibleToAI._prioritiesObj){
-      return stateVisibleToAI._prioritiesObj;
     }
     return {};
   }
 
   function createLogicEnv(stateVisibleToAI, aiPriorities){
-    const pObj = resolvePrioritiesObject(stateVisibleToAI, aiPriorities);
-    // The AI uses the tactical rules engine passed on the snapshot DTO.
-    const rules = (stateVisibleToAI && (stateVisibleToAI.rules || stateVisibleToAI._rulesAdapter)) || null;
+    const pObj = resolvePrioritiesObject(aiPriorities);
+    // The AI uses the frozen rules facade projected onto the snapshot DTO
+    // (pure functions + copied data). It is spread FLAT onto the env below, so
+    // the leaves call env.canShoot(...), env.dist(...), env.shipSpecs, ...
+    const rules = (stateVisibleToAI && stateVisibleToAI.rules) || null;
     const errorCounts = new Map();
     function guard(where, fn, onErrorValue){
       try {
@@ -84,8 +83,7 @@
         return onErrorValue;
       }
     }
-    const env = {
-      rules,
+    const env = Object.assign(Object.create(null), rules, {
       priorities(){ return pObj; },
       tuning(){ return { ...pObj.tuning }; },
       doctrineWeights(doctrine){
@@ -135,38 +133,58 @@
       // ---- Planners ----
       planUnitTurn(ctx, u, unitRoll){ return guard("buildUnitPlan", () => buildUnitPlan(env, ctx, u, unitRoll), null); },
       selectBestPlan(ctx){ return guard("selectFleetActionPlan", () => selectFleetActionPlan(env, ctx), null); }
-    };
+    });
     return env;
   }
 
+  // One-way result shape shared by the whole AI tree. Every outcome is
+  // returned as plain data — nothing is ever written onto stateVisibleToAI.
+  function emptyResult(stateVisibleToAI, lastSeenEnemies){
+    return {
+      action: "NONE",
+      coord: [-1, -1],
+      decision: null,
+      selectedPlan: null,
+      reservations: (stateVisibleToAI && stateVisibleToAI.reservations) ? new Map(stateVisibleToAI.reservations) : new Map(),
+      lastSeenEnemies: lastSeenEnemies || new Map(),
+      aiEmergencyMode: false,
+      aiScoreTrace: []
+    };
+  }
+
   function GetAIAction(stateVisibleToAI, aiPriorities) {
-    if (!stateVisibleToAI) return ["NONE", [-1, -1]];
+    if (!stateVisibleToAI) return emptyResult(null, null);
     const env = createLogicEnv(stateVisibleToAI, aiPriorities);
     const invWarnings = env.checkInvariants(stateVisibleToAI);
     if (invWarnings && invWarnings.length){
       for (let i = 0; i < invWarnings.length; i++) console.warn(invWarnings[i]);
     }
     const syncedBeliefs = env.computeSyncedMemory(stateVisibleToAI);
-    stateVisibleToAI.lastSeenEnemies = syncedBeliefs;
-    stateVisibleToAI.decision = null;
+    const early = emptyResult(stateVisibleToAI, syncedBeliefs);
     if (
       stateVisibleToAI.syncOnly ||
       stateVisibleToAI.gameOver ||
       stateVisibleToAI.activeTeam !== 2 ||
       (stateVisibleToAI.ap !== undefined && stateVisibleToAI.ap <= 0)
     ){
-      return ["NONE", [-1, -1]];
+      return early;
     }
     const res = env.selectBestPlan(stateVisibleToAI);
-    if (!res) return ["NONE", [-1, -1]];
-    stateVisibleToAI.lastSeenEnemies = res.nextBeliefs;
-    stateVisibleToAI.aiEmergencyMode = res.aiEmergencyMode;
-    stateVisibleToAI.aiScoreTrace = res.aiScoreTrace;
-    stateVisibleToAI.selectedPlan = res.plan || null;
-    if (!res.plan) return ["NONE", [-1, -1]];
+    if (!res) return early;
+    const out = {
+      action: "NONE",
+      coord: [-1, -1],
+      decision: null,
+      selectedPlan: res.plan || null,
+      reservations: early.reservations,
+      lastSeenEnemies: res.nextBeliefs,
+      aiEmergencyMode: Boolean(res.aiEmergencyMode),
+      aiScoreTrace: res.aiScoreTrace
+    };
+    if (!res.plan) return out;
 
     const st = res.plan.steps[0];
-    if (!st) return ["NONE", [-1, -1]];
+    if (!st) return out;
     const buildDecision = (action, coord, from, to, warpOpts) => ({
       action,
       coord,
@@ -179,41 +197,42 @@
       score: res.plan.score,
       plan: res.plan
     });
+    const finish = (decision, warpOpts) => {
+      out.action = decision.action;
+      out.coord = decision.coord;
+      out.decision = decision;
+      if (warpOpts) out.warpOpts = warpOpts;
+      return out;
+    };
 
     if (st.kind === "WARP"){
       const cx = Math.round(st.locus.x), cy = Math.round(st.locus.y);
       const warpOpts = { radius: st.radius, costMult: st.costMult };
-      stateVisibleToAI.warpOpts = warpOpts;
-      stateVisibleToAI.decision = buildDecision("WARP:" + st.shipType, [cx, cy], { x: cx, y: cy }, { x: cx, y: cy }, warpOpts);
-      return ["WARP:" + st.shipType, [cx, cy]];
+      return finish(buildDecision("WARP:" + st.shipType, [cx, cy], { x: cx, y: cy }, { x: cx, y: cy }, warpOpts), warpOpts);
     }
     const us = stateVisibleToAI.units || [], u = us.find(x => x.id === res.plan.unitId && x.hp > 0);
-    if (!u) return ["NONE", [-1, -1]];
+    if (!u) return out;
     const ux = Math.round(u.x), uy = Math.round(u.y);
     if (st.kind === "MOVE"){
       const tx = Math.round(st.to.x), ty = Math.round(st.to.y);
-      stateVisibleToAI.decision = buildDecision("MOVE", [tx, ty], { x: ux, y: uy }, { x: tx, y: ty }, null);
-      return ["MOVE", [tx, ty]];
+      return finish(buildDecision("MOVE", [tx, ty], { x: ux, y: uy }, { x: tx, y: ty }, null));
     }
     if (st.kind === "SHOOT"){
       const t = us.find(x => x.id === st.target.id && x.hp > 0);
-      if (!t) return ["NONE", [-1, -1]];
+      if (!t) return out;
       const tx = Math.round(t.x), ty = Math.round(t.y);
-      stateVisibleToAI.decision = buildDecision("SHOOT", [tx, ty], { x: ux, y: uy }, { x: tx, y: ty }, null);
-      return ["SHOOT", [tx, ty]];
+      return finish(buildDecision("SHOOT", [tx, ty], { x: ux, y: uy }, { x: tx, y: ty }, null));
     }
     if (st.kind === "CAPTURE"){
       const t = us.find(x => x.id === st.target.id && x.hp > 0);
-      if (!t) return ["NONE", [-1, -1]];
+      if (!t) return out;
       const tx = Math.round(t.x), ty = Math.round(t.y);
-      stateVisibleToAI.decision = buildDecision("CAPTURE", [tx, ty], { x: ux, y: uy }, { x: tx, y: ty }, null);
-      return ["CAPTURE", [tx, ty]];
+      return finish(buildDecision("CAPTURE", [tx, ty], { x: ux, y: uy }, { x: tx, y: ty }, null));
     }
     if (st.kind === "SHIELD"){
-      stateVisibleToAI.decision = buildDecision("SHIELD", [ux, uy], { x: ux, y: uy }, { x: ux, y: uy }, null);
-      return ["SHIELD", [ux, uy]];
+      return finish(buildDecision("SHIELD", [ux, uy], { x: ux, y: uy }, { x: ux, y: uy }, null));
     }
-    return ["NONE", [-1, -1]];
+    return out;
   }
 
   AITurnWorkflow._register("logic", {

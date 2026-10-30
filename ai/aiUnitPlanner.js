@@ -16,14 +16,14 @@
     if (bg >= 1){
       for (let i = 0; i < sp.length; i++){
         const p = sp[i];
-        if (env.rules.canShoot(ctx, u, p)){
+        if (env.canShoot(ctx, u, p)){
           plans.push({ unitId: u.id, apCost: 1, steps: [{ kind: "SHOOT", target: p }], score: env.scoreShoot(ctx, u, p) });
         }
-        if (env.rules.canCapture(ctx, u, p)){
+        if (env.canCapture(ctx, u, p)){
           plans.push({ unitId: u.id, apCost: 1, steps: [{ kind: "CAPTURE", target: p }], score: env.scoreCapture(ctx, u, p) });
         }
       }
-      if (env.rules.canShield(ctx, u, u)){
+      if (env.canShield(ctx, u, u)){
         plans.push({ unitId: u.id, apCost: 1, steps: [{ kind: "SHIELD" }], score: env.scoreShield(ctx, u) });
       }
       if (!u.flags.has("-moved") && u.move > 0){
@@ -53,13 +53,13 @@
         if (u.flags.has("!flagship") && env.threatAt(ctx, u, d) >= u.hp + (u.flags.has("+shield") ? 1 : 0)) continue;
         for (let j = 0; j < ts.length; j++){
           const p = ts[j];
-          if (env.rules.canShoot(ctx, u, p)) continue;
-          if (!env.rules.shootableFrom(ctx, u, d, p)) continue;
+          if (env.canShoot(ctx, u, p)) continue;
+          if (!env.shootableFrom(ctx, u, d, p)) continue;
           plans.push({
             unitId: u.id,
             apCost: tn.compositeApCost,
             steps: [{ kind: "MOVE", to: d }, { kind: "SHOOT", target: p }],
-            score: env.scoreMove(ctx, u, d) + env.scoreShoot(ctx, u, p, { from: d }) - sc + (env.rules.isKillShot(u, p) ? tn.killBonus : 0)
+            score: env.scoreMove(ctx, u, d) + env.scoreShoot(ctx, u, p, { from: d }) - sc + (env.isKillShot(u, p) ? tn.killBonus : 0)
           });
         }
       }
@@ -72,7 +72,7 @@
         const d = ds[i];
         for (let j = 0; j < sp.length; j++){
           const p = sp[j];
-          if (p.team === u.team || p.flags.has("!flagship") || !env.rules.isUnitSpottedByTeam(ctx, p, u.team) || !env.rules.inRange(d, p, capRng)) continue;
+          if (p.team === u.team || p.flags.has("!flagship") || !env.isUnitSpottedByTeam(ctx, p, u.team) || !env.inRange(d, p, capRng)) continue;
           plans.push({
             unitId: u.id,
             apCost: tn.compositeApCost,
@@ -91,13 +91,13 @@
       const smsSeqMult = smsCfg.seqCostMultiplier !== undefined ? smsCfg.seqCostMultiplier : 2;
       for (let i = 0; i < sp.length && i < smsMaxT; i++){
         const p1 = sp[i];
-        if (!env.rules.canShoot(ctx, u, p1)) continue;
+        if (!env.canShoot(ctx, u, p1)) continue;
         const ds = env.reachableCells(ctx, u, smsCap);
         for (let d = 0; d < ds.length; d++){
           const dst = ds[d];
           for (let j = 0; j < sp.length && j < smsMaxT; j++){
             const p2 = sp[j];
-            if (p2.id === p1.id || !env.rules.shootableFrom(ctx, u, dst, p2)) continue;
+            if (p2.id === p1.id || !env.shootableFrom(ctx, u, dst, p2)) continue;
             plans.push({
               unitId: u.id,
               apCost: smsAp,

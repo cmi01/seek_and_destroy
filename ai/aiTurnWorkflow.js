@@ -55,20 +55,23 @@
     const st1 = plan.steps[1];
     const u = ((ctx && ctx.units) || []).find(x => x.id === plan.unitId);
     if (st0 && st0.kind === "SHOOT" && st0.target){
+      // Plan steps carry {id,x,y} snapshots; resolve the unit for flag reads.
+      const tgt = ((ctx && ctx.units) || []).find(x => x.id === st0.target.id) || st0.target;
       // Immediate SHOOT resolves on this beat (reducing target.hp directly),
       // so record the attacker in killers for focus-fire follow-up without
       // double-counting already-applied damage in committedDmg.
       const cur = nx.get(st0.target.id) || { committedDmg: 0, killers: [] };
       const prevPending = cur.killers.includes(plan.unitId)
-        ? ((st0.target.flags && st0.target.flags.has("+shield") && u && !u.flags.has("#railgun")) ? 1 : (u ? u.firepower : 0))
+        ? ((tgt.flags && tgt.flags.has("+shield") && u && !u.flags.has("#railgun")) ? 1 : (u ? u.firepower : 0))
         : 0;
       nx.set(st0.target.id, {
         committedDmg: Math.max(0, cur.committedDmg - prevPending),
         killers: cur.killers.includes(plan.unitId) ? cur.killers.slice() : cur.killers.concat([plan.unitId])
       });
     } else if (st0 && st0.kind === "MOVE" && st1 && st1.kind === "SHOOT" && st1.target){
+      const tgt = ((ctx && ctx.units) || []).find(x => x.id === st1.target.id) || st1.target;
       const cur = nx.get(st1.target.id) || { committedDmg: 0, killers: [] };
-      const effDmg = (st1.target.flags && st1.target.flags.has("+shield") && u && !u.flags.has("#railgun")) ? 1 : (u ? u.firepower : 0);
+      const effDmg = (tgt.flags && tgt.flags.has("+shield") && u && !u.flags.has("#railgun")) ? 1 : (u ? u.firepower : 0);
       nx.set(st1.target.id, {
         committedDmg: cur.committedDmg + effDmg,
         killers: cur.killers.includes(plan.unitId) ? cur.killers.slice() : cur.killers.concat([plan.unitId])
@@ -77,45 +80,38 @@
     return nx;
   }
 
+  // One-way boundary: nothing is written onto gameStateSnapshot. evaluate's
+  // plain result flows up with reservations recomputed here.
   function evaluateTurnStep(env, gameStateSnapshot){
-    if (!gameStateSnapshot) return ["NONE", [-1, -1]];
+    const fallback = () => (env && typeof env.fallbackEvaluate === "function")
+      ? env.fallbackEvaluate(gameStateSnapshot)
+      : {
+          action: "NONE", coord: [-1, -1], decision: null, selectedPlan: null,
+          reservations: new Map(), lastSeenEnemies: new Map(),
+          aiEmergencyMode: false, aiScoreTrace: []
+        };
+    if (!gameStateSnapshot) return fallback();
     const prioritiesObj = env && env.priorities ? env.priorities(gameStateSnapshot) : null;
-    const stateVisibleToAI = gameStateSnapshot;
-    if (env && env.rules){
-      stateVisibleToAI._rulesAdapter = env.rules;
-    }
-    if (prioritiesObj){
-      stateVisibleToAI._prioritiesObj = prioritiesObj;
-    }
 
-    let tuple = null;
+    let result = null;
     try {
-      tuple = _logic.evaluate(stateVisibleToAI, prioritiesObj);
+      result = _logic.evaluate(gameStateSnapshot, prioritiesObj);
     } catch (err) {
       // Keep the AI turn alive (fallback below), but never hide the cause.
       console.error("[S&D AI] GetAIAction threw; using fallback action:", err);
-      tuple = null;
+      result = null;
     }
 
-    if (tuple && Array.isArray(tuple)){
-      const cfg = env && env.cfg ? env.cfg(stateVisibleToAI) : { focusFire: true };
-      if (stateVisibleToAI.selectedPlan){
-        stateVisibleToAI.reservations = computeUpdatedReservations(
-          stateVisibleToAI,
-          stateVisibleToAI.selectedPlan,
-          Boolean(cfg && cfg.focusFire)
-        );
-        if (stateVisibleToAI.decision){
-          stateVisibleToAI.decision.reservations = stateVisibleToAI.reservations;
-        }
-      }
-      return tuple;
+    if (result && typeof result === "object"){
+      const cfg = env && env.cfg ? env.cfg(gameStateSnapshot) : { focusFire: true };
+      result.reservations = computeUpdatedReservations(
+        gameStateSnapshot,
+        result.selectedPlan,
+        Boolean(cfg && cfg.focusFire)
+      );
+      return result;
     }
-
-    if (env && typeof env.fallbackEvaluate === "function"){
-      return env.fallbackEvaluate(gameStateSnapshot);
-    }
-    return ["NONE", [-1, -1]];
+    return fallback();
   }
 
   getAIAction._register("turnWorkflow", {

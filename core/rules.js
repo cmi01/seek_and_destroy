@@ -169,17 +169,9 @@ Game._registerModule("rules", D => {
     return true;
   }
 
-  function canShield(ctxOrUnit, maybeUnit, maybeB){
-    let ctx = null;
-    let unitA = ctxOrUnit;
-    let B = maybeUnit;
-    if (maybeB !== undefined) {
-      ctx = ctxOrUnit;
-      unitA = maybeUnit;
-      B = maybeB;
-    } else if (typeof GetGameState === "function") {
-      ctx = GetGameState();
-    }
+  // ctx is required, like every other rule query: state belongs to the
+  // caller and is never fetched through a bare-global back-channel.
+  function canShield(ctx, unitA, B){
     if (!unitA || unitA.hp <= 0 || !B) return false;
     if (ctx && typeof ctx.ap === "number" && ctx.ap <= 0) return false;
     if (unitA.x !== B.x || unitA.y !== B.y) return false;

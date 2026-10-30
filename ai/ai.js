@@ -5,7 +5,9 @@
 // Privately registered with Game (core/game.js); loads data/aiPriorities_DATA.js &
 // ai/aiTurnWorkflow.js (which cascades into aiLogic.js and its 4
 // leaf modules) via temporary private registration.
-// Signature: tuple<string_action, tuple_coordinate<intx, inty>>(object_gamestate_snapshot)
+// Signature: (object_gameStateSnapshot) => plain result object
+//   {action, coord, decision, selectedPlan, reservations, lastSeenEnemies,
+//    aiEmergencyMode, aiScoreTrace}  (warpOpts may ride along on WARP results)
 // ============================================================
 Game._registerModule("ai", (() => {
   const _aiModules = {
@@ -15,19 +17,34 @@ Game._registerModule("ai", (() => {
   let _regOpen = true;
   let _loadPromise = null;
 
+  // Deep-copies plain data so the normalized table never aliases the frozen
+  // priorities manifest (any write into it throws since v74).
+  function deepCopy(v){
+    if (Array.isArray(v)) return v.map(deepCopy);
+    if (v && typeof v === "object"){
+      const o = {}, ks = Object.keys(v);
+      for (let i = 0; i < ks.length; i++) o[ks[i]] = deepCopy(v[ks[i]]);
+      return o;
+    }
+    return v;
+  }
+
   function aiNormalizePriorities(raw){
     const base = _aiModules.prioritiesData || {};
     const merge = (b, r) => {
-      if (!r || typeof r !== "object" || Array.isArray(r)) return b;
-      const o = { ...(b || {}) }, ks = Object.keys(r);
+      if (!r || typeof r !== "object" || Array.isArray(r)) return deepCopy(b);
+      const o = deepCopy(b || {}), ks = Object.keys(r);
       for (let i = 0; i < ks.length; i++){
         const k = ks[i], rv = r[k], bv = b ? b[k] : undefined;
-        if (Array.isArray(rv)) o[k] = rv.slice();
+        if (Array.isArray(rv)) o[k] = deepCopy(rv);
         else if (rv && typeof rv === "object") o[k] = merge(bv, rv);
         else if (rv !== undefined) o[k] = rv;
       }
       return o;
     };
+    // Both merge paths deep-copy base first: `out` shares zero refs with
+    // _aiModules.prioritiesData, so the weights rewrite below can never
+    // assign into the frozen manifest.
     const out = (raw && raw !== base) ? merge(base, raw) : merge({}, base);
     out.source = "aiPriorities_DATA.js";
     if (out.doctrines && out.doctrines.weights){
@@ -52,26 +69,37 @@ Game._registerModule("ai", (() => {
     return { ...aiPriorities(ctx).tuning };
   }
 
-  // Difficulty profiles come from the snapshot DTO or ctx.rules.
+  // Difficulty profiles come from the snapshot DTO or its rules facade.
   function aiCfg(ctx){
-    const rules = (ctx && (ctx.rules || ctx._rulesAdapter)) || null;
+    const rules = (ctx && ctx.rules) || null;
     const t = (ctx && ctx.difficultyTable) || (rules && rules.difficultyProfiles) || {};
     const k = (ctx && ctx.difficulty) || (rules && rules.defaultDifficulty) || "NORMAL";
     return t[k] || t.NORMAL;
   }
 
-  function fallbackEvaluate(){
-    return ["NONE", [-1, -1]];
+  function fallbackEvaluate(gameStateSnapshot){
+    const seen = (gameStateSnapshot && gameStateSnapshot.lastSeenEnemies) || null;
+    return {
+      action: "NONE",
+      coord: [-1, -1],
+      decision: null,
+      selectedPlan: null,
+      reservations: new Map(),
+      lastSeenEnemies: new Map(seen instanceof Map ? seen : Object.entries(seen || {})),
+      aiEmergencyMode: false,
+      aiScoreTrace: []
+    };
   }
 
   function getAIAction(gameStateSnapshot) {
-    const aiEnv = {
-      rules: (gameStateSnapshot && (gameStateSnapshot.rules || gameStateSnapshot._rulesAdapter)) || null,
+    // Flat rules facade: pure functions + copied data from the snapshot DTO,
+    // merged straight onto the env the AI tree receives (no live Rules handle).
+    const aiEnv = Object.assign(Object.create(null), gameStateSnapshot && gameStateSnapshot.rules, {
       priorities: aiPriorities,
       tuning: aiTuning,
       cfg: aiCfg,
       fallbackEvaluate
-    };
+    });
     if (_aiModules.turnWorkflow){
       return _aiModules.turnWorkflow.evaluateTurnStep(aiEnv, gameStateSnapshot);
     }

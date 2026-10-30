@@ -39,6 +39,9 @@ let SerializeGameState = null;
 let DeserializeGameState = null;
 
 let Rules = null;
+// Frozen plain-data facade of the pure rule queries, handed to the AI on the
+// snapshot DTO instead of the Rules module identity (built once in load()).
+let PURE_RULES = null;
 let Themes = null;
 let Hud = null;
 let getAIAction = null;
@@ -1269,7 +1272,7 @@ const AI = {
     const clonedTerrain = Array.isArray(State.terrain)
       ? State.terrain.map(col => Array.isArray(col) ? col.slice() : [])
       : [];
-    return {
+    const snap = {
       gridSize: GRID_SIZE,
       spawnRadius: SPAWN_RADIUS,
       difficulty: DIFFICULTY,
@@ -1285,16 +1288,19 @@ const AI = {
       // O(1) Rules.getUnitAt during planning (the board does not change while
       // the AI evaluates a beat; a new snapshot is built every beat).
       unitIndex: Rules.buildUnitIndex(clonedUnits),
-      lastSeenEnemies: State.lastSeenEnemies,
-      reservations: (State.aiPlan && State.aiPlan.reservations) ? State.aiPlan.reservations : new Map(),
+      lastSeenEnemies: new Map(State.lastSeenEnemies),
+      reservations: (State.aiPlan && State.aiPlan.reservations) ? new Map(State.aiPlan.reservations) : new Map(),
       aiEmergencyMode: State.aiEmergencyMode,
-      aiScoreTrace: State.aiScoreTrace,
+      aiScoreTrace: deepCopy(State.aiScoreTrace),
       gameOver: State.gameOver,
       rolls,
       roll: withRolls ? RND() : 1,
       syncOnly,
-      rules: Rules
+      rules: PURE_RULES
     };
+    // One-way boundary: the DTO is deep-frozen, so the AI tree can only read
+    // it — it returns a result object instead of decorating the snapshot.
+    return deepFreeze(snap);
   },
   getAIAction(snap){
     return getAIAction(snap);
@@ -1302,19 +1308,21 @@ const AI = {
   syncMemory(){
     if (typeof getAIAction !== "function") return;
     const snap = this._snapshot(false, true);
-    getAIAction(snap);
-    State.lastSeenEnemies = snap.lastSeenEnemies;
+    const res = getAIAction(snap);
+    State.lastSeenEnemies = res.lastSeenEnemies;
   },
   chooseBestPlan(){
     if (typeof getAIAction !== "function") return null;
     const snap = this._snapshot(true, false);
-    const [action, coord] = getAIAction(snap);
-    State.lastSeenEnemies = snap.lastSeenEnemies;
-    State.aiEmergencyMode = snap.aiEmergencyMode;
-    State.aiScoreTrace = snap.aiScoreTrace;
+    const res = getAIAction(snap);
+    State.lastSeenEnemies = res.lastSeenEnemies;
+    State.aiEmergencyMode = res.aiEmergencyMode;
+    State.aiScoreTrace = res.aiScoreTrace;
+    const action = res.action;
+    const coord = res.coord;
     if (!action || action === "NONE") return null;
-    const dec = snap.decision || {};
-    const pl = snap.selectedPlan || {};
+    const dec = res.decision || {};
+    const pl = res.selectedPlan || {};
     return {
       action,
       coord,
@@ -1329,16 +1337,18 @@ const AI = {
     if (State.ap <= 0) return false;
     if (typeof getAIAction !== "function") return false;
     const snap = this._snapshot(true, false);
-    const [action, coord] = getAIAction(snap);
-    State.lastSeenEnemies = snap.lastSeenEnemies;
-    State.aiEmergencyMode = snap.aiEmergencyMode;
-    State.aiScoreTrace = snap.aiScoreTrace;
+    const res = getAIAction(snap);
+    State.lastSeenEnemies = res.lastSeenEnemies;
+    State.aiEmergencyMode = res.aiEmergencyMode;
+    State.aiScoreTrace = res.aiScoreTrace;
     if (!State.aiPlan) State.aiPlan = {reservations: new Map(), currentPlan: null, stepIndex: 0};
-    State.aiPlan.reservations = snap.reservations;
-    State.aiPlan.currentPlan = snap.selectedPlan || null;
+    State.aiPlan.reservations = res.reservations;
+    State.aiPlan.currentPlan = res.selectedPlan || null;
     State.aiPlan.stepIndex = 0;
 
-    const dec = snap.decision || null;
+    const action = res.action;
+    const coord = res.coord;
+    const dec = res.decision || null;
     const actingUnit = (dec && dec.unitId !== undefined)
       ? State.units.find(u => u.id === dec.unitId && u.hp > 0 && u.team === 2) || null
       : null;
@@ -1349,7 +1359,7 @@ const AI = {
       const shipType = action.slice(5);
       const capitalUnit = actingUnit || MathGrid.getUnitAt(gx, gy);
       if (capitalUnit){
-        Actions.executeWarpIn(capitalUnit, shipType, true, 1, (dec && dec.warpOpts) || snap.warpOpts || {});
+        Actions.executeWarpIn(capitalUnit, shipType, true, 1, (dec && dec.warpOpts) || res.warpOpts || {});
       } else {
         GameAudio.play("enemy.unknownAction", {team:2, isVisible:false});
         Actions.consumeAPAndCheckTurn(true, 1);
@@ -1551,6 +1561,18 @@ function deepFreeze(o){
   return o;
 }
 
+// Plain-data deep copy (arrays and plain objects) for DTO handoffs.
+function deepCopy(o){
+  if (Array.isArray(o)) return o.map(deepCopy);
+  if (o && typeof o === "object") {
+    const out = {};
+    const ks = Object.keys(o);
+    for (let i = 0; i < ks.length; i++) out[ks[i]] = deepCopy(o[ks[i]]);
+    return out;
+  }
+  return o;
+}
+
 let _gameLoadPromise = null;
 const api = {
   _registerModule(name, mod){
@@ -1621,6 +1643,34 @@ const api = {
       Rules.initState = function(opts){ return InitializeGameState(opts); };
       Rules.patchState = function(delta){ return TryPatchGameState(delta); };
 
+      // Frozen plain facade of the pure rule queries + copied rule data,
+      // built once here: this is what crosses into the AI snapshot DTO —
+      // the Rules module identity never leaves game.js.
+      PURE_RULES = deepFreeze({
+        gridSize: Rules.gridSize,
+        spawnRadius: Rules.spawnRadius,
+        defaultDifficulty: Rules.defaultDifficulty,
+        difficultyProfiles: deepCopy(Rules.difficultyProfiles),
+        shipSpecs: deepCopy(Rules.shipSpecs),
+        dist(a, b){ return Rules.dist(a, b); },
+        inBounds(ctx, gx, gy){ return Rules.inBounds(ctx, gx, gy); },
+        terrainAt(ctx, gx, gy){ return Rules.terrainAt(ctx, gx, gy); },
+        getUnitAt(ctx, gx, gy){ return Rules.getUnitAt(ctx, gx, gy); },
+        canMove(ctx, unitA, B){ return Rules.canMove(ctx, unitA, B); },
+        canCapture(ctx, unitA, B){ return Rules.canCapture(ctx, unitA, B); },
+        canShoot(ctx, unitA, B){ return Rules.canShoot(ctx, unitA, B); },
+        canShield(ctx, unitA, B){ return Rules.canShield(ctx, unitA, B); },
+        inRange(a, b, r){ return Rules.inRange(a, b, r); },
+        isCellVisibleToTeam(ctx, gx, gy, team){ return Rules.isCellVisibleToTeam(ctx, gx, gy, team); },
+        isUnitSpottedByTeam(ctx, targetUnit, observerTeam){ return Rules.isUnitSpottedByTeam(ctx, targetUnit, observerTeam); },
+        hasLineOfSight(ctx, x0, y0, x1, y1, mode){ return Rules.hasLineOfSight(ctx, x0, y0, x1, y1, mode); },
+        effectiveScan(ctx, unit){ return Rules.effectiveScan(ctx, unit); },
+        getValidWarpCells(ctx, capitalUnit, radius){ return Rules.getValidWarpCells(ctx, capitalUnit, radius); },
+        shootableFrom(ctx, u, dest, target){ return Rules.shootableFrom(ctx, u, dest, target); },
+        isKillShot(u, target){ return Rules.isKillShot(u, target); },
+        getPriorityActionAt(ctx, unitA, gx, gy, opts){ return Rules.getPriorityActionAt(ctx, unitA, gx, gy, opts); }
+      });
+
       _hudStore = _modules.hud.createInitialHudStore();
       Hud = _modules.hud.createHud({
         hudStore: _hudStore,
@@ -1640,7 +1690,10 @@ const api = {
       const rawAI = _modules.ai;
       await rawAI.load();
       getAIAction = snap => {
-        if (snap && !snap.rules) snap.rules = pureRules;
+        // Sanctioned carve-out: hand-built snapshots (tests) may omit `rules`;
+        // give them the same frozen facade the AI DTO carries (game-built
+        // snapshots already have it, so this never writes to a frozen DTO).
+        if (snap && !snap.rules) snap.rules = PURE_RULES;
         return rawAI(snap);
       };
 
