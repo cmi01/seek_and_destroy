@@ -1,40 +1,28 @@
 "use strict";
-
 // ============================================================
-// BACKGROUND RENDERER — Grid, coordinate ticks, cached procedural terrain,
-// explored-terrain fog memory & batched fog of war.
-// Privately registered with Graphics (graphics.js); exposes zero globals.
+// BACKGROUND RENDERER — Grid, coordinate ticks, procedural
+// terrain painting, explored-terrain fog memory & batched fog
+// of war. Pure data in / pixels out: the parent (graphics.js)
+// owns the terrain cache canvas, its key and its invalidation,
+// and hands down a validated canvas plus plain asteroid shape
+// data to paint. Privately registered with Graphics; exposes
+// zero globals.
 // ============================================================
 (() => {
-  function _mulberry32(seed) {
-    let a = seed >>> 0;
-    return function() {
-      a = (a + 0x6D2B79F5) >>> 0;
-      let t = a;
-      t = Math.imul(t ^ (t >>> 15), t | 1);
-      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
+  // ---- Plain-data helpers (local re-implementations over frame data) -------
+  const _spottedBy = (u, team) => Boolean(u && (u.team === team || u.spottedByPlayer));
+  const _effScanOf = u => (u && typeof u.effectiveScan === "number") ? u.effectiveScan : (u ? (u.scan || 0) : 0);
 
-  function _ensureTerrainCache(terrainCache, state, themeKey, bp, gridSize, CP, FS, makeRng, TC) {
-    if (!terrainCache) return null;
-    const rngFactory = typeof makeRng === "function" ? makeRng : _mulberry32;
-    const tKey = themeKey || (state && state.theme) || "default";
-    const key = `${state.levelId}|${tKey}|${gridSize}|${CP.toFixed(2)}|${FS.toFixed(3)}`;
-    if (terrainCache.canvas && terrainCache.key === key && terrainCache.ref === state.terrain) {
-      return terrainCache.canvas;
-    }
-    if (typeof document === "undefined") return null;
+  // Paints procedural terrain (nebulae + asteroid shapes) into the parent's
+  // offscreen cache canvas. `shapes[gx][gy]` is plain geometry data computed
+  // by the parent's single RNG source: { seed, pts: [[x, y]…], ex, ey, erot }.
+  // Returns nothing but pixels.
+  function paintTerrain(cmd) {
+    const { canvas, state, bp, gridSize, CP, FS, shapes, TC: rawTC } = cmd;
+    const TC = typeof rawTC === "function" ? rawTC : (c => c);
+    if (!canvas) return;
     const totalPx = Math.max(64, Math.ceil(gridSize * CP));
-    if (!terrainCache.canvas) {
-      terrainCache.canvas = document.createElement("canvas");
-    }
-    if (terrainCache.canvas.width !== totalPx || terrainCache.canvas.height !== totalPx) {
-      terrainCache.canvas.width = totalPx;
-      terrainCache.canvas.height = totalPx;
-    }
-    const tctx = terrainCache.canvas.getContext("2d");
+    const tctx = canvas.getContext("2d");
     tctx.clearRect(0, 0, totalPx, totalPx);
 
     for (let gx = 0; gx < gridSize; gx++) {
@@ -54,19 +42,16 @@
           tctx.fillStyle = nebGrad;
           tctx.fillRect(gx * CP, gy * CP, CP, CP);
         } else if (t === "ASTEROID") {
-          const seed = (state.asteroidSeeds && state.asteroidSeeds[gx]) ? state.asteroidSeeds[gx][gy] : 0.5;
-          const rng = rngFactory(Math.floor(seed * 10000));
+          const shape = (shapes && shapes[gx] && shapes[gx][gy]) ? shapes[gx][gy] : null;
+          if (!shape) continue;
           tctx.save();
           tctx.translate(cx, cy);
-          tctx.rotate(seed * Math.PI * 2);
+          tctx.rotate(shape.seed * Math.PI * 2);
 
           tctx.beginPath();
-          const pts = 9;
-          for (let i = 0; i < pts; i++) {
-            const a = (i / pts) * Math.PI * 2;
-            const rad = (7.5 + rng() * 4 - 2) * FS;
-            const vx = Math.cos(a) * rad, vy = Math.sin(a) * rad;
-            if (i === 0) tctx.moveTo(vx, vy); else tctx.lineTo(vx, vy);
+          const pts = shape.pts;
+          for (let i = 0; i < pts.length; i++) {
+            if (i === 0) tctx.moveTo(pts[i][0], pts[i][1]); else tctx.lineTo(pts[i][0], pts[i][1]);
           }
           tctx.closePath();
 
@@ -82,25 +67,20 @@
 
           tctx.fillStyle = TC("rgba(0,0,0,0.3)");
           tctx.beginPath();
-          tctx.ellipse((rng() * 4 - 2) * FS, (rng() * 4 - 2) * FS, 2.5 * FS, 1.8 * FS, rng() * Math.PI, 0, Math.PI * 2);
+          tctx.ellipse(shape.ex, shape.ey, 2.5 * FS, 1.8 * FS, shape.erot, 0, Math.PI * 2);
           tctx.fill();
 
           tctx.restore();
         }
       }
     }
-
-    terrainCache.key = key;
-    terrainCache.ref = state.terrain;
-    return terrainCache.canvas;
   }
 
   function drawBattleGridAndTerrain(cmd) {
     const {
-      ctx, visMatrix, state, theme, bp, gridSize,
-      CP, FS, DX0, DX1, DY0, DY1, makeRng, terrainCache, TC: rawTC
+      ctx, visMatrix, state, bp, gridSize,
+      CP, FS, DX0, DX1, DY0, DY1, terrainCanvas
     } = cmd;
-    const TC = typeof rawTC === "function" ? rawTC : (c => c);
 
     // 1. Batched grid lines (minor + major) (ISS-030)
     ctx.lineWidth = 1;
@@ -145,7 +125,7 @@
     ctx.stroke();
 
     // 3. Cached procedural terrain (active visibility at 1.0 alpha, explored memory at 0.45 alpha) (ISS-030, ISS-069)
-    const cacheCanvas = _ensureTerrainCache(terrainCache, state, theme, bp, gridSize, CP, FS, makeRng, TC);
+    const cacheCanvas = terrainCanvas || null;
     const explored = state.exploredCells;
     if (cacheCanvas) {
       ctx.save();
@@ -183,7 +163,6 @@
       }
     }
     ctx.restore();
-
     // Batched diagonal hatch lines across all fogged cells in a single stroke call (ISS-030)
     ctx.lineWidth = 1;
     ctx.strokeStyle = TC("rgba(255, 255, 255, 0.02)");
@@ -264,6 +243,7 @@
   }
 
   Graphics._registerLayer("background", {
+    paintTerrain,
     drawBattleGridAndTerrain,
     drawBattleFog,
     drawMinimapBackground

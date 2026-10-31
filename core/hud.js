@@ -87,8 +87,8 @@ Game._registerModule("hud", (() => {
   // ----------------------------------------------------------------
   // STARMAP LAYOUT — single deterministic source of truth for the
   // campaign starmap. Both the hit-test layout (syncLayout) and the
-  // renderer (uiRenderer._drawCampaignModal) consume the node geometry
-  // computed here (the renderer reads it from the HUD snapshot), so the
+  // starmap renderer consume the node geometry computed here (the
+  // renderer reads it from the HUD snapshot), so the
   // clickable regions always match what is drawn. Pure: depends only on
   // the card list and the canvas size.
   // ----------------------------------------------------------------
@@ -409,7 +409,7 @@ Game._registerModule("hud", (() => {
       if (w.activeModal === "campaign") {
         // Starmap: one clickable node per campaign level. Node geometry is
         // computed by the shared _computeStarmapLayout so the hit regions
-        // stored here exactly match what uiRenderer draws (it reads the same
+        // stored here exactly match what the starmap draws (it reads the same
         // nodes/layout from the HUD snapshot).
         const cards = Array.isArray(w.campaignModal.cards) ? w.campaignModal.cards : [];
         const layout = _computeStarmapLayout(cards, DS, US);

@@ -1742,6 +1742,62 @@ function deepCopy(o){
   return o;
 }
 
+// ---- Frame DTO copies (v78) -------------------------------------------------
+// Render frames are plain data: nothing in a frame may alias live State.
+// The big grids are copy-on-write — State replaces terrain/asteroidSeeds/
+// visCache wholesale (TryPatchGameState, Visibility.ensureCache) and never
+// mutates them in place, so their frozen deep copies are rebuilt only when the
+// source identity changes. A stable copy identity between frames also keeps
+// graphics-side caches keyed on it (backgroundRenderer._terrainCache.ref) valid.
+// exploredCells IS mutated in place (Visibility.ensureCache) and is re-copied
+// on every publish.
+const _frameCopyCache = new WeakMap();
+function frameCopy(src){
+  if (!src || typeof src !== "object") return src;
+  const hit = _frameCopyCache.get(src);
+  if (hit) return hit;
+  const copy = deepFreeze(deepCopy(src));
+  _frameCopyCache.set(src, copy);
+  return copy;
+}
+function freshCopy(src){
+  return (src && typeof src === "object") ? deepFreeze(deepCopy(src)) : src;
+}
+// Element DTOs for frame arrays: only the scalar/DTO fields the renderers read
+// (graphics/vfx.js, graphics/objectRenderer.js, graphics/uiRenderer.js).
+function frameCell(c){ return { x: c ? c.x : 0, y: c ? c.y : 0 }; }
+function vectorDTO(v){
+  return { kind: String(v.kind || ""), from: frameCell(v.from), to: frameCell(v.to) };
+}
+function animationDTO(a){
+  return {
+    kind: String(a.kind || ""),
+    start: Number(a.start) || 0,
+    duration: Number(a.duration) || 0,
+    unitId: typeof a.unitId === "number" ? a.unitId : null,
+    from: a.from ? frameCell(a.from) : null,
+    to: a.to ? frameCell(a.to) : null,
+    cell: a.cell ? frameCell(a.cell) : null,
+    wType: typeof a.wType === "string" ? a.wType : "",
+    damage: Number(a.damage) || 0,
+    shieldStripped: Boolean(a.shieldStripped),
+    shipType: typeof a.shipType === "string" ? a.shipType : "",
+    targetName: typeof a.targetName === "string" ? a.targetName : ""
+  };
+}
+function buttonDTO(b){
+  return {
+    id: typeof b.id === "string" ? b.id : "",
+    label: typeof b.label === "string" ? b.label : "",
+    x: Number(b.x) || 0,
+    y: Number(b.y) || 0,
+    w: Number(b.w) || 0,
+    h: Number(b.h) || 0,
+    enabled: Boolean(b.enabled),
+    active: Boolean(b.active)
+  };
+}
+
 let _gameLoadPromise = null;
 const api = {
   _registerModule(name, mod){
@@ -2095,13 +2151,13 @@ const api = {
       buttonPressed: State.buttonPressed,
       selectedCell: State.selectedCell ? { ...State.selectedCell } : null,
       hoveredCell: State.hoveredCell ? { ...State.hoveredCell } : null,
-      terrain: State.terrain,
-      asteroidSeeds: State.asteroidSeeds,
-      exploredCells: State.exploredCells,
+      terrain: frameCopy(State.terrain),
+      asteroidSeeds: frameCopy(State.asteroidSeeds),
+      exploredCells: freshCopy(State.exploredCells),
       units: unitsDTO,
-      historicalVectors: Array.isArray(State.historicalVectors) ? State.historicalVectors.slice() : [],
-      animations: Array.isArray(State.animations) ? State.animations.slice() : [],
-      canvasButtons: Array.isArray(State.canvasButtons) ? State.canvasButtons.slice() : [],
+      historicalVectors: Array.isArray(State.historicalVectors) ? State.historicalVectors.map(vectorDTO) : [],
+      animations: Array.isArray(State.animations) ? State.animations.map(animationDTO) : [],
+      canvasButtons: Array.isArray(State.canvasButtons) ? State.canvasButtons.map(buttonDTO) : [],
       audioSettings: State.audioSettings ? { muted: Boolean(State.audioSettings.muted) } : { muted: false },
       canShieldSelected,
       tacticalOverlays
@@ -2119,7 +2175,7 @@ const api = {
       metrics: metricsDTO,
       theme: State.theme || "default",
       now: nowVal,
-      visCache: rawVis,
+      visCache: frameCopy(rawVis),
       uiHud: Hud.getSnapshot(nowVal)
     };
     if (overrides && typeof overrides === "object") {
