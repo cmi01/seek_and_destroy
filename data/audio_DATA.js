@@ -1,9 +1,8 @@
 "use strict";
 
 // ============================================================
-// AUDIO DATA — clip manifests (offsets into the baked theme buffers) and the
-// destruction-sound tier per ship category.
-// Privately registered with SoundEngine (sounds.js); exposes zero globals.
+// audio_DATA.js — job: hold the audio clip table.
+// Owner: audio/sounds.js. Holds no state unless it is a core.
 // ============================================================
 SoundEngine._registerModule("audioData", {
   version: "V58-1.0",

@@ -1,10 +1,7 @@
 "use strict";
 // ============================================================
-// VFX RENDERER — Combat animations, explosions & popups.
-// Privately registered with Graphics (graphics.js); exposes zero
-// globals. Draws ONE animation per call so the parent can
-// interleave its own ship rendering (glides) in exact draw
-// order. Never draws ships: ship rendering is parent-owned.
+// vfx.js — job: draw the frame's effects layer.
+// Owner: graphics/graphics.js. Holds no state unless it is a core.
 // ============================================================
 (() => {
   const _cellCenter = (gx, gy, CP) => ({ x: (gx + 0.5) * CP, y: (gy + 0.5) * CP });

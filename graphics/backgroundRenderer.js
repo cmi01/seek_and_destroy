@@ -1,12 +1,7 @@
 "use strict";
 // ============================================================
-// BACKGROUND RENDERER — Grid, coordinate ticks, procedural
-// terrain painting, explored-terrain fog memory & batched fog
-// of war. Pure data in / pixels out: the parent (graphics.js)
-// owns the terrain cache canvas, its key and its invalidation,
-// and hands down a validated canvas plus plain asteroid shape
-// data to paint. Privately registered with Graphics; exposes
-// zero globals.
+// backgroundRenderer.js — job: draw the frame's background layer.
+// Owner: graphics/graphics.js. Holds no state unless it is a core.
 // ============================================================
 (() => {
   // ---- Plain-data helpers (local re-implementations over frame data) -------

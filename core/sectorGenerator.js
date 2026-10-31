@@ -1,10 +1,8 @@
 "use strict";
 
 // ============================================================
-// SECTOR GENERATOR — Pure-function campaign sector generator: procedural
-// asteroid clusters & nebula patches, unit spawning, and initial camera.
-// Privately registered with Game (core/game.js); holds zero state, mutates
-// zero external objects, and exposes zero globals.
+// sectorGenerator.js — job: generate a level's sector data (terrain, spawns, formation).
+// Owner: core/game.js. Holds no state unless it is a core.
 // ============================================================
 Game._registerModule("sectorGenerator", (() => {
   function inBounds(gridSize, gx, gy) {

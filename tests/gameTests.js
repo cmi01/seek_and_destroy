@@ -1,9 +1,8 @@
 "use strict";
 
 // ============================================================
-// GAME TESTS â€” AI + viewport-zoom self-tests.
-// Child of core/game.js: registered privately via Game._registerModule("tests", ...)
-// and handed a bridge object by its parent. References zero other files.
+// gameTests.js — job: run the game-side self-tests through the test bridge.
+// Owner: core/game.js. Holds no state unless it is a core.
 // ============================================================
 Game._registerModule("tests", function runTest(bridge, testName) {  const suite = {
     // Fresh state from the single template (profile kept), then only the

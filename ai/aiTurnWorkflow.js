@@ -1,9 +1,8 @@
 "use strict";
 
 // ============================================================
-// AI TURN WORKFLOW — reservation updates & delegation to aiLogic.js.
-// Referenced exclusively by ai.js; loads and delegates to aiLogic.js
-// via the temporary AITurnWorkflow._register registrar.
+// aiTurnWorkflow.js — job: sequence the AI turn's action beats.
+// Owner: ai/aiLogic.js. Holds no state unless it is a core.
 // ============================================================
 (() => {
   let _logic = null;

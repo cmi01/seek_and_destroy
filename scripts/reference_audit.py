@@ -192,7 +192,20 @@ def list_js_files():
 
 def read(path):
     with open(os.path.join(REPO_ROOT, path), encoding="utf-8") as fh:
-        return fh.read()
+        lines = fh.read().splitlines(keepends=True)
+    # Header-contract lines (docs/ARCHITECTURE_COMPLIANCE.md section 5) declare
+    # the file's job and owner. They name files on purpose and are declarations,
+    # not code references, so they are scrubbed before analysis.
+    out = []
+    for ln in lines:
+        s = ln.lstrip()
+        if s.startswith("//"):
+            body = s[2:].lstrip()
+            if body.startswith("job:") or body.startswith("Owner:") or "\u2014 job:" in body:
+                out.append("\n" if ln.endswith("\n") else "")
+                continue
+        out.append(ln)
+    return "".join(out)
 
 
 def blank_spans(text, kind):

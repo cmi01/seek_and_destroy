@@ -1,10 +1,8 @@
 "use strict";
 
 // ============================================================
-// RULES — stateless pure tactical rules engine (movement, line of sight,
-// visibility, combat outcomes, endgame).
-// Privately registered with Game (core/game.js); holds zero state and
-// exposes zero globals.
+// rules.js — job: answer tactical rule queries.
+// Owner: core/game.js. Holds no state unless it is a core.
 // ============================================================
 Game._registerModule("rules", D => {
   function getGridSize(){ return D.gridSize; }

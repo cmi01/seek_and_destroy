@@ -1,10 +1,8 @@
 "use strict";
 
 // ============================================================
-// GRAPHICS TESTS â€” baked sprite atlas + Theme B pixel self-tests.
-// Child of graphics/graphics.js: registered privately via
-// Graphics._registerLayer("tests", ...) and handed a bridge object by its parent.
-// References zero other files.
+// graphicsTests.js — job: run the graphics self-tests through the test bridge.
+// Owner: graphics/graphics.js. Holds no state unless it is a core.
 // ============================================================
 Graphics._registerLayer("tests", function runTest(bridge, testName) {
   const suite = {

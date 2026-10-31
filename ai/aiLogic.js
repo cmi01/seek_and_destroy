@@ -1,10 +1,8 @@
 "use strict";
 
 // ============================================================
-// AI LOGIC — orchestrates aiStateQueries.js, aiThreatScorer.js,
-// aiUnitPlanner.js & aiFleetCommander.js (all loaded and registered
-// privately via AILogic._register).
-// Referenced exclusively by aiTurnWorkflow.js.
+// aiLogic.js — job: orchestrate the AI children into one decision.
+// Owner: ai/ai.js. Holds no state unless it is a core.
 // ============================================================
 (() => {
   let Q = null;

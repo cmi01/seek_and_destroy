@@ -1,10 +1,8 @@
 "use strict";
 
 // ============================================================
-// MAIN.JS — Supervisor & Wiring Root (V69).
-// Initializes the 3 Unidirectional Interface Servers (InputInterface,
-// GraphicsInterface, AudioInterface) and the 4 Core System Processes
-// (Game, Graphics, Inputs, SoundEngine) and steps the frame loop.
+// main.js — job: create the cores and interfaces, wire them together, and run the frame loop.
+// Owner: wiring root (index.html). Holds no state unless it is a core.
 // ============================================================
 
 // ============================================================

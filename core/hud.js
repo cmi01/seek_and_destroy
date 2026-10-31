@@ -1,68 +1,9 @@
 "use strict";
 
 // ============================================================
-// HUD — Stateless pure view-model & layout/hitbox calculator for the canvas
-// HUD: top bar, telemetry cards, priority banner, intel overlay,
-// Bridge / Campaign / Endgame modals and oscilloscope waveform.
-// Privately registered with Game (core/game.js); holds no state, mutates
-// nothing, and exposes zero globals (§3: pure-function child).
-//
-// ============================ CONTRACT ============================
-// DEPS (built once by Game, plain data + pure closures — never modules):
-//   deps.campaignLevels   plain copy of the campaign level specs
-//   deps.shipSpecs        plain copy of the ship spec table
-//   deps.flagDescriptions plain copy of the rules flag descriptions
-//   deps.getUnitAt(gx, gy)        -> unit DTO (plain copy) | null
-//   deps.terrainAt(gx, gy)        -> terrain string ("EMPTY"/"NEBULA"/…)
-//   deps.isSpotted(unit)          -> bool (spotted by the player)
-//   deps.cellVisible(gx, gy)      -> bool (visible to the player)
-//   deps.effectiveScan(unit)      -> number
-//   deps.validWarpCells(unit)     -> [{x, y}, …]
-//   deps.canShield(unit, pos)     -> bool
-//   deps.canCapture(unit, pos)    -> bool
-//   deps.canShoot(unit, pos)      -> bool
-//   deps.priorityAction(unit, gx, gy) -> "MOVE"/"CAPTURE"/"SHOOT"/"SHIELD"|null
-//   deps.renderedViewport()       -> {viewX, viewY, cellPx}
-//
-// INPUT (per call, plain data only):
-//   input.now       numeric timestamp (ms)
-//   input.state     read-only plain snapshot of the game state fields the HUD
-//                   may see: levelId, turnNumber, activeTeam, gameOver, ap,
-//                   credits {1,2}, theme (already resolved by Game), viewX,
-//                   viewY, viewSpan, mousePx {x,y}, hoveredCell {x,y}|null,
-//                   selectedCell {x,y}|null, inspectMode, audioMuted,
-//                   completedLevels [ids]
-//   input.metrics   {displaySize, uiScale, minimapSize, cellPx}
-//   input.units     plain copies of the living units
-//   input.selectedUnit  plain copy of the selected unit | null
-//   input.cache     {priorityKey, priorityLabel, hoveredSpotted} — the
-//                   priority-banner memo Game stores between calls
-//
-// RESULT SHAPE — every operation returns one plain object (fields appear
-// only when the operation produces them):
-//   {
-//     view:        the FULL next HUD view-model (Game replaces its stored
-//                  view with it). telemetry/banner/panelRects below are
-//                  named aliases into the same objects, kept for consumers:
-//     telemetry:   { hovered, selected }   (view.hoveredTelemetry/selectedTelemetry)
-//     banner:      priority banner         (view.priorityBanner)
-//     panelRects:  hit-test rects          (view.panelRects)
-//     buttons:     canvas button descriptors -> the canvasButtons state field
-//     theme:       requested theme key -> Game applies the theme state field,
-//                  the body data-theme attribute and the audio theme command
-//     selection:   { unitId } — request Game to select that unit;
-//                  { sync: true } — request Game to re-sync the selection mirror
-//     sounds:      [{ kind, payload }] sound commands -> Game routes them to
-//                  its audio producer
-//     cache:       updated priority-banner memo -> Game stores it
-//     flags:       { clearInteraction, renderRequests } —
-//                  clearInteraction: clear the button-hovered/button-pressed
-//                  state fields;
-//                  renderRequests: [overrides, …] frame publishes for Game/
-//                  main.js to run through the host render entry point
-//   }
-// Game applies every field; this child touches no state of its own.
-// =================================================================
+// hud.js — job: build the HUD widget model and button list from game state.
+// Owner: core/game.js. Holds no state unless it is a core.
+// ============================================================
 Game._registerModule("hud", (() => {
   function _estimateTelemetryCardHeight(model, inspectMode, US) {
     if (!model || model.kind === "none") return 0;

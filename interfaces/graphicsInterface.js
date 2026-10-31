@@ -1,17 +1,8 @@
 "use strict";
 
 // ============================================================
-// GRAPHICS INTERFACE — Strictly 1-Way Data Broker (Game ---> Graphics)
-// Initialized and wired by main.js.
-// Game only sees `producer.publishStaticConfig(cfg)` & `producer.publishFrame(frameDTO)`.
-// Graphics only sees `consumer.getStaticConfig()` & `consumer.readFrame()`.
-// Payloads are rebuilt field-by-field on ingest (the audioInterface
-// sanitizeCommand/clonePayload precedent): the channel carries only detached
-// plain data — never live state, never functions. Deep clones are memoized by
-// source identity so stable subtrees (the frame grids, spec tables) are cloned
-// once and keep a stable identity across frames for graphics-side caches.
-// Producers must therefore pass immutable or per-frame-fresh sub-objects
-// (game.js buildFrame does: frozen grid copies + freshly built DTOs).
+// graphicsInterface.js — job: carry plain render frames from Game to Graphics.
+// Owner: main.js. Holds no state unless it is a core.
 // ============================================================
 const GraphicsInterface = (() => {
   const _cloneMemo = new WeakMap();

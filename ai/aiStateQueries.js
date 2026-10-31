@@ -1,10 +1,8 @@
 "use strict";
 
 // ============================================================
-// AI STATE QUERIES — unit filtering, belief memory & threat queries.
-// BASE LAYER of the AI: depends only on the rules queries and config services
-// passed in the flat `env` (env.dist, env.tuning, env.cfg, env.priorities).
-// Privately registered with its parent (aiLogic.js); exposes zero globals.
+// aiStateQueries.js — job: answer AI state queries.
+// Owner: ai/aiLogic.js. Holds no state unless it is a core.
 // ============================================================
 (() => {
   function myUnits(env, ctx){

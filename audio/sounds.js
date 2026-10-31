@@ -1,22 +1,8 @@
 "use strict";
 
 // ============================================================
-// SOUNDS.JS — WebAudio engine. Owns the AudioContext, bus graph, master
-// DynamicsCompressorNode, per-bus polyphony cap, theme buffers and persisted
-// mixer settings; delegates one-shot effects to SfxEngine (sfx.js) and
-// looping beds to MusicEngine (music.js).
-//
-// Public API (SoundEngine):
-//   bindHost(host)            — inject game services (timers, game-over, settings, enable-button, viewport)
-//   play(eventName, payload)  — play a semantic sound event ("unit.move", "weapon.fire", ...)
-//   unlock()                  — create/resume the AudioContext and unmute (needs a user gesture)
-//   isReady()                 — true when AudioContext is running
-//   stopLoops()               — stop looping ambience & music beds without cancelling one-shots
-//   toggleMute() / setMaster(v) / setBusGain(name, v) / setReduced(bool)
-//   setTheme(key) / getTheme()
-//   clearAll()                — cancel tracked audio timers & stop loops
-//   getAnalyser() / getRadioActiveUntil()
-//   runSelfTests()            — validate clip manifest, event routing, loops, themes, buses
+// sounds.js — job: own the audio context and active sound nodes.
+// Owner: core (loaded by main.js). Holds no state unless it is a core.
 // ============================================================
 const SoundEngine = (() => {
   const AUDIO_CHILDREN = [

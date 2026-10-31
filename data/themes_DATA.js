@@ -1,10 +1,8 @@
 "use strict";
 
 // ============================================================
-// THEME DATA — the three visual themes: board palettes, the colour remap
-// that re-tints UI/VFX colours for non-default themes, and the baked
-// sprite-atlas layout.
-// Privately registered with Game (core/game.js); exposes zero globals.
+// themes_DATA.js — job: hold the theme tables.
+// Owner: core/game.js. Holds no state unless it is a core.
 // ============================================================
 Game._registerModule("themesData", {
   version: "V58-1.0",

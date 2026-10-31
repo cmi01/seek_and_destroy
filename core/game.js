@@ -1,11 +1,8 @@
 "use strict";
 
 // ============================================================
-// GAME CORE — State view, seeded RNG, host binding, GameAudio, MathGrid,
-// Visibility, Selection, Actions (domain actions & turn state machine),
-// InputProcessor, and AI turn runner. Owns all state and privately loads
-// data/*_DATA.js, core/gameState.js, core/themes.js, core/rules.js,
-// core/hud.js, core/sectorGenerator.js, and ai/ai.js via Game._registerModule.
+// game.js — job: own all authoritative state, rules and turn flow.
+// Owner: core (loaded by main.js). Holds no state unless it is a core.
 // ============================================================
 const Game = (() => {
 const _modules = {

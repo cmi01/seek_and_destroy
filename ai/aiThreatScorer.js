@@ -1,10 +1,8 @@
 "use strict";
 
 // ============================================================
-// AI THREAT SCORER — Stateless pure-function threat envelopes, nebula risk,
-// retreat search & action/target utility. Depends only on the `env` and `ctx`
-// passed by its parent orchestrator (aiLogic.js); holds zero state and zero
-// sibling references.
+// aiThreatScorer.js — job: score threats and candidate moves and shots.
+// Owner: ai/aiLogic.js. Holds no state unless it is a core.
 // ============================================================
 (() => {
 

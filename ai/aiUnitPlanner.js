@@ -1,8 +1,8 @@
 "use strict";
 
 // ============================================================
-// AI UNIT PLANNER — 1-AP, 2-AP & 3-AP lookahead plan search per unit.
-// Privately registered with its parent (aiLogic.js); exposes zero globals.
+// aiUnitPlanner.js — job: generate candidate unit plans.
+// Owner: ai/aiLogic.js. Holds no state unless it is a core.
 // ============================================================
 (() => {
   function buildUnitPlan(env, ctx, u, unitRoll) {

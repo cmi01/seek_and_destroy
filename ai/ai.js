@@ -1,13 +1,8 @@
 "use strict";
 
 // ============================================================
-// AI ENGINE — Stateless pure-function AI entry point (getAIAction)
-// Privately registered with Game (core/game.js); loads data/aiPriorities_DATA.js &
-// ai/aiTurnWorkflow.js (which cascades into aiLogic.js and its 4
-// leaf modules) via temporary private registration.
-// Signature: (object_gameStateSnapshot) => plain result object
-//   {action, coord, decision, selectedPlan, reservations, lastSeenEnemies,
-//    aiEmergencyMode, aiScoreTrace}  (warpOpts may ride along on WARP results)
+// ai.js — job: expose the single AI decision entry point and load its children.
+// Owner: core/game.js. Holds no state unless it is a core.
 // ============================================================
 Game._registerModule("ai", (() => {
   const _aiModules = {

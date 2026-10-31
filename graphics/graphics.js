@@ -1,25 +1,7 @@
 "use strict";
 // ============================================================
-// GRAPHICS ORCHESTRATOR — Palette management & render pipeline coordinator.
-// Owns and privately loads its four rendering layers (backgroundRenderer.js,
-// objectRenderer.js, vfx.js, uiRenderer.js) via Graphics.load(). None of the
-// child renderers are exposed on the global scope.
-//
-// The core owns the canvas and sprite caches (§2): it creates/loads the
-// atlas Images, owns the terrain cache canvas + key + invalidation, holds
-// the single RNG source, and runs the shared ship renderer (static blit +
-// dynamic subsystems). Layers receive plain data (sprite slice descriptors,
-// sheet+rect drawing material, resolved fonts/colors) and never execute
-// each other's code.
-//
-// Public API (Graphics):
-//   load()                        — load & verify private rendering layers + atlases
-//   render(frame)                 — draw one frame (minimap + battle canvas)
-//   whenReady()                   — Promise resolved when sprite atlases decode
-//   setTheme(t) / getTheme()      — active sprite/palette theme
-//   railgunPulseOffset(t, period) — triangle-wave helper used by sprites
-//   spriteKey(unit, cellPx) / spriteGet(unit)
-//   blitSprite / drawUnitStatic / drawUnitDynamic / drawUnitOnCanvas
+// graphics.js — job: own the canvas and sprite caches and draw each frame.
+// Owner: core (loaded by main.js). Holds no state unless it is a core.
 // ============================================================
 const Graphics = (() => {
   const GRAPHICS_CHILDREN = [

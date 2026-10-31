@@ -1,10 +1,8 @@
 "use strict";
 
 // ============================================================
-// INPUT INTERFACE — Strictly 1-Way Data Broker (Inputs ---> Game)
-// Initialized and wired by main.js.
-// Inputs only sees `producer.pushEvent(eventDTO)`.
-// Game only sees `consumer.drainEvents()`.
+// inputInterface.js — job: carry plain input events from Inputs to Game.
+// Owner: main.js. Holds no state unless it is a core.
 // ============================================================
 const InputInterface = (() => {
   function sanitizeEvent(evt) {

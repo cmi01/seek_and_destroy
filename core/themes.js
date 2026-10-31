@@ -1,14 +1,8 @@
 "use strict";
 
 // ============================================================
-// THEMES — stateless pure theme normalizer and colour remapper.
-// Privately registered with Game (core/game.js); holds zero mutable state
-// and exposes zero globals.
-//
-// Pure-function child (§3): every function takes the theme EXPLICITLY.
-// Game owns the active theme (State.theme) and resolves/passes the key as
-// plain data. There is no setActive/getActive and no memoization cache —
-// ORDER / ALIASES / PALETTES are frozen derived data.
+// themes.js — job: resolve theme keys and colour remaps.
+// Owner: core/game.js. Holds no state unless it is a core.
 // ============================================================
 Game._registerModule("themes", THEME_DATA => {
   const ORDER = Object.freeze(THEME_DATA.order.slice());

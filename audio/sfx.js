@@ -1,9 +1,8 @@
 "use strict";
 
 // ============================================================
-// SFX.JS — One-shot sound effects manifest, viewport-relative spatial panning,
-// WebAudio clock scheduling, node cleanup & event routing.
-// Privately registered with SoundEngine (sounds.js); exposes zero globals.
+// sfx.js — job: play one-shot sound effects from audio commands.
+// Owner: audio/sounds.js. Holds no state unless it is a core.
 // ============================================================
 SoundEngine._registerModule("sfx", AUDIO => {
   if (!AUDIO) console.error("[S&D audio] audio data manifest is not loaded; sound effects are disabled.");

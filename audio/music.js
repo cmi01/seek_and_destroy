@@ -1,8 +1,8 @@
 "use strict";
 
 // ============================================================
-// MUSIC.JS — Looping ambience & music bed manifest and playback controller.
-// Privately registered with SoundEngine (sounds.js); exposes zero globals.
+// music.js — job: manage music and ambience playback.
+// Owner: audio/sounds.js. Holds no state unless it is a core.
 // ============================================================
 SoundEngine._registerModule("music", AUDIO => {
   if (!AUDIO) console.error("[S&D audio] audio data manifest is not loaded; ambience/music are disabled.");

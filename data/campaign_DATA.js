@@ -1,9 +1,8 @@
 "use strict";
 
 // ============================================================
-// CAMPAIGN DATA — sector definitions: terrain generation parameters,
-// starting credits/income, spawn lists, AI doctrine and briefing intel.
-// Privately registered with Game (core/game.js); exposes zero globals.
+// campaign_DATA.js — job: hold the campaign and level table.
+// Owner: core/game.js. Holds no state unless it is a core.
 // ============================================================
 Game._registerModule("campaignData", {
   version: "V58-1.0",

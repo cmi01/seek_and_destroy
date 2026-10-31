@@ -1,10 +1,8 @@
 "use strict";
 
 // ============================================================
-// UI RENDERER — Full canvas HUD, minimap composite, telemetry cards,
-// priority banner, intel overlay, modals (Bridge, Campaign, Endgame),
-// and interactive canvas buttons (driven by state.buttonHovered).
-// Privately registered with Graphics (graphics.js); exposes zero globals.
+// uiRenderer.js — job: draw the frame's UI layer.
+// Owner: graphics/graphics.js. Holds no state unless it is a core.
 // ============================================================
 (() => {
   const _hasFlag = (u, f) => Boolean(u && u.flags && (typeof u.flags.has === "function" ? u.flags.has(f) : Array.isArray(u.flags) && u.flags.includes(f)));

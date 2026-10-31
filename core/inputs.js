@@ -1,11 +1,8 @@
 "use strict";
 
 // ============================================================
-// INPUT PROCESS — Strictly 1-Way Hardware Event Producer (V66).
-// Listens to DOM/window events (pointer, wheel, keyboard, blur, resize),
-// normalizes pointer coordinates to canvas-relative [0..1] (u, v), and
-// pushes plain InputEventDTOs into InputInterface.
-// Holds ZERO references to Game state, UI layout, or tactical rules.
+// inputs.js — job: translate raw hardware events into plain input events.
+// Owner: core (loaded by main.js). Holds no state unless it is a core.
 // ============================================================
 const Inputs = (() => {
   let _inputProducer = null;

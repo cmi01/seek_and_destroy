@@ -1,9 +1,8 @@
 "use strict";
 
 // ============================================================
-// RULES DATA — declarative tactical constants, zoom ladder, ship specs &
-// flag (ability/status) descriptions. Single source of truth (V58).
-// Privately registered with Game (core/game.js); exposes zero globals.
+// rules_DATA.js — job: hold the tactical rules table (specs, combat rules, flags).
+// Owner: core/game.js. Holds no state unless it is a core.
 // ============================================================
 Game._registerModule("rulesData", {
   version: "V58-1.0",

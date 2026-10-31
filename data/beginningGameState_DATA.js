@@ -1,8 +1,8 @@
 "use strict";
 
 // ============================================================
-// BEGINNING GAME STATE DATA — the single declarative state template.
-// Privately registered with Game (core/game.js); exposes zero globals.
+// beginningGameState_DATA.js — job: hold the initial state template.
+// Owner: core/game.js. Holds no state unless it is a core.
 // ============================================================
 Game._registerModule("beginningGameStateData", {
   version: "V58-1.0",

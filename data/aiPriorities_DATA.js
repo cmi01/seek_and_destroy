@@ -1,5 +1,10 @@
 "use strict";
 
+// ============================================================
+// aiPriorities_DATA.js — job: hold the AI priorities table.
+// Owner: ai/ai.js. Holds no state unless it is a core.
+// ============================================================
+
 getAIAction._register("prioritiesData", {
   "version": "V35-1.0",
   "schema": "seek-and-destroy.ai-priorities",

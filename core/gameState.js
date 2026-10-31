@@ -1,10 +1,8 @@
 "use strict";
 
 // ============================================================
-// GAME STATE STORE — Pure state materialization, delta validation,
-// lifetime reset, and (de)serialization library.
-// Privately registered with Game (core/game.js); holds zero state and
-// exposes zero globals.
+// gameState.js — job: operate the state store container passed in by its parent.
+// Owner: core/game.js. Holds no state unless it is a core.
 // ============================================================
 Game._registerModule("gameState", DATA => {
   const TEMPLATE = DATA.initialState;

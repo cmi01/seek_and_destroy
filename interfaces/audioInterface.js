@@ -1,10 +1,8 @@
 "use strict";
 
 // ============================================================
-// AUDIO INTERFACE — Strictly 1-Way Data Broker (Game ---> Audio)
-// Initialized and wired by main.js.
-// Game only sees `producer.pushCommand(cmdDTO)`.
-// Audio only sees `consumer.drainCommands()`.
+// audioInterface.js — job: carry plain audio commands from Game to Audio.
+// Owner: main.js. Holds no state unless it is a core.
 // ============================================================
 const AudioInterface = (() => {
   function clonePayload(p) {

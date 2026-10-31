@@ -1,10 +1,7 @@
 "use strict";
 // ============================================================
-// OBJECT RENDERER — Sprite-slice queries, warp arcs, sensors,
-// historical vectors & tactical overlays. Pure data in / pixels
-// out: it never touches document, never loads images, and never
-// draws another layer's work. Privately registered with Graphics
-// (graphics.js); exposes zero globals.
+// objectRenderer.js — job: draw the frame's board-object layer.
+// Owner: graphics/graphics.js. Holds no state unless it is a core.
 // ============================================================
 (() => {
   const _hasFlag = (u, f) => Boolean(u && u.flags && (typeof u.flags.has === "function" ? u.flags.has(f) : Array.isArray(u.flags) && u.flags.includes(f)));

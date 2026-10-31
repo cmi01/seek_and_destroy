@@ -186,9 +186,12 @@ Run this checklist against every touched file before calling a version done:
   first split candidates (`GUIDING_PRINCIPLES.md` §5). Concretely: a procedural
   file over ~300 lines, or exposing more than ~8 functions, is **presumed
   multi-job or a library until proven otherwise** — the proof is the job tests.
-- Candidate extensions to `scripts/reference_audit.py` (planned, not yet
-  implemented): filename blocklist (`utils|helpers|common|shared|misc`), missing
-  job-sentence header, and an export-count presumption flag.
+- `scripts/structure_audit.py` machine-checks the checkable structural rules:
+  the filename blocklist (`utils|helpers|common|shared|misc`), the header
+  contract (`— job:` + `Owner:` declarations), and the size/export presumptions
+  (printed as warnings; the job tests decide). `scripts/reference_audit.py`
+  exempts declared header lines (they name files on purpose and are ownership
+  declarations, not code references).
 
 ## 7. Document Map
 

@@ -1,8 +1,8 @@
 "use strict";
 
 // ============================================================
-// AI FLEET COMMANDER — flagship survival reflexes & warp-in reinforcements.
-// Privately registered with its parent (aiLogic.js); exposes zero globals.
+// aiFleetCommander.js — job: decide flagship survival reflexes and warp-in actions.
+// Owner: ai/aiLogic.js. Holds no state unless it is a core.
 // ============================================================
 (() => {
   function chooseReinforcement(env, ctx){
