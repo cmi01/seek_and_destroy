@@ -294,7 +294,9 @@ getAIAction._register("prioritiesData", {
     "singleMove": {
       "flagshipReachableCap": 96,
       "standardReachableCap": 12,
-      "flagshipLeastThreatFallbackCount": 3
+      "flagshipLeastThreatFallbackCount": 3,
+      "moveInRangeNoAttackPenalty": 250,
+      "description": "Score penalty for a bare MOVE plan whose destination ends within the mover's weapon range of a spotted enemy the plan will not attack this turn. Discourages advancing into firing range without shooting; composite MOVE->SHOOT plans carry the attack and are never penalized."
     },
     "compositeMoveShoot": {
       "minLookaheadDepth": 2,

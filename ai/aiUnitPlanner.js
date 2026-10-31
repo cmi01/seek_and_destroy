@@ -38,8 +38,19 @@
             ? sf
             : env.reachableCells(ctx, u, flagCap).slice().sort((a, b) => env.threatAt(ctx, u, a) - env.threatAt(ctx, u, b)).slice(0, fbCount);
         }
+        // A bare MOVE plan that ends within the mover's weapon range of a
+        // spotted enemy attacks nothing this turn — penalize idling in
+        // firing range. Paired attacks arrive as composite MOVE->SHOOT
+        // plans, which are not penalized.
+        const noAtkPen = smCfg.moveInRangeNoAttackPenalty !== undefined ? smCfg.moveInRangeNoAttackPenalty : 0;
         for (let i = 0; i < cs.length; i++){
-          plans.push({ unitId: u.id, apCost: 1, steps: [{ kind: "MOVE", to: cs[i] }], score: env.scoreMove(ctx, u, cs[i]) });
+          let score = env.scoreMove(ctx, u, cs[i]);
+          if (noAtkPen > 0 && u.firepower > 0 && u.range > 0){
+            for (let j = 0; j < sp.length; j++){
+              if (env.inRange(cs[i], sp[j], u.range)){ score -= noAtkPen; break; }
+            }
+          }
+          plans.push({ unitId: u.id, apCost: 1, steps: [{ kind: "MOVE", to: cs[i] }], score });
         }
       }
     }

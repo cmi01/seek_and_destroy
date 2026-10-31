@@ -65,6 +65,30 @@ Game._registerModule("sectorGenerator", (() => {
       return u;
     };
 
+    // The player fleet always starts in a tight semicircle formation: the
+    // flagship at the lead (apex facing the enemy side, +x) with the escorts
+    // filling the arc directly behind it (radius 2). Formation cells are
+    // cleared of asteroids. Returns the spawned units, lead first.
+    const spawnPlayerFormation = (spawnList) => {
+      const flagIdx = spawnList.findIndex(n => shipSpecs[n].flags.includes("!flagship"));
+      const leadIdx = flagIdx >= 0 ? flagIdx : 0;
+      const lead = { x: 4, y: 15 };
+      const cells = [{ type: spawnList[leadIdx], x: lead.x, y: lead.y }];
+      const escorts = spawnList.filter((_, i) => i !== leadIdx);
+      for (let i = 0; i < escorts.length; i++) {
+        const theta = Math.PI / 2 + Math.PI * (i + 0.5) / escorts.length;
+        cells.push({
+          type: escorts[i],
+          x: lead.x + Math.round(2 * Math.cos(theta)),
+          y: lead.y + Math.round(2 * Math.sin(theta))
+        });
+      }
+      return cells.map(c => {
+        if (terrain[c.x][c.y] === "ASTEROID") terrain[c.x][c.y] = "EMPTY";
+        return spawnUnit(c.type, 1, c.x, c.y, false);
+      });
+    };
+
     // Asteroid clusters
     const astCount = spec.asteroidClusters.count;
     const seeds = [];
@@ -139,15 +163,10 @@ Game._registerModule("sectorGenerator", (() => {
     let viewport = { viewSpan: 32, viewX: 0, viewY: 0 };
 
     if (spec.id === 101) {
-      terrain[9][14] = "NEBULA"; terrain[10][14] = "NEBULA";
-      terrain[9][15] = "NEBULA"; terrain[10][15] = "NEBULA";
-      terrain[11][12] = "ASTEROID"; terrain[11][13] = "ASTEROID";
-      terrain[12][12] = "EMPTY"; terrain[12][16] = "EMPTY";
-      spawnUnit("Flagship Battlecruiser", 1, 4, 15, false);
-      const probe = spawnUnit("Probe", 1, 7, 14, false);
-      spawnUnit("Attack Frigate", 1, 6, 12, false);
-      spawnUnit("Railgun Destroyer", 1, 6, 16, false);
-      spawnUnit("Boarding APC", 1, 8, 15, false);
+      // Fog (nebula), asteroids and enemies are all randomly positioned by
+      // the generators above and the placement loops below — nothing here is
+      // pinned to fixed cells.
+      const playerUnits = spawnPlayerFormation(spec.t1SpawnList);
 
       // The enemy arrangement is randomly generated: the level's fixed
       // composition (t2SpawnList) is scattered across the right half of the
@@ -187,30 +206,12 @@ Game._registerModule("sectorGenerator", (() => {
       t2List.filter(n => shipSpecs[n].flags.includes("!flagship"))
         .forEach(n => placeEnemy(n, 23, 28, 4.5));
 
-      selectedUnit = probe;
+      selectedUnit = playerUnits.find(u => u.type === "Probe") || playerUnits[0];
       viewport = { viewSpan: 16, viewX: 0, viewY: 7 };
     } else {
-      // Team 1
-      const t1Capitals = [];
-      spec.t1SpawnList.forEach((shipType, idx) => {
-        const isFlag = shipSpecs[shipType].flags.includes("!flagship");
-        let placed = false;
-        for (let tries = 0; tries < 80 && !placed; tries++) {
-          const gx = isFlag ? (3 + Math.floor(R() * 2)) : (2 + Math.floor(R() * 5));
-          const gy = isFlag ? (12 + Math.floor(R() * 8)) : (6 + Math.floor(R() * 20));
-          if (terrain[gx][gy] === "ASTEROID") continue;
-          if (getUnitAt(gx, gy)) continue;
-          const u = spawnUnit(shipType, 1, gx, gy, false);
-          if (u.flags.has("#capital ship")) t1Capitals.push(u);
-          placed = true;
-        }
-        if (!placed) {
-          const fallbackY = Math.min(30, 8 + idx * 2);
-          terrain[3][fallbackY] = "EMPTY";
-          const u = spawnUnit(shipType, 1, 3, fallbackY, false);
-          if (u.flags.has("#capital ship")) t1Capitals.push(u);
-        }
-      });
+      // Team 1 — the standard semicircle formation (flagship at the lead).
+      const t1Units = spawnPlayerFormation(spec.t1SpawnList);
+      const t1Capitals = t1Units.filter(u => u.flags.has("#capital ship"));
       if (t1Capitals.length > 0) selectedUnit = t1Capitals[0];
 
       // Team 2

@@ -17,11 +17,15 @@ const LayoutMetrics = {
   viewportHeight: 768,
   isWidescreen: false,
   renderScale: 2,     // min(devicePixelRatio, 2)
-  devicePx: 1536,     // displaySize * renderScale  (backing store)
+  // cellPx / fontScale are getters driven by Game.getViewSpan(). fontScale
+  // scales with cell size by design: it sizes board-space labels (terrain
+  // shapes, tactical glyphs, warp-arc text). The UI itself never scales —
+  // uiScale is a constant, so HUD text, widgets and layout keep one fixed
+  // size regardless of window size or zoom (768px design reference).
   get cellPx()    { return this.displaySize / Game.getViewSpan(); },
   get fontScale() { return this.cellPx / 24; },
   get textScale() { return Math.min(this.fontScale, 2); },
-  get uiScale()   { return Math.max(0.85, Math.min(1.35, this.displaySize / 768)); },
+  get uiScale()   { return 1; },
   minimapSize: 120,          // frame outer size (CSS px, includes border)
   minimapCanvasSize: 118,    // canvas content size (CSS px) = minimapSize − 2
   minimapDevicePx: 236       // canvas backing store = minimapCanvasSize × renderScale
@@ -170,7 +174,7 @@ function computeLayoutMetrics() {
     canvas.height = devicePx;
   }
 
-  const minimapSize       = Math.min(120, Math.floor(size * 0.24));
+  const minimapSize       = 120; // fixed: part of the non-scaling UI
   const minimapCanvasSize = minimapSize - 2;
   const minimapDevicePx   = Math.round(minimapCanvasSize * renderScale);
 
