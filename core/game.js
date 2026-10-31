@@ -23,6 +23,11 @@ const _modules = {
   cameraMath: null,
   selectionQueries: null,
   visibilityCache: null,
+  frameBoard: null,
+  frameUnits: null,
+  frameOverlay: null,
+  frameCursor: null,
+  frameStatus: null,
   hud: null,
   sectorGenerator: null,
   ai: null,
@@ -65,6 +70,13 @@ let EndgameStatus = null;
 let CameraMath = null;
 let SelectionQueries = null;
 let VisibilityCache = null;
+// The render-frame build children (v89): one pure child per frame domain;
+// buildFrame composes their slices into the render-frame DTO.
+let FrameBoard = null;
+let FrameUnits = null;
+let FrameOverlay = null;
+let FrameCursor = null;
+let FrameStatus = null;
 // Frozen plain-data facade of the pure rule queries, handed to the AI on the
 // snapshot DTO instead of the Rules module identity (built once in load()).
 let PURE_RULES = null;
@@ -1813,40 +1825,7 @@ function frameCopy(src){
 function freshCopy(src){
   return (src && typeof src === "object") ? deepFreeze(deepCopy(src)) : src;
 }
-// Element DTOs for frame arrays: only the scalar/DTO fields the renderers read
-// (graphics/vfx.js, graphics/objectRenderer.js, graphics/uiRenderer.js).
-function frameCell(c){ return { x: c ? c.x : 0, y: c ? c.y : 0 }; }
-function vectorDTO(v){
-  return { kind: String(v.kind || ""), from: frameCell(v.from), to: frameCell(v.to) };
-}
-function animationDTO(a){
-  return {
-    kind: String(a.kind || ""),
-    start: Number(a.start) || 0,
-    duration: Number(a.duration) || 0,
-    unitId: typeof a.unitId === "number" ? a.unitId : null,
-    from: a.from ? frameCell(a.from) : null,
-    to: a.to ? frameCell(a.to) : null,
-    cell: a.cell ? frameCell(a.cell) : null,
-    wType: typeof a.wType === "string" ? a.wType : "",
-    damage: Number(a.damage) || 0,
-    shieldStripped: Boolean(a.shieldStripped),
-    shipType: typeof a.shipType === "string" ? a.shipType : "",
-    targetName: typeof a.targetName === "string" ? a.targetName : ""
-  };
-}
-function buttonDTO(b){
-  return {
-    id: typeof b.id === "string" ? b.id : "",
-    label: typeof b.label === "string" ? b.label : "",
-    x: Number(b.x) || 0,
-    y: Number(b.y) || 0,
-    w: Number(b.w) || 0,
-    h: Number(b.h) || 0,
-    enabled: Boolean(b.enabled),
-    active: Boolean(b.active)
-  };
-}
+
 
 let _gameLoadPromise = null;
 const api = {
@@ -1878,6 +1857,11 @@ const api = {
         "core/cameraMath.js",
         "core/selectionQueries.js",
         "core/visibilityCache.js",
+        "core/frameBoard.js",
+        "core/frameUnits.js",
+        "core/frameOverlay.js",
+        "core/frameCursor.js",
+        "core/frameStatus.js",
         "core/hud.js",
         "core/sectorGenerator.js",
         "ai/ai.js"
@@ -1900,6 +1884,11 @@ const api = {
         ["core/cameraMath.js",              typeof _modules.cameraMath === "function"],
         ["core/selectionQueries.js",        typeof _modules.selectionQueries === "function"],
         ["core/visibilityCache.js",         typeof _modules.visibilityCache === "function"],
+        ["core/frameBoard.js",              typeof _modules.frameBoard === "function"],
+        ["core/frameUnits.js",              typeof _modules.frameUnits === "function"],
+        ["core/frameOverlay.js",            typeof _modules.frameOverlay === "function"],
+        ["core/frameCursor.js",             typeof _modules.frameCursor === "function"],
+        ["core/frameStatus.js",             typeof _modules.frameStatus === "function"],
         ["core/hud.js",                     _modules.hud && typeof _modules.hud.createHud === "function"],
         ["core/sectorGenerator.js",         _modules.sectorGenerator && typeof _modules.sectorGenerator.generateSectorData === "function"],
         ["ai/ai.js",                        typeof _modules.ai === "function" && typeof _modules.ai.load === "function"]
@@ -1952,6 +1941,30 @@ const api = {
       CameraMath = _modules.cameraMath(RULES_DATA);
       SelectionQueries = _modules.selectionQueries(RULES_DATA);
       VisibilityCache = _modules.visibilityCache(RULES_DATA);
+      // The render-frame build children (v89): one pure child per frame
+      // domain. The parent's plain-copy helpers and pure rule/action queries
+      // are injected; the children receive state-shape params and return
+      // plain slice data.
+      FrameBoard = _modules.frameBoard({ frameCopy, freshCopy });
+      FrameUnits = _modules.frameUnits({
+        getEffectiveScan: u => Visibility.getEffectiveScan(u),
+        isUnitSpottedByTeam: (u, team) => Visibility.isUnitSpottedByTeam(u, team),
+        canShield: (unitA, B) => Actions.canShield(unitA, B)
+      });
+      FrameOverlay = _modules.frameOverlay({
+        buildUnitIndex: units => Rules.buildUnitIndex(units),
+        canMove: (ctx, unitA, B) => Rules.canMove(ctx, unitA, B),
+        hasLineOfSight: (ctx, x0, y0, x1, y1, mode) => Rules.hasLineOfSight(ctx, x0, y0, x1, y1, mode),
+        hasFlag: (unit, flag) => Rules.hasFlag(unit, flag),
+        computeShootOutcome: (unitA, target) => Rules.computeShootOutcome(unitA, target),
+        inRange: (a, b, r) => MathGrid.inRange(a, b, r),
+        dist: (a, b) => MathGrid.dist(a, b),
+        getSpottedEnemyAt: (gx, gy, team) => Visibility.getSpottedEnemyAt(gx, gy, team),
+        canCapture: (unitA, B) => Actions.canCapture(unitA, B),
+        canShield: (unitA, B) => Actions.canShield(unitA, B)
+      });
+      FrameCursor = _modules.frameCursor();
+      FrameStatus = _modules.frameStatus();
       Rules = {
         getState(ctx){ return (ctx && ctx.units !== undefined) ? ctx : GetGameState(); },
         initState(opts){ return InitializeGameState(opts); },
@@ -2119,179 +2132,80 @@ const api = {
     return Visibility.ensureCache();
   },
 
+  // The render-frame build (v89): the per-domain pure children build the
+  // frame's slices; this body only composes their plain data into the
+  // render-frame DTO (unchanged shape — interfaces/graphicsInterface.js and
+  // graphics/* consume it as before). Input gathering (clock, visibility
+  // cache, selection, viewport query) and the publish handoff stay here.
   buildFrame(overrides){
     const nowVal = (overrides && typeof overrides.now === "number")
       ? overrides.now
       : ((typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now());
     const rawVis = (overrides && overrides.visCache) || State.visCache || Visibility.ensureCache();
-    const m = (_host && _host.metrics) ? _host.metrics : null;
-    const metricsDTO = m ? {
-      displaySize: m.displaySize,
-      viewportWidth: m.viewportWidth,
-      viewportHeight: m.viewportHeight,
-      isWidescreen: m.isWidescreen,
-      renderScale: m.renderScale,
-      devicePx: m.devicePx,
-      cellPx: m.cellPx,
-      fontScale: m.fontScale,
-      textScale: m.textScale,
-      uiScale: m.uiScale,
-      minimapSize: m.minimapSize,
-      minimapCanvasSize: m.minimapCanvasSize,
-      minimapDevicePx: m.minimapDevicePx
-    } : null;
-
-    const vp = MathGrid.getRenderedViewport(nowVal);
-    const anim = State.zoomAnim;
-    let dx0 = State.viewX, dx1 = State.viewX + State.viewSpan;
-    let dy0 = State.viewY, dy1 = State.viewY + State.viewSpan;
-    if (anim && anim.active){
-      dx0 = Math.max(0, Math.floor(Math.min(anim.fromX, anim.toX)));
-      dx1 = Math.min(GRID_SIZE, Math.ceil(Math.max(anim.fromX + anim.fromSpan, anim.toX + anim.toSpan)));
-      dy0 = Math.max(0, Math.floor(Math.min(anim.fromY, anim.toY)));
-      dy1 = Math.min(GRID_SIZE, Math.ceil(Math.max(anim.fromY + anim.fromSpan, anim.toY + anim.toSpan)));
-    }
-    const viewportDTO = {
-      viewX: State.viewX,
-      viewY: State.viewY,
-      viewSpan: State.viewSpan,
-      renderViewX: vp.viewX,
-      renderViewY: vp.viewY,
-      renderViewSpan: vp.viewSpan,
-      dx0, dx1, dy0, dy1
-    };
-
     const selUnit = Selection.getUnit();
     const isPlayerTurn = State.activeTeam === 1 && !State.gameOver;
-    const canShieldSelected = Boolean(
-      isPlayerTurn &&
-      selUnit &&
-      selUnit.team === 1 &&
-      State.ap > 0 &&
-      Actions.canShield(selUnit, { x: selUnit.x, y: selUnit.y })
-    );
 
-    const tacticalOverlays = { active: false, originX: 0, originY: 0, cells: [], hoveredMoveLine: null };
-    if (selUnit && selUnit.team === 1 && isPlayerTurn && State.ap > 0){
-      tacticalOverlays.active = true;
-      tacticalOverlays.originX = selUnit.x;
-      tacticalOverlays.originY = selUnit.y;
-      const explored = State.exploredCells;
-      const knownTerrain = Array.from({ length: GRID_SIZE }, (_, x) =>
-        Array.from({ length: GRID_SIZE }, (__, y) => {
-          const isKnown = Boolean((rawVis && rawVis[x] && rawVis[x][y]) || (explored && explored[x] && explored[x][y]));
-          return isKnown && State.terrain && State.terrain[x] ? State.terrain[x][y] : "EMPTY";
-        })
-      );
-      const knownCtx = Object.create(GetGameState());
-      knownCtx.terrain = knownTerrain;
-      knownCtx.unitIndex = Rules.buildUnitIndex(State.units);
-      const canMoveKnown = (u, b) => Rules.canMove(knownCtx, u, b);
-      const hasKnownLos = (x0, y0, x1, y1, mode) => Rules.hasLineOfSight(knownCtx, x0, y0, x1, y1, mode);
-
-      for (let gx = dx0; gx < dx1; gx++){
-        for (let gy = dy0; gy < dy1; gy++){
-          const B = { x: gx, y: gy };
-          const cm = canMoveKnown(selUnit, B);
-          const cs = Boolean(
-            !Rules.hasFlag(selUnit, "-attacked") &&
-            selUnit.firepower > 0 &&
-            !(gx === selUnit.x && gy === selUnit.y) &&
-            MathGrid.inRange(selUnit, B, selUnit.range) &&
-            hasKnownLos(selUnit.x, selUnit.y, gx, gy, "WEAPON")
-          );
-          const spottedEnemy = cs ? Visibility.getSpottedEnemyAt(gx, gy, 1) : null;
-          const spottedEnemyDmg = spottedEnemy ? Rules.computeShootOutcome(selUnit, spottedEnemy).damageDealt : null;
-          const isHov = Boolean(State.hoveredCell && State.hoveredCell.x === gx && State.hoveredCell.y === gy);
-          const cc = Actions.canCapture(selUnit, B);
-          const csh = Actions.canShield(selUnit, B);
-          if (cm || cs || cc || csh){
-            tacticalOverlays.cells.push({
-              gx, gy,
-              canMove: cm,
-              canShoot: cs,
-              spottedEnemyDmg,
-              isHovered: isHov,
-              firepower: selUnit.firepower,
-              canCapture: cc,
-              canShield: csh
-            });
-          }
-        }
-      }
-      if (State.hoveredCell && canMoveKnown(selUnit, State.hoveredCell)){
-        tacticalOverlays.hoveredMoveLine = {
-          fromX: selUnit.x,
-          fromY: selUnit.y,
-          toX: State.hoveredCell.x,
-          toY: State.hoveredCell.y,
-          dist: MathGrid.dist(selUnit, State.hoveredCell)
-        };
-      }
-    }
-
-    const unitsDTO = Array.isArray(State.units) ? State.units.map(u => ({
-      id: u.id,
-      type: u.type,
-      team: u.team,
-      x: u.x,
-      y: u.y,
-      hp: u.hp,
-      maxHp: u.maxHp,
-      move: u.move,
-      firepower: u.firepower,
-      range: u.range,
-      scan: u.scan,
-      effectiveScan: Visibility.getEffectiveScan(u),
-      spottedByPlayer: Visibility.isUnitSpottedByTeam(u, 1),
-      cost: u.cost,
-      flags: new Set(u.flags)
-    })) : [];
+    const board = FrameBoard.build({
+      gridSize: GRID_SIZE,
+      spawnRadius: SPAWN_RADIUS,
+      state: State,
+      visCache: rawVis,
+      renderedViewport: MathGrid.getRenderedViewport(nowVal),
+      metrics: (_host && _host.metrics) ? _host.metrics : null
+    });
+    const units = FrameUnits.build({ state: State, selUnit, isPlayerTurn });
+    const overlay = FrameOverlay.build({
+      state: State,
+      visCache: rawVis,
+      selUnit,
+      isPlayerTurn,
+      baseState: GetGameState(),
+      gridSize: GRID_SIZE,
+      dx0: board.viewport.dx0,
+      dx1: board.viewport.dx1,
+      dy0: board.viewport.dy0,
+      dy1: board.viewport.dy1
+    });
+    const cursor = FrameCursor.build({ state: State, cursorStyle: InputProcessor.getCursor() });
+    const status = FrameStatus.build({ state: State, maxAp: MAX_AP });
 
     const stateDTO = {
-      levelId: State.levelId,
-      turnNumber: State.turnNumber,
-      activeTeam: State.activeTeam,
-      ap: State.ap,
-      maxAp: MAX_AP,
-      gameOver: Boolean(State.gameOver),
-      credits: State.credits ? { ...State.credits } : { 1: 0, 2: 0 },
-      income: State.income ? { ...State.income } : { 1: 0, 2: 0 },
-      theme: State.theme || "default",
-      viewX: State.viewX,
-      viewY: State.viewY,
-      viewSpan: State.viewSpan,
-      zoomAnim: State.zoomAnim ? { ...State.zoomAnim } : { active: false },
-      inspectMode: Boolean(State.inspectMode),
-      buttonHovered: State.buttonHovered,
-      buttonPressed: State.buttonPressed,
-      selectedCell: State.selectedCell ? { ...State.selectedCell } : null,
-      hoveredCell: State.hoveredCell ? { ...State.hoveredCell } : null,
-      terrain: frameCopy(State.terrain),
-      asteroidSeeds: frameCopy(State.asteroidSeeds),
-      exploredCells: freshCopy(State.exploredCells),
-      units: unitsDTO,
-      historicalVectors: Array.isArray(State.historicalVectors) ? State.historicalVectors.map(vectorDTO) : [],
-      animations: Array.isArray(State.animations) ? State.animations.map(animationDTO) : [],
-      canvasButtons: Array.isArray(State.canvasButtons) ? State.canvasButtons.map(buttonDTO) : [],
-      audioSettings: State.audioSettings ? { muted: Boolean(State.audioSettings.muted) } : { muted: false },
-      canShieldSelected,
-      tacticalOverlays
+      ...status,
+      theme: cursor.theme,
+      viewX: board.viewX,
+      viewY: board.viewY,
+      viewSpan: board.viewSpan,
+      zoomAnim: board.zoomAnim,
+      inspectMode: cursor.inspectMode,
+      buttonHovered: cursor.buttonHovered,
+      buttonPressed: cursor.buttonPressed,
+      selectedCell: cursor.selectedCell,
+      hoveredCell: cursor.hoveredCell,
+      terrain: board.terrain,
+      asteroidSeeds: board.asteroidSeeds,
+      exploredCells: board.exploredCells,
+      units: units.units,
+      historicalVectors: units.historicalVectors,
+      animations: units.animations,
+      canvasButtons: cursor.canvasButtons,
+      audioSettings: cursor.audioSettings,
+      canShieldSelected: units.canShieldSelected,
+      tacticalOverlays: overlay.tacticalOverlays
     };
 
     const frame = {
-      GRID_SIZE,
-      SPAWN_RADIUS,
+      GRID_SIZE: board.GRID_SIZE,
+      SPAWN_RADIUS: board.SPAWN_RADIUS,
       SHIP_SPECS,
       CAMPAIGN_LEVELS,
-      MAX_AP,
+      MAX_AP: status.maxAp,
       state: stateDTO,
-      viewport: viewportDTO,
-      cursor: InputProcessor.getCursor(),
-      metrics: metricsDTO,
-      theme: State.theme || "default",
+      viewport: board.viewport,
+      cursor: cursor.cursor,
+      metrics: board.metrics,
+      theme: cursor.theme,
       now: nowVal,
-      visCache: frameCopy(rawVis),
+      visCache: board.visCache,
       uiHud: Hud.getSnapshot(nowVal)
     };
     if (overrides && typeof overrides === "object") {
