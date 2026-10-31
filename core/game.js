@@ -20,6 +20,9 @@ const _modules = {
   combatMath: null,
   reservePlacement: null,
   endgameStatus: null,
+  cameraMath: null,
+  selectionQueries: null,
+  visibilityCache: null,
   hud: null,
   sectorGenerator: null,
   ai: null,
@@ -58,6 +61,10 @@ let ActionLegality = null;
 let CombatMath = null;
 let ReservePlacement = null;
 let EndgameStatus = null;
+// The pure game.js children (single job each, registered below at load time).
+let CameraMath = null;
+let SelectionQueries = null;
+let VisibilityCache = null;
 // Frozen plain-data facade of the pure rule queries, handed to the AI on the
 // snapshot DTO instead of the Rules module identity (built once in load()).
 let PURE_RULES = null;
@@ -256,43 +263,27 @@ const GameAudio = (() => {
 
 const MathGrid = {
   inBounds(gx,gy){ return typeof Rules!=="undefined"?Rules.inBounds(State,gx,gy):(gx>=0&&gx<GRID_SIZE&&gy>=0&&gy<GRID_SIZE); },
-  gridToCenter(gx,gy){ const cp = _host.getCellPx(); return {x:(gx+0.5)*cp, y:(gy+0.5)*cp}; },
+  gridToCenter(gx,gy){ return CameraMath.gridToCenter(gx, gy, _host.getCellPx()); },
   getRenderedViewport(now){
     const DS = _host ? _host.getDisplaySize() : 768;
-    const anim = State.zoomAnim;
-    if (anim && anim.active){
-      const tNow = (typeof now === "number")
-        ? now
-        : ((typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now());
-      const t = Math.min(1, Math.max(0, (tNow - anim.start) / (anim.duration || 180)));
-      if (t < 1){
-        const ease = 1 - Math.pow(1 - t, 3);
-        const viewSpan = anim.fromSpan + (anim.toSpan - anim.fromSpan) * ease;
-        const viewX = anim.fromX + (anim.toX - anim.fromX) * ease;
-        const viewY = anim.fromY + (anim.toY - anim.fromY) * ease;
-        return { viewX, viewY, viewSpan, cellPx: DS / viewSpan, active: true };
-      }
-    }
-    const viewSpan = State.viewSpan;
-    return { viewX: State.viewX, viewY: State.viewY, viewSpan, cellPx: DS / viewSpan, active: false };
+    const tNow = (typeof now === "number")
+      ? now
+      : ((typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now());
+    return CameraMath.getRenderedViewport(State.viewX, State.viewY, State.viewSpan, State.zoomAnim, tNow, DS);
   },
   pixelToGrid(px,py){
-    const vp = this.getRenderedViewport();
-    return {
-      x: Math.max(0, Math.min(GRID_SIZE - 1, Math.floor(vp.viewX + px / vp.cellPx))),
-      y: Math.max(0, Math.min(GRID_SIZE - 1, Math.floor(vp.viewY + py / vp.cellPx)))
-    };
+    return CameraMath.pixelToGrid(px, py, this.getRenderedViewport());
   },
   clampViewport(){
-    const nextSpan = Math.max(5, Math.min(32, State.viewSpan));
-    const nextX = Math.max(0, Math.min(GRID_SIZE - nextSpan, State.viewX));
-    const nextY = Math.max(0, Math.min(GRID_SIZE - nextSpan, State.viewY));
+    // Pure computation (core/cameraMath.js); Game applies the returned
+    // values to state through the same patch path as before.
+    const next = CameraMath.clampViewport(State.viewX, State.viewY, State.viewSpan);
     if (typeof Rules !== "undefined" && Rules.patchState){
-      Rules.patchState({ viewSpan: nextSpan, viewX: nextX, viewY: nextY });
+      Rules.patchState({ viewSpan: next.viewSpan, viewX: next.viewX, viewY: next.viewY });
     } else {
-      State.viewSpan = nextSpan;
-      State.viewX = nextX;
-      State.viewY = nextY;
+      State.viewSpan = next.viewSpan;
+      State.viewX = next.viewX;
+      State.viewY = next.viewY;
     }
   },
   dist(a,b){ return typeof Rules!=="undefined"?Rules.dist(a,b):Math.hypot(a.x-b.x, a.y-b.y); },
@@ -302,53 +293,12 @@ const MathGrid = {
     return typeof Rules!=="undefined"?Rules.hasLineOfSight(State,x0,y0,x1,y1,mode):false;
   },
 
-  // Camera zoom: step the zoom ladder by whole wheel notches while keeping
-  // the grid cell under the cursor anchored. Pure function of its inputs.
-  // (Moved here from Rules in V57 — it is viewport math, not a game rule.)
+  // Camera zoom: pure viewport math in core/cameraMath.js (moved here from
+  // Rules in V57 — it is viewport math, not a game rule). Game resolves the
+  // display size and applies the returned view values to state.
   resolveZoom(viewX, viewY, viewSpan, mousePx, deltaY, displaySize) {
-    const zoomLadder = Rules.zoomLadder;
-    const wheelNotchPx = Rules.wheelNotchPx;
-    const maxZoomStepsPerEvent = Rules.maxZoomStepsPerEvent;
-    const gridSize = Rules.gridSize;
-    const DS = displaySize || (_host ? _host.getDisplaySize() : 768);
-    if (deltaY === 0) return { viewX, viewY, viewSpan, changed: false };
-
-    const rawSteps = deltaY / wheelNotchPx;
-    let steps = Math.round(rawSteps);
-    steps = Math.max(-maxZoomStepsPerEvent, Math.min(maxZoomStepsPerEvent, steps));
-    if (steps === 0) return { viewX, viewY, viewSpan, changed: false };
-
-    let idx = zoomLadder.indexOf(viewSpan);
-    if (idx === -1) {
-      let best = 0, bestDiff = Infinity;
-      for (let i = 0; i < zoomLadder.length; i++) {
-        const d = Math.abs(zoomLadder[i] - viewSpan);
-        if (d < bestDiff) { bestDiff = d; best = i; }
-      }
-      idx = best;
-    }
-
-    const newIdx = Math.max(0, Math.min(zoomLadder.length - 1, idx + steps));
-    if (newIdx === idx) return { viewX, viewY, viewSpan, changed: false };
-
-    const newSpan = zoomLadder[newIdx];
-    const cellPx = DS / viewSpan;
-    const anchorGX = viewX + mousePx.x / cellPx;
-    const anchorGY = viewY + mousePx.y / cellPx;
-
-    const newCellPx = DS / newSpan;
-    let newViewX = Math.round(anchorGX - mousePx.x / newCellPx);
-    let newViewY = Math.round(anchorGY - mousePx.y / newCellPx);
-
-    newViewX = Math.max(0, Math.min(gridSize - newSpan, newViewX));
-    newViewY = Math.max(0, Math.min(gridSize - newSpan, newViewY));
-
-    return {
-      viewX: newViewX,
-      viewY: newViewY,
-      viewSpan: newSpan,
-      changed: (newSpan !== viewSpan || newViewX !== viewX || newViewY !== viewY)
-    };
+    return CameraMath.resolveZoom(viewX, viewY, viewSpan, mousePx, deltaY,
+      displaySize || (_host ? _host.getDisplaySize() : 768));
   }
 };
 
@@ -358,15 +308,15 @@ const Visibility = {
   },
   ensureCache(){
     if (!State.visCache || State.visDirty){
-      const vis = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(false));
+      // Pure computation (core/visibilityCache.js): the vis grid as plain
+      // data. Game owns the cache storage and the explored bookkeeping.
+      const vis = VisibilityCache.computeVisCache(State, 1);
       if (!Array.isArray(State.exploredCells) || State.exploredCells.length !== GRID_SIZE){
         State.exploredCells = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(false));
       }
       for (let gx = 0; gx < GRID_SIZE; gx++){
         for (let gy = 0; gy < GRID_SIZE; gy++){
-          const v = this.isCellVisibleToTeam(gx, gy, 1);
-          vis[gx][gy] = v;
-          if (v && State.exploredCells[gx]) State.exploredCells[gx][gy] = true;
+          if (vis[gx][gy] && State.exploredCells[gx]) State.exploredCells[gx][gy] = true;
         }
       }
       State.visCache = vis;
@@ -396,7 +346,7 @@ const Selection = {
   select(unit){
     if (!unit) return this.clear();
     State.selectedUnitId = unit.id;
-    State.selectedCell = { x: unit.x, y: unit.y };
+    State.selectedCell = SelectionQueries.cellFor(unit);
     return unit;
   },
   clear(){
@@ -405,16 +355,15 @@ const Selection = {
     return null;
   },
   getUnit(){
-    const id = State.selectedUnitId;
-    if (id === null || id === undefined) return null;
-    return State.units.find(u => u.id === id && u.hp > 0) || null;
+    return SelectionQueries.getUnit(State.units, State.selectedUnitId);
   },
   // Re-derive selectedCell after units move, die or change hands.
   sync(){
     const u = this.getUnit();
     if (!u) return this.clear();
+    const next = SelectionQueries.cellFor(u);
     const c = State.selectedCell;
-    if (!c || c.x !== u.x || c.y !== u.y) State.selectedCell = { x: u.x, y: u.y };
+    if (!c || c.x !== next.x || c.y !== next.y) State.selectedCell = next;
     return u;
   }
 };
@@ -1926,6 +1875,9 @@ const api = {
         "core/combatMath.js",
         "core/reservePlacement.js",
         "core/endgameStatus.js",
+        "core/cameraMath.js",
+        "core/selectionQueries.js",
+        "core/visibilityCache.js",
         "core/hud.js",
         "core/sectorGenerator.js",
         "ai/ai.js"
@@ -1945,6 +1897,9 @@ const api = {
         ["core/combatMath.js",              typeof _modules.combatMath === "function"],
         ["core/reservePlacement.js",        typeof _modules.reservePlacement === "function"],
         ["core/endgameStatus.js",           typeof _modules.endgameStatus === "function"],
+        ["core/cameraMath.js",              typeof _modules.cameraMath === "function"],
+        ["core/selectionQueries.js",        typeof _modules.selectionQueries === "function"],
+        ["core/visibilityCache.js",         typeof _modules.visibilityCache === "function"],
         ["core/hud.js",                     _modules.hud && typeof _modules.hud.createHud === "function"],
         ["core/sectorGenerator.js",         _modules.sectorGenerator && typeof _modules.sectorGenerator.generateSectorData === "function"],
         ["ai/ai.js",                        typeof _modules.ai === "function" && typeof _modules.ai.load === "function"]
@@ -1992,6 +1947,11 @@ const api = {
       CombatMath = _modules.combatMath(RULES_DATA);
       ReservePlacement = _modules.reservePlacement(RULES_DATA);
       EndgameStatus = _modules.endgameStatus(RULES_DATA);
+      // The pure game.js children (single job each): camera math, selection
+      // queries and the visibility-cache computation. State stays here.
+      CameraMath = _modules.cameraMath(RULES_DATA);
+      SelectionQueries = _modules.selectionQueries(RULES_DATA);
+      VisibilityCache = _modules.visibilityCache(RULES_DATA);
       Rules = {
         getState(ctx){ return (ctx && ctx.units !== undefined) ? ctx : GetGameState(); },
         initState(opts){ return InitializeGameState(opts); },
