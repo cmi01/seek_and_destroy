@@ -258,8 +258,7 @@ const Graphics = (() => {
       "body[data-theme='alien']{--bg-void:#070312;--t1-cyan:#2dd4bf;--warp-violet:#e879f9;}",
       "*{box-sizing:border-box;margin:0;padding:0;user-select:none;}",
       "body{background-color:#030407;color:#e2e8f0;font-family:var(--font-mono);display:flex;align-items:center;justify-content:center;width:100vw;height:100vh;overflow:hidden;padding:0;}",
-      "#battle-canvas{display:block;border:1px solid rgba(56,189,248,0.35);background:var(--bg-void);box-shadow:0 0 24px rgba(0,0,0,0.9);cursor:crosshair;}",
-      "#battle-canvas.warp-anomaly{border-color:#a855f7;box-shadow:0 0 18px rgba(168,85,247,0.45),inset 0 0 12px rgba(168,85,247,0.35);}"
+      "#battle-canvas{display:block;border:1px solid rgba(56,189,248,0.35);background:var(--bg-void);box-shadow:0 0 24px rgba(0,0,0,0.9);cursor:crosshair;}"
     ].join("\n");
     document.head.appendChild(styleEl);
   }

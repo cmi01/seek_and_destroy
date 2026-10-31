@@ -56,6 +56,9 @@ const HostBridge = {
   handleResize(){
     computeLayoutMetrics();
     Game.onResize();
+    // Repaint synchronously: resizing the backing store clears the canvas,
+    // and without this the browser can composite one blank frame (a flash).
+    requestCanvasUpdate({});
   }
 };
 

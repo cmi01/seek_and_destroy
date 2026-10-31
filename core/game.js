@@ -608,7 +608,6 @@ const Actions = {
     GameAudio.play("unit.warpIn", {from:pick, to:pick, team, unitType:shipType, isVisible:vis});
 
     this.addAnimation({kind:"warp",duration:300,cell:pick,shipType:spawned.type});
-    Hud.triggerWarpAnomaly();
     this.consumeAPAndCheckTurn(isAI,apCost);
     return true;
   },
@@ -709,7 +708,7 @@ const Actions = {
 // orchestrator: it builds the plain input, invokes the pure operation, and
 // applies the returned data to Game state — State.canvasButtons /
 // buttonHovered / buttonPressed / theme, Selection, sound commands routed
-// through GameAudio, and render requests / the warp-anomaly CSS pulse through
+// through GameAudio, and render requests through
 // the host. The hud child never sees a module handle or live state.
 function _unitDTO(u){
   if (!u) return null;
@@ -806,13 +805,6 @@ function _applyHudResult(res){
       GameAudio.play(res.sounds[i].kind, res.sounds[i].payload);
     }
   }
-  if (res.flags && res.flags.warpAnomaly){
-    const canvas = _host ? _host.getBattleCanvas() : null;
-    if (canvas){
-      canvas.classList.add("warp-anomaly");
-      setTimeout(() => canvas.classList.remove("warp-anomaly"), 300);
-    }
-  }
   if (res.flags && res.flags.renderRequests){
     for (let i = 0; i < res.flags.renderRequests.length; i++){
       if (_host && typeof _host.requestRender === "function"){
@@ -857,7 +849,6 @@ const Hud = {
     input.radioActive = now < (GameAudio.getRadioActiveUntil() || 0);
     _applyHudResult(HudLib.sampleOscilloscope(_hudView, input));
   },
-  triggerWarpAnomaly(){ _applyHudResult(HudLib.triggerWarpAnomaly()); },
   updateAll(){ _applyHudResult(HudLib.updateAll(_hudView, _hudInput())); },
   setTheme(theme){
     // Game owns the active theme: it resolves the key and passes it down as

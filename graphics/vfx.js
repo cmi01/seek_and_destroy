@@ -69,11 +69,17 @@
       }
     } else if (anim.kind === "destroy") {
       const c = _cellCenter(anim.cell.x, anim.cell.y, CP);
-      if (t < 0.25) {
-        ctx.fillStyle = TC("#ffffff");
+      if (t < 0.35) {
+        // Soft warm shockwave that grows and fades — the screen must never
+        // strobe, so no white flash, even at max zoom where one cell is huge.
+        const ft = t / 0.35;
+        ctx.save();
+        ctx.globalAlpha = 0.45 * (1 - ft);
+        ctx.fillStyle = TC("#fdba74");
         ctx.beginPath();
-        ctx.arc(c.x, c.y, CP * 1.2 * (t / 0.25), 0, Math.PI * 2);
+        ctx.arc(c.x, c.y, CP * 1.2 * ft, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
       }
       ctx.strokeStyle = TC("#fe481a");
       ctx.lineWidth = 2;

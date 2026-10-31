@@ -3,9 +3,8 @@
 // ============================================================
 // HUD — Stateless pure view-model & layout/hitbox calculator for the canvas
 // HUD: top bar, telemetry cards, priority banner, intel overlay,
-// Bridge / Campaign / Endgame modals, oscilloscope waveform, theme switching
-// requests & warp-anomaly frame effect.
-// Privately registered with Game (core/game.js); holds zero state, mutates
+// Bridge / Campaign / Endgame modals and oscilloscope waveform.
+// Privately registered with Game (core/game.js); holds no state, mutates
 // nothing, and exposes zero globals (§3: pure-function child).
 //
 // ============================ CONTRACT ============================
@@ -57,10 +56,9 @@
 //     sounds:      [{ kind, payload }] sound commands -> Game routes them to
 //                  its audio producer
 //     cache:       updated priority-banner memo -> Game stores it
-//     flags:       { clearInteraction, warpAnomaly, renderRequests } —
+//     flags:       { clearInteraction, renderRequests } —
 //                  clearInteraction: clear the button-hovered/button-pressed
 //                  state fields;
-//                  warpAnomaly: pulse the canvas warp-anomaly CSS class;
 //                  renderRequests: [overrides, …] frame publishes for Game/
 //                  main.js to run through the host render entry point
 //   }
@@ -165,7 +163,6 @@ Game._registerModule("hud", (() => {
       sounds: (a.sounds || []).concat(b.sounds || []),
       flags: {
         clearInteraction: Boolean(fa.clearInteraction || fb.clearInteraction),
-        warpAnomaly: Boolean(fa.warpAnomaly || fb.warpAnomaly),
         renderRequests: (fa.renderRequests || []).concat(fb.renderRequests || [])
       }
     };
@@ -1000,11 +997,7 @@ Game._registerModule("hud", (() => {
 
       sampleOscilloscope(view, input) { return _finalize(_sampleOscilloscope(view, input)); },
       applyTheme(view, input, key) { return _finalize(_applyTheme(view, input, key)); },
-      updateAll(view, input) { return _finalize(_updateAll(view, input)); },
-
-      // The warp anomaly is a canvas CSS effect applied by Game (or its
-      // host); the HUD only requests it as data.
-      triggerWarpAnomaly() { return { flags: { warpAnomaly: true } }; }
+      updateAll(view, input) { return _finalize(_updateAll(view, input)); }
     };
   }
 
