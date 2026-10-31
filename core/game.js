@@ -12,7 +12,14 @@ const _modules = {
   themesData: null,
   gameState: null,
   themes: null,
-  rules: null,
+  rulesConfig: null,
+  boardQueries: null,
+  lineOfSight: null,
+  visionQueries: null,
+  actionLegality: null,
+  combatMath: null,
+  reservePlacement: null,
+  endgameStatus: null,
   hud: null,
   sectorGenerator: null,
   ai: null,
@@ -38,7 +45,19 @@ let GetStateLifetimes = null;
 let SerializeGameState = null;
 let DeserializeGameState = null;
 
+// The Rules handle: the composed rules surface over the pure rule children
+// (config values, board/LOS/vision queries, evidence-composed decisions).
+// The AI snapshot facade (PURE_RULES) and the SD debug handle read it.
 let Rules = null;
+// The pure rule children (single job each, registered below at load time).
+let RulesConfig = null;
+let BoardQueries = null;
+let LineOfSight = null;
+let VisionQueries = null;
+let ActionLegality = null;
+let CombatMath = null;
+let ReservePlacement = null;
+let EndgameStatus = null;
 // Frozen plain-data facade of the pure rule queries, handed to the AI on the
 // snapshot DTO instead of the Rules module identity (built once in load()).
 let PURE_RULES = null;
@@ -400,6 +419,83 @@ const Selection = {
   }
 };
 
+// ======================== RULE EVIDENCE (composition) ========================
+// The pure rule children never call each other: Game fetches board, LOS and
+// vision evidence here and hands plain evidence to the decision children
+// (core/actionLegality.js, core/combatMath.js). Each evidence object mirrors
+// the checks the pre-split rule queries evaluated inline, so every decision
+// is the same conjunction of the same facts.
+function _hasFlag(unit, flag){
+  if (!unit || !unit.flags) return false;
+  return typeof unit.flags.has === "function" ? unit.flags.has(flag) : unit.flags.includes(flag);
+}
+function _moveEvidence(ctx, unitA, B){
+  if (!unitA || !B) return {};
+  const occ = BoardQueries.getUnitAt(ctx, B.x, B.y);
+  return {
+    inMoveRange: BoardQueries.inBounds(ctx, B.x, B.y) && BoardQueries.inRange(unitA, B, unitA.move),
+    losClear: LineOfSight.hasLineOfSight(ctx, unitA.x, unitA.y, B.x, B.y, "MOVE"),
+    occ,
+    occSpotted: occ ? VisionQueries.isUnitSpottedByTeam(ctx, occ, unitA.team) : false
+  };
+}
+function _shootEvidence(ctx, unitA, B){
+  if (!unitA || !B) return {};
+  const occ = BoardQueries.getUnitAt(ctx, B.x, B.y);
+  return {
+    inWeaponRange: BoardQueries.inRange(unitA, B, unitA.range),
+    occ,
+    occSpotted: occ ? VisionQueries.isUnitSpottedByTeam(ctx, occ, unitA.team) : false,
+    losClear: LineOfSight.hasLineOfSight(ctx, unitA.x, unitA.y, B.x, B.y, "WEAPON")
+  };
+}
+function _captureEvidence(ctx, unitA, B){
+  if (!unitA || !B) return {};
+  const occ = BoardQueries.getUnitAt(ctx, B.x, B.y);
+  return {
+    inBoardRange: BoardQueries.inRange(unitA, B, 1.0),  // boarding range 1.0
+    occ,
+    occSpotted: occ ? VisionQueries.isUnitSpottedByTeam(ctx, occ, unitA.team) : false
+  };
+}
+function _shieldEvidence(ctx){
+  return { ap: ctx ? ctx.ap : undefined };
+}
+function _priorityEvidence(ctx, unitA, gx, gy){
+  if (!unitA) return {};
+  const B = { x: gx, y: gy };
+  const occ = BoardQueries.getUnitAt(ctx, gx, gy);
+  const occSpotted = occ ? VisionQueries.isUnitSpottedByTeam(ctx, occ, unitA.team) : false;
+  return {
+    move: {
+      inMoveRange: BoardQueries.inBounds(ctx, gx, gy) && BoardQueries.inRange(unitA, B, unitA.move),
+      losClear: LineOfSight.hasLineOfSight(ctx, unitA.x, unitA.y, gx, gy, "MOVE"),
+      occ,
+      occSpotted
+    },
+    shoot: {
+      inWeaponRange: BoardQueries.inRange(unitA, B, unitA.range),
+      losClear: LineOfSight.hasLineOfSight(ctx, unitA.x, unitA.y, gx, gy, "WEAPON"),
+      occ,
+      occSpotted
+    },
+    capture: {
+      inBoardRange: BoardQueries.inRange(unitA, B, 1.0),  // boarding range 1.0
+      occ,
+      occSpotted
+    },
+    shield: _shieldEvidence(ctx)
+  };
+}
+function _shootableEvidence(ctx, u, dest, target){
+  const ready = Boolean(u && target && target.hp > 0 && u.firepower > 0 && u.range > 0);
+  return {
+    inRange: ready && BoardQueries.inRange(dest, target, u.range),
+    spotted: ready && VisionQueries.isUnitSpottedByTeam(ctx, target, u.team),
+    losClear: ready && LineOfSight.hasLineOfSight(ctx, dest.x, dest.y, target.x, target.y, "WEAPON")
+  };
+}
+
 // ======================== ACTIONS ========================
 // Domain actions & turn state machine: rule queries, combat/move/capture/
 // shield/warp execution, AP accounting, endgame detection and turn hand-off.
@@ -412,28 +508,30 @@ const Actions = {
 
   addAnimation(anim){ State.animations.push({...anim,start:performance.now()}); },
 
+  // The composer: fetch rule evidence from the query children, then ask the
+  // decision children for the verdict (siblings never call each other).
   getPriorityActionAt(unitA,gx,gy,opts){
-    return Rules.getPriorityActionAt(State,unitA,gx,gy,opts);
+    return ActionLegality.getPriorityActionAt(unitA, gx, gy, _priorityEvidence(State, unitA, gx, gy), opts);
   },
 
   canMove(unitA,B){
-    return Rules.canMove(State,unitA,B);
+    return ActionLegality.canMove(unitA, B, _moveEvidence(State, unitA, B));
   },
 
   canCapture(unitA,B){
-    return Rules.canCapture(State,unitA,B);
+    return ActionLegality.canCapture(unitA, B, _captureEvidence(State, unitA, B));
   },
 
   canShoot(unitA,B){
-    return Rules.canShoot(State,unitA,B);
+    return ActionLegality.canShoot(unitA, B, _shootEvidence(State, unitA, B));
   },
 
   canShield(unitA,B){
-    return Rules.canShield(State,unitA,B);
+    return ActionLegality.canShield(unitA, B, _shieldEvidence(State));
   },
 
   getValidWarpCells(capitalUnit,radius){
-    return Rules.getValidWarpCells(State,capitalUnit,radius);
+    return ReservePlacement.getValidWarpCells(State, capitalUnit, radius);
   },
 
   executeMove(unitA,B,isAI=false,apCost=1){
@@ -449,7 +547,7 @@ const Actions = {
     if(occupant&&occupant.team!==unitA.team){
       GameAudio.play("unit.move.collision", {from:origin, to:dest, team:unitA.team, unitType:unitA.type, targetType:occupant.type, isVisible:visStartOrEnd});
 
-      const outcome=Rules.computeCollisionOutcome(unitA,occupant);
+      const outcome=CombatMath.computeCollisionOutcome(unitA,occupant);
       const {moverHadShield,occHadShield,moverRem,occRem}=outcome;
 
       if(moverHadShield){ unitA.flags.delete("+shield"); this.addAnimation({kind:"shielddrop",duration:160,cell:dest}); }
@@ -532,7 +630,7 @@ const Actions = {
       GameAudio.play("weapon.shieldStrip", {from:origin, to:origin, team:unitA.team, isVisible:visStartOrEnd, attackerStrip:true});
     }
 
-    const shootOutcome=Rules.computeShootOutcome(unitA,target);
+    const shootOutcome=CombatMath.computeShootOutcome(unitA,target);
     const {damageDealt,shieldStripped}=shootOutcome;
 
     if(shieldStripped){
@@ -611,7 +709,7 @@ const Actions = {
 
   checkEndgame(){
     if(State.gameOver) return true;
-    const status=Rules.checkEndgameStatus(State.units);
+    const status=EndgameStatus.checkEndgameStatus(State.units);
 
     if(status.t1Defeated){
       State.gameOver=true;
@@ -1820,7 +1918,14 @@ const api = {
         "data/themes_DATA.js",
         "core/gameState.js",
         "core/themes.js",
-        "core/rules.js",
+        "core/rulesConfig.js",
+        "core/boardQueries.js",
+        "core/lineOfSight.js",
+        "core/visionQueries.js",
+        "core/actionLegality.js",
+        "core/combatMath.js",
+        "core/reservePlacement.js",
+        "core/endgameStatus.js",
         "core/hud.js",
         "core/sectorGenerator.js",
         "ai/ai.js"
@@ -1832,7 +1937,14 @@ const api = {
         ["data/themes_DATA.js",             _modules.themesData],
         ["core/gameState.js",               typeof _modules.gameState === "function"],
         ["core/themes.js",                  typeof _modules.themes === "function"],
-        ["core/rules.js",                   typeof _modules.rules === "function"],
+        ["core/rulesConfig.js",             typeof _modules.rulesConfig === "function"],
+        ["core/boardQueries.js",            typeof _modules.boardQueries === "function"],
+        ["core/lineOfSight.js",             typeof _modules.lineOfSight === "function"],
+        ["core/visionQueries.js",           typeof _modules.visionQueries === "function"],
+        ["core/actionLegality.js",          typeof _modules.actionLegality === "function"],
+        ["core/combatMath.js",              typeof _modules.combatMath === "function"],
+        ["core/reservePlacement.js",        typeof _modules.reservePlacement === "function"],
+        ["core/endgameStatus.js",           typeof _modules.endgameStatus === "function"],
         ["core/hud.js",                     _modules.hud && typeof _modules.hud.createHud === "function"],
         ["core/sectorGenerator.js",         _modules.sectorGenerator && typeof _modules.sectorGenerator.generateSectorData === "function"],
         ["ai/ai.js",                        typeof _modules.ai === "function" && typeof _modules.ai.load === "function"]
@@ -1867,11 +1979,58 @@ const api = {
       // and passes the key explicitly to every call.
       Themes = _modules.themes(THEME_DATA);
 
-      const pureRules = _modules.rules(RULES_DATA);
-      Rules = Object.defineProperties({}, Object.getOwnPropertyDescriptors(pureRules));
-      Rules.getState = function(ctx){ return (ctx && ctx.units !== undefined) ? ctx : GetGameState(); };
-      Rules.initState = function(opts){ return InitializeGameState(opts); };
-      Rules.patchState = function(delta){ return TryPatchGameState(delta); };
+      // Bind the pure rule children (single job each) and assemble the Rules
+      // handle over them: config values from rulesConfig, queries delegated
+      // to the query children, and the composite decisions composed here from
+      // plain evidence. The surface is exactly the pre-split rules module's —
+      // the AI snapshot facade and the SD debug handle read it unchanged.
+      RulesConfig = _modules.rulesConfig(RULES_DATA);
+      BoardQueries = _modules.boardQueries(RULES_DATA);
+      LineOfSight = _modules.lineOfSight(RULES_DATA);
+      VisionQueries = _modules.visionQueries(RULES_DATA);
+      ActionLegality = _modules.actionLegality(RULES_DATA);
+      CombatMath = _modules.combatMath(RULES_DATA);
+      ReservePlacement = _modules.reservePlacement(RULES_DATA);
+      EndgameStatus = _modules.endgameStatus(RULES_DATA);
+      Rules = {
+        getState(ctx){ return (ctx && ctx.units !== undefined) ? ctx : GetGameState(); },
+        initState(opts){ return InitializeGameState(opts); },
+        patchState(delta){ return TryPatchGameState(delta); },
+        get flagDescriptions(){ return RulesConfig.flagDescriptions; },
+        get gridSize(){ return RulesConfig.gridSize; },
+        get spawnRadius(){ return RulesConfig.spawnRadius; },
+        get maxAp(){ return RulesConfig.maxAp; },
+        get enemyActionIntervalMs(){ return RulesConfig.enemyActionIntervalMs; },
+        get zoomLadder(){ return RulesConfig.zoomLadder; },
+        get wheelNotchPx(){ return RulesConfig.wheelNotchPx; },
+        get maxZoomStepsPerEvent(){ return RulesConfig.maxZoomStepsPerEvent; },
+        get defaultDifficulty(){ return RulesConfig.defaultDifficulty; },
+        get difficultyProfiles(){ return RulesConfig.difficultyProfiles; },
+        get shipSpecs(){ return RulesConfig.shipSpecs; },
+        inBounds(ctx, gx, gy){ return BoardQueries.inBounds(ctx, gx, gy); },
+        dist(a, b){ return BoardQueries.dist(a, b); },
+        inRange(a, b, r){ return BoardQueries.inRange(a, b, r); },
+        terrainAt(ctx, gx, gy){ return BoardQueries.terrainAt(ctx, gx, gy); },
+        getUnitAt(ctx, gx, gy){ return BoardQueries.getUnitAt(ctx, gx, gy); },
+        buildUnitIndex(units){ return BoardQueries.buildUnitIndex(units); },
+        hasFlag(unit, flag){ return _hasFlag(unit, flag); },
+        hasLineOfSight(ctx, x0, y0, x1, y1, mode){ return LineOfSight.hasLineOfSight(ctx, x0, y0, x1, y1, mode); },
+        effectiveScan(ctx, unit){ return VisionQueries.effectiveScan(ctx, unit); },
+        isCellVisibleToTeam(ctx, gx, gy, team){ return VisionQueries.isCellVisibleToTeam(ctx, gx, gy, team); },
+        isUnitSpottedByTeam(ctx, targetUnit, observerTeam){ return VisionQueries.isUnitSpottedByTeam(ctx, targetUnit, observerTeam); },
+        getSpottedEnemyAt(ctx, gx, gy, observerTeam){ return VisionQueries.getSpottedEnemyAt(ctx, gx, gy, observerTeam); },
+        canMove(ctx, unitA, B){ return ActionLegality.canMove(unitA, B, _moveEvidence(ctx, unitA, B)); },
+        canCapture(ctx, unitA, B){ return ActionLegality.canCapture(unitA, B, _captureEvidence(ctx, unitA, B)); },
+        canShoot(ctx, unitA, B){ return ActionLegality.canShoot(unitA, B, _shootEvidence(ctx, unitA, B)); },
+        canShield(ctx, unitA, B){ return ActionLegality.canShield(unitA, B, _shieldEvidence(ctx)); },
+        getPriorityActionAt(ctx, unitA, gx, gy, opts){ return ActionLegality.getPriorityActionAt(unitA, gx, gy, _priorityEvidence(ctx, unitA, gx, gy), opts); },
+        getValidWarpCells(ctx, capitalUnit, radius){ return ReservePlacement.getValidWarpCells(ctx, capitalUnit, radius); },
+        shootableFrom(ctx, u, dest, target){ return CombatMath.shootableFrom(u, dest, target, _shootableEvidence(ctx, u, dest, target)); },
+        isKillShot(u, target){ return CombatMath.isKillShot(u, target); },
+        computeCollisionOutcome(unitA, occupant){ return CombatMath.computeCollisionOutcome(unitA, occupant); },
+        computeShootOutcome(unitA, target){ return CombatMath.computeShootOutcome(unitA, target); },
+        checkEndgameStatus(units){ return EndgameStatus.checkEndgameStatus(units); }
+      };
 
       // Frozen plain facade of the pure rule queries + copied rule data,
       // built once here: this is what crosses into the AI snapshot DTO —
