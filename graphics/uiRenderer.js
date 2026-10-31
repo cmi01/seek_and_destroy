@@ -63,31 +63,6 @@
     return lo > 0 ? (s.slice(0, lo) + "…") : "";
   }
 
-  function _drawOscilloscopeBox(ctx, x, y, w, h, uiHud, bp, C) {
-    ctx.save();
-    ctx.fillStyle = C["#06040b"];
-    ctx.strokeStyle = (uiHud && uiHud.radioActive) ? C["#c084fc"] : C["rgba(148, 163, 184, 0.4)"];
-    ctx.lineWidth = 1;
-    ctx.fillRect(x, y, w, h);
-    ctx.strokeRect(x, y, w, h);
-
-    const wave = (uiHud && uiHud.scopeWave) ? uiHud.scopeWave : null;
-    ctx.strokeStyle = (uiHud && uiHud.radioActive) ? C["#c084fc"] : bp.accent;
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    const n = (wave && wave.length) ? wave.length : 32;
-    for (let i = 0; i < n; i++) {
-      const t = i / Math.max(1, n - 1);
-      const px = x + 2 + t * (w - 4);
-      const v = wave ? wave[i] : 0;
-      const py = y + h * 0.5 + v * (h * 0.40);
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
-
   function _drawButtonWidget(ctx, b, hoveredId, pressedId, bp, US, F, C) {
     const isHovered = (hoveredId === b.id);
     const isPressed = (pressedId === b.id);
@@ -139,11 +114,12 @@
     ctx.restore();
   }
 
+  // Fixed-size canvas status bar: level tag + turn/AP/credits only.
   function _drawTopLeftHudBar(ctx, state, uiHud, bp, DS, US, leftMaxW, F, C) {
-    const pad = Math.max(8, Math.round(10 * US));
-    const barW = Math.max(180, Math.min(Math.round(334 * US), leftMaxW));
-    const barH = Math.max(44, Math.round(50 * US));
-    const cut = Math.max(4, Math.round(6 * US));
+    const pad = Math.round(10 * US);
+    const barW = Math.min(Math.round(340 * US), leftMaxW);
+    const barH = Math.round(46 * US);
+    const cut = Math.round(6 * US);
     const isAI = state.activeTeam !== 1;
 
     ctx.save();
@@ -157,59 +133,27 @@
 
     // Left accent stripe
     ctx.fillStyle = isAI ? bp.hostile : bp.accent;
-    ctx.fillRect(pad, pad, Math.max(2, Math.round(3 * US)), barH);
+    ctx.fillRect(pad, pad, Math.round(3 * US), barH);
 
     const textX = pad + Math.round(9 * US);
+    const maxW = barW - Math.round(16 * US);
     ctx.textBaseline = "top";
 
-    const oscW = Math.max(38, Math.round(54 * US));
-    const oscH = Math.max(11, Math.round(13 * US));
-    const hasOsc = barW > 240 * US;
-    if (hasOsc) {
-      _drawOscilloscopeBox(ctx, pad + barW - oscW - Math.round(7 * US), pad + Math.round(5 * US), oscW, oscH, uiHud, bp, C);
-    }
-
-    // Row 1: Level tag
+    // Row 1: level tag
     ctx.font = F["bold:7"];
     ctx.fillStyle = C["#c084fc"];
     const lvlTag = (uiHud && uiHud.levelTag) ? uiHud.levelTag : `SECTOR ${state.levelId}`;
-    const row1MaxW = hasOsc ? (barW - oscW - Math.round(22 * US)) : (barW - Math.round(16 * US));
-    ctx.fillText(_fitTextToWidth(ctx, lvlTag, row1MaxW), textX, pad + Math.round(5 * US));
+    ctx.fillText(_fitTextToWidth(ctx, lvlTag, maxW), textX, pad + Math.round(6 * US));
 
-    // Row 2: Turn + AP pips + Credits
-    const row2Y = pad + Math.round(20 * US);
-    ctx.font = F["bold:7"];
-    ctx.fillStyle = isAI ? bp.hostile : bp.accent;
-    const turnStr = `T${String(state.turnNumber).padStart(2, "0")} ${isAI ? "AI" : "BLUE"}`;
-    ctx.fillText(turnStr, textX, row2Y);
-
-    // AP pips
-    const apX = textX + Math.round(62 * US);
+    // Row 2: turn · AP · credits
+    const isAI2 = isAI;
+    ctx.fillStyle = isAI2 ? bp.hostile : bp.accent;
+    const turnStr = `T${String(state.turnNumber).padStart(2, "0")} ${isAI2 ? "AI" : "BLUE"}`;
     const maxAp = state.maxAp || 4;
-    ctx.fillStyle = C["#94a3b8"];
-    ctx.fillText("AP:", apX, row2Y);
-    for (let i = 0; i < maxAp; i++) {
-      ctx.fillStyle = i < state.ap ? bp.accent : C["#334155"];
-      ctx.fillText("◆", apX + Math.round((22 + i * 9) * US), row2Y);
-    }
-
-    // Credits & Income
-    const credX = apX + Math.round((24 + maxAp * 9 + 8) * US);
     const credits = (state.credits && state.credits[1] !== undefined) ? state.credits[1] : 0;
     const income = (state.income && state.income[1] !== undefined) ? state.income[1] : 0;
-    ctx.fillStyle = bp.gold;
-    const credStr = `${credits}ⒸB`;
-    ctx.fillText(credStr, credX, row2Y);
-    const credW = ctx.measureText(credStr).width;
-    ctx.fillStyle = C["#34d399"];
-    ctx.font = F["regular:6"];
-    ctx.fillText(`+${income}/T`, credX + credW + Math.round(5 * US), row2Y + Math.round(1 * US));
-
-    // Row 3: Compact controls hint
-    const row3Y = pad + Math.round(35 * US);
-    ctx.font = F["regular:6"];
-    ctx.fillStyle = C["#94a3b8"];
-    ctx.fillText(_fitTextToWidth(ctx, "[LMB]ACT [WASD]PAN [WHL]ZOOM [SPC]SHOP [I]INFO", barW - Math.round(16 * US)), textX, row3Y);
+    const row2 = `${turnStr}   AP ${state.ap}/${maxAp}   ${credits}ⒸB +${income}/T`;
+    ctx.fillText(_fitTextToWidth(ctx, row2, maxW), textX, pad + Math.round(25 * US));
 
     ctx.restore();
     return { x: pad, y: pad, w: barW, h: barH };
@@ -229,95 +173,49 @@
     ctx.fillRect(x, y, mmSize, mmSize);
     ctx.drawImage(minimapCanvas, x + 1, y + 1, mmSize - 2, mmSize - 2);
     ctx.strokeRect(x + 0.5, y + 0.5, mmSize - 1, mmSize - 1);
-
-    // Header label strip
-    const lblH = Math.max(12, Math.round(14 * US));
-    ctx.fillStyle = C["rgba(6, 8, 14, 0.82)"];
-    ctx.fillRect(x + 1, y + 1, mmSize - 2, lblH);
-    ctx.font = `${Math.max(7, Math.round(7.5 * US))}px monospace`;
-    ctx.fillStyle = bp.accent;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const lbl = (uiHud && uiHud.minimapLabel) ? uiHud.minimapLabel : "MINIMAP // 32×32";
-    ctx.fillText(_fitTextToWidth(ctx, lbl, mmSize - 4), x + mmSize * 0.5, y + 1 + lblH * 0.5);
     ctx.restore();
 
     return { x, y, w: mmSize, h: mmSize };
   }
 
+  // Compact fixed-size telemetry card: header + HP/stats row; flag details
+  // only in inspect mode. Row count must match the HUD model's height estimate
+  // so the hit rect equals the drawn box.
   function _drawTelemetryCard(ctx, model, labelPrefix, x, bottomY, w, bp, US, inspectMode, F, C) {
     if (!model) return null;
-    const cut = Math.max(3, Math.round(5 * US));
+    const cut = Math.round(5 * US);
     const isHostile = Boolean(model.isHostile);
     const borderCol = isHostile ? bp.hostile : (labelPrefix === "HOV" ? bp.gold : bp.accent);
     const padX = Math.round(8 * US);
     const padY = Math.round(6 * US);
     const innerW = w - padX * 2;
-    const lineH = Math.max(11, Math.round(12 * US));
-    const headerH = Math.max(13, Math.round(14 * US));
+    const lineH = Math.max(15, Math.round(17 * US));
+    const headerH = Math.max(16, Math.round(18 * US));
 
-    ctx.save();
-    ctx.font = F["regular:6"];
-
-    const contentRows = [];
+    const rows = [];
     if (model.kind === "unit") {
-      // Row 1: HP bar + core stats
       const ratio = model.maxHp > 0 ? Math.max(0, Math.min(1, model.hp / model.maxHp)) : 0;
       const filled = Math.round(ratio * 8);
       const bar = "█".repeat(filled) + "░".repeat(8 - filled);
-      contentRows.push({
-        kind: "unitStats",
-        hpText: `HP ${model.hp}/${model.maxHp} ${bar}`,
-        statsText: model.stats || ""
-      });
-
-      // Row 2+: Unit flags (always shown, never overwritten by locusTag)
-      const flagNames = (model.flags || []).map(f => f.flag).join(" ") || "NO ACTIVE FLAGS";
-      const wrappedFlags = _wrapTextLines(ctx, flagNames, innerW);
-      for (let i = 0; i < wrappedFlags.length; i++) {
-        contentRows.push({ kind: "text", text: wrappedFlags[i], color: C["#94a3b8"] });
-      }
-
-      // Dedicated line for friendly capital ship warp locus status
-      if (model.locusTag) {
-        const wrappedLocus = _wrapTextLines(ctx, model.locusTag, innerW);
-        for (let i = 0; i < wrappedLocus.length; i++) {
-          contentRows.push({ kind: "text", text: wrappedLocus[i], color: C["#c084fc"] });
-        }
-      }
-
-      // Inspect mode ([Hold I]): full wrapped descriptions for ALL unit flags
-      if (inspectMode && Array.isArray(model.flags) && model.flags.length > 0) {
-        for (let i = 0; i < model.flags.length; i++) {
-          const f = model.flags[i];
-          if (f && f.desc) {
-            const descLines = _wrapTextLines(ctx, `${f.flag}: ${f.desc}`, innerW);
-            for (let j = 0; j < descLines.length; j++) {
-              contentRows.push({ kind: "text", text: descLines[j], color: bp.gold });
-            }
-          }
-        }
+      rows.push({ kind: "text", text: `HP ${model.hp}/${model.maxHp} ${bar}`, color: C["#34d399"] });
+      rows.push({ kind: "text", text: model.stats || "", color: C["#e2e8f0"] });
+      if (inspectMode) {
+        const flagNames = (model.flags || []).map(f => f.flag).join(" ") || "NO ACTIVE FLAGS";
+        rows.push({ kind: "text", text: flagNames, color: C["#94a3b8"] });
+        if (model.locusTag) rows.push({ kind: "text", text: model.locusTag, color: C["#c084fc"] });
       }
     } else {
-      if (model.subtitle) {
-        const subLines = _wrapTextLines(ctx, model.subtitle, innerW);
-        for (let i = 0; i < subLines.length; i++) {
-          contentRows.push({ kind: "text", text: subLines[i], color: C["#94a3b8"] });
-        }
-      }
-      if (Array.isArray(model.lines)) {
-        for (let i = 0; i < model.lines.length; i++) {
-          const wrapped = _wrapTextLines(ctx, model.lines[i], innerW);
-          for (let j = 0; j < wrapped.length; j++) {
-            contentRows.push({ kind: "text", text: wrapped[j], color: C["#64748b"] });
-          }
-        }
+      rows.push({ kind: "text", text: model.subtitle || "", color: C["#94a3b8"] });
+      const lines = Array.isArray(model.lines) ? model.lines : [];
+      for (let i = 0; i < lines.length; i++) {
+        rows.push({ kind: "text", text: lines[i], color: C["#64748b"] });
       }
     }
 
-    const h = Math.max(Math.round(44 * US), padY * 2 + headerH + contentRows.length * lineH);
+    const h = Math.max(Math.round(52 * US), padY * 2 + headerH + rows.length * lineH);
     const y = Math.max(Math.round(8 * US), bottomY - h);
 
+    ctx.save();
     _drawChamferedRect(ctx, x, y, w, h, cut);
     ctx.fillStyle = C["rgba(6, 8, 14, 0.90)"];
     ctx.strokeStyle = borderCol;
@@ -327,34 +225,22 @@
     ctx.clip();
 
     ctx.fillStyle = borderCol;
-    ctx.fillRect(x, y, Math.max(2, Math.round(3 * US)), h);
+    ctx.fillRect(x, y, Math.round(3 * US), h);
 
     const tx = x + padX;
     let cy = y + padY;
     ctx.textBaseline = "top";
 
-    // Header line: HOV/SEL + Title + Coord
     ctx.font = F["bold:7"];
     ctx.fillStyle = borderCol;
-    const titleStr = `${labelPrefix}: ${model.title || ""} ${model.coordTag || ""}`;
-    ctx.fillText(_fitTextToWidth(ctx, titleStr, innerW), tx, cy);
+    ctx.fillText(_fitTextToWidth(ctx, `${labelPrefix}: ${model.title || ""}`, innerW), tx, cy);
     cy += headerH;
 
-    for (let i = 0; i < contentRows.length; i++) {
-      const row = contentRows[i];
-      if (row.kind === "unitStats") {
-        ctx.font = F["bold:6"];
-        ctx.fillStyle = C["#34d399"];
-        ctx.fillText(row.hpText, tx, cy);
-        const hpW = ctx.measureText(row.hpText).width;
-        ctx.font = F["regular:6"];
-        ctx.fillStyle = C["#e2e8f0"];
-        ctx.fillText(_fitTextToWidth(ctx, row.statsText, innerW - hpW - Math.round(8 * US)), tx + hpW + Math.round(8 * US), cy);
-      } else {
-        ctx.font = F["regular:6"];
-        ctx.fillStyle = row.color;
-        ctx.fillText(row.text, tx, cy);
-      }
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      ctx.font = F["regular:6"];
+      ctx.fillStyle = row.color;
+      ctx.fillText(_fitTextToWidth(ctx, row.text, innerW), tx, cy);
       cy += lineH;
     }
 
@@ -415,30 +301,51 @@
     return { x, y, w, h };
   }
 
-  function _drawPriorityBanner(ctx, uiHud, bp, DS, US, F, C) {
-    if (!uiHud || !uiHud.priorityBanner || !uiHud.priorityBanner.visible) return;
-    const b = uiHud.priorityBanner;
-    if (!b.label) return;
+  // HELP — fixed-size canvas panel with the hidden text (controls + mission
+  // briefing). The CLOSE button comes from the HUD's button list.
+  function _drawHelpModal(ctx, uiHud, state, bp, DS, US, F, C) {
+    const help = (uiHud && uiHud.helpModal) ? uiHud.helpModal : null;
+    if (!help || !help.rect) return;
+    const r = help.rect;
 
     ctx.save();
-    ctx.font = F["bold:6.5"];
-    ctx.textBaseline = "middle";
-    const textW = ctx.measureText(b.label).width;
-    const padX = Math.round(8 * US);
-    const w = textW + padX * 2;
-    const h = Math.max(18, Math.round(20 * US));
-    const x = Math.max(6, Math.min(DS - w - 6, b.x));
-    const y = Math.max(6, Math.min(DS - h - 6, b.y));
+    ctx.fillStyle = C["rgba(3, 5, 10, 0.88)"];
+    ctx.fillRect(0, 0, DS, DS);
+    _drawChamferedRect(ctx, r.x, r.y, r.w, r.h, Math.round(10 * US));
+    ctx.fillStyle = C["#060911"];
+    ctx.strokeStyle = bp.accent;
+    ctx.lineWidth = 1.5;
+    ctx.fill();
+    ctx.stroke();
+    ctx.clip();
 
-    ctx.fillStyle = C["rgba(4, 6, 11, 0.94)"];
-    ctx.strokeStyle = bp.gold;
-    ctx.lineWidth = 1.2;
-    ctx.fillRect(x, y, w, h);
-    ctx.strokeRect(x, y, w, h);
+    ctx.textBaseline = "top";
+    let cy = r.y + Math.round(16 * US);
+    const maxW = r.w - Math.round(36 * US);
 
-    ctx.fillStyle = bp.gold;
-    ctx.fillText(b.label, x + padX, y + h * 0.5 + 0.5);
+    ctx.font = F["bold:8.5"];
+    ctx.fillStyle = bp.accent;
+    ctx.fillText(_fitTextToWidth(ctx, help.title || "HELP", maxW), r.x + Math.round(18 * US), cy);
+    cy += Math.round(30 * US);
+
+    const rows = Array.isArray(help.rows) ? help.rows :
+      (Array.isArray(help.lines) ? help.lines.map(function (t) {
+        const raw = String(t || "");
+        return { text: raw.charAt(0) === "#" ? raw.slice(1) : raw, head: raw.charAt(0) === "#" };
+      }) : []);
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      ctx.font = row.head ? F["bold:7"] : F["regular:6"];
+      ctx.fillStyle = row.head ? bp.gold : C["#cbd5e1"];
+      ctx.fillText(_fitTextToWidth(ctx, String(row.text || ""), maxW), r.x + Math.round(18 * US), cy);
+      cy += Math.round(24 * US);
+    }
     ctx.restore();
+
+    const btns = Array.isArray(state.canvasButtons) ? state.canvasButtons : [];
+    for (let i = 0; i < btns.length; i++) {
+      _drawButtonWidget(ctx, btns[i], state.buttonHovered || null, state.buttonPressed || null, bp, US, F, C);
+    }
   }
 
   function _drawBridgeModal(ctx, state, uiHud, bp, DS, US, iconSprites, F, C) {
@@ -470,7 +377,7 @@
     ctx.lineTo(mx + mw, my + hdrH);
     ctx.stroke();
 
-    // Close button & credits & scope in header right
+    // Close button & credits in header right
     const closeW = Math.max(88, Math.round(106 * US));
     const closeH = Math.max(22, Math.round(26 * US));
     const closeX = mx + mw - closeW - Math.round(10 * US);
@@ -488,19 +395,11 @@
     const credW = ctx.measureText(credStr).width;
     ctx.textAlign = "left";
 
-    // Oscilloscope in header
-    const oscW = Math.round(62 * US), oscH = Math.round(18 * US);
-    const oscX = credRightX - credW - oscW - Math.round(12 * US);
-    const showOsc = mw > 520 * US;
-    if (showOsc) {
-      _drawOscilloscopeBox(ctx, oscX, my + Math.round(15 * US), oscW, oscH, uiHud, bp, C);
-    }
-
-    const headerLeftMaxW = (showOsc ? oscX : (credRightX - credW)) - (mx + Math.round(20 * US));
+    const headerLeftMaxW = (credRightX - credW) - (mx + Math.round(20 * US));
     ctx.textBaseline = "top";
     ctx.font = F["bold:8"];
     ctx.fillStyle = bp.accent;
-    ctx.fillText(_fitTextToWidth(ctx, "COMMAND BRIDGE // HYPERSPACE REINFORCEMENT LOCUS", headerLeftMaxW), mx + Math.round(12 * US), my + Math.round(6 * US));
+    ctx.fillText(_fitTextToWidth(ctx, "REINFORCEMENTS // HYPERSPACE WARP LOCUS", headerLeftMaxW), mx + Math.round(12 * US), my + Math.round(6 * US));
 
     ctx.font = F["bold:6.2"];
     ctx.fillStyle = modal.locusOk ? C["#34d399"] : bp.hostile;
@@ -975,6 +874,10 @@
       _drawCampaignModal(ctx, state, uiHud, bp, DS, US, now, F, C);
       return;
     }
+    if (uiHud && uiHud.activeModal === "help") {
+      _drawHelpModal(ctx, uiHud, state, bp, DS, US, F, C);
+      return;
+    }
 
     // 2. Composite Minimap in bottom-left of battle canvas
     const mmRect = _drawMinimapOnBattleCanvas(ctx, minimapCanvas, metrics, uiHud, bp, DS, US, F, C);
@@ -985,63 +888,34 @@
     }
 
     // 3. Standard HUD buttons (top-right and bottom-right)
-    const selUnit = state.selectedCell ? _unitAt(state, state.selectedCell.x, state.selectedCell.y) : null;
-    const isPlayerTurn = state.activeTeam === 1 && !state.gameOver;
-    const isCapitalSelected = Boolean(selUnit && selUnit.team === 1 && _hasFlag(selUnit, "#capital ship"));
-    const canShieldSelected = Boolean(
-      isPlayerTurn &&
-      selUnit &&
-      selUnit.team === 1 &&
-      state.ap > 0 &&
-      Boolean(state.canShieldSelected)
-    );
-    const audioMuted = Boolean(state.audioSettings && state.audioSettings.muted);
-    const audioReady = Boolean(uiHud && uiHud.audioReady);
-    const audioLabel = !audioReady ? "AUD:OFF" : (audioMuted ? "AUD:MUTE" : "AUD:ON");
-    const themeLabel = String(theme || state.theme || "default").toUpperCase();
+    // 3. Buttons — drawn from the HUD's own button list (the HUD model computes
+    // the fixed-size layout; the render frame carries the plain button DTOs).
+    const btnH = Math.round(30 * US);
+    const gap = Math.round(6 * US);
+    const padRight = Math.round(10 * US);
+    const topY = Math.round(10 * US);
+    const botY = DS - btnH - Math.round(10 * US);
 
-    const btnH = Math.max(22, Math.round(25 * US));
-    const gap = Math.max(5, Math.round(6 * US));
-    const padRight = Math.max(8, Math.round(10 * US));
-    const topY = Math.max(8, Math.round(10 * US));
-    const botY = DS - btnH - Math.max(8, Math.round(10 * US));
-
-    const topDefs = [
-      { id: "BRIDGE", label: "[SPC] BRIDGE",     w: Math.round(108 * US), enabled: isPlayerTurn, active: isCapitalSelected },
-      { id: "MAP",    label: "SECTOR MAP",       w: Math.round(94 * US),  enabled: true,         active: false },
-      { id: "THEME",  label: `THM:${themeLabel}`, w: Math.round(96 * US),  enabled: true,         active: false },
-      { id: "AUDIO",  label: audioLabel,         w: Math.round(80 * US),  enabled: true,         active: audioReady && !audioMuted }
-    ];
-
-    const botDefs = [
-      { id: "SHIELD",   label: "REGEN SHIELD", w: Math.round(108 * US), enabled: canShieldSelected, active: canShieldSelected },
-      { id: "END_TURN", label: "END TURN >>",  w: Math.round(98 * US),  enabled: isPlayerTurn,      active: false }
-    ];
-
-    const layout = [];
-    let curRight = DS - padRight;
-    for (let i = topDefs.length - 1; i >= 0; i--) {
-      const d = topDefs[i];
-      const w = Math.max(58, d.w);
-      const x = curRight - w;
-      layout.unshift({ id: d.id, label: d.label, x, y: topY, w, h: btnH, enabled: d.enabled, active: d.active });
-      curRight = x - gap;
-    }
-    const topButtonsLeftEdge = layout.length > 0 ? layout[0].x : (DS - padRight);
-
-    let botRight = DS - padRight;
-    for (let i = botDefs.length - 1; i >= 0; i--) {
-      const d = botDefs[i];
-      const w = Math.max(66, d.w);
-      const x = botRight - w;
-      layout.push({ id: d.id, label: d.label, x, y: botY, w, h: btnH, enabled: d.enabled, active: d.active });
-      botRight = x - gap;
+    // Dropdown panel behind the menu items.
+    const menuRect = (uiHud && uiHud.panelRects) ? uiHud.panelRects.menu : null;
+    if (menuRect) {
+      _drawChamferedRect(ctx, menuRect.x, menuRect.y, menuRect.w, menuRect.h, Math.round(5 * US));
+      ctx.fillStyle = C["rgba(6, 8, 14, 0.94)"];
+      ctx.strokeStyle = bp.accent;
+      ctx.lineWidth = 1.2;
+      ctx.fill();
+      ctx.stroke();
     }
 
     const hoveredId = state.buttonHovered || null;
     const pressedId = state.buttonPressed || null;
-    for (let i = 0; i < layout.length; i++) {
-      _drawButtonWidget(ctx, layout[i], hoveredId, pressedId, bp, US, F, C);
+    const btns = Array.isArray(state.canvasButtons) ? state.canvasButtons : [];
+    let topButtonsLeftEdge = DS - padRight;
+    for (let i = 0; i < btns.length; i++) {
+      if (Math.abs(btns[i].y - topY) < 1) topButtonsLeftEdge = Math.min(topButtonsLeftEdge, btns[i].x);
+    }
+    for (let i = 0; i < btns.length; i++) {
+      _drawButtonWidget(ctx, btns[i], hoveredId, pressedId, bp, US, F, C);
     }
 
     // 4. Top-Left HUD Status Bar
@@ -1066,16 +940,13 @@
         state.hoveredCell.x === state.selectedCell.x &&
         state.hoveredCell.y === state.selectedCell.y
       );
-      if (state.hoveredCell && !hoverSameAsSelected && uiHud.hoveredTelemetry && uiHud.hoveredTelemetry.kind !== "none") {
+      if (state.inspectMode && state.hoveredCell && !hoverSameAsSelected && uiHud.hoveredTelemetry && uiHud.hoveredTelemetry.kind !== "none") {
         _drawTelemetryCard(ctx, uiHud.hoveredTelemetry, "HOV", cardX, nextCardBottom, cardW, bp, US, state.inspectMode, F, C);
       }
     }
 
     // 6. Operational Intel Overlay (top-left below HUD bar)
     _drawIntelOverlay(ctx, uiHud, topBarRect, bp, DS, US, F, C);
-
-    // 7. Priority Action Banner near cursor
-    _drawPriorityBanner(ctx, uiHud, bp, DS, US, F, C);
   }
 
   function drawMinimapUi(cmd) {

@@ -19,13 +19,15 @@ const LayoutMetrics = {
   renderScale: 2,     // min(devicePixelRatio, 2)
   // cellPx / fontScale are getters driven by Game.getViewSpan(). fontScale
   // scales with cell size by design: it sizes board-space labels (terrain
-  // shapes, tactical glyphs, warp-arc text). The UI itself never scales —
-  // uiScale is a constant, so HUD text, widgets and layout keep one fixed
-  // size regardless of window size or zoom (768px design reference).
+  // shapes, tactical glyphs, warp-arc text). The UI is a set of fixed-size
+  // canvas objects in the 768x768 design grid: uiScale scales the whole grid
+  // uniformly with the canvas, so the UI's size relative to the game is
+  // constant at any window size and any browser zoom — the UI never changes
+  // scale on its own.
   get cellPx()    { return this.displaySize / Game.getViewSpan(); },
   get fontScale() { return this.cellPx / 24; },
   get textScale() { return Math.min(this.fontScale, 2); },
-  get uiScale()   { return 1; },
+  get uiScale()   { return this.displaySize / 768; },
   minimapSize: 120,          // frame outer size (CSS px, includes border)
   minimapCanvasSize: 118,    // canvas content size (CSS px) = minimapSize − 2
   minimapDevicePx: 236       // canvas backing store = minimapCanvasSize × renderScale
@@ -177,7 +179,7 @@ function computeLayoutMetrics() {
     canvas.height = devicePx;
   }
 
-  const minimapSize       = 120; // fixed: part of the non-scaling UI
+  const minimapSize       = Math.round(120 * size / 768); // fixed design-grid size (120), scaled with the canvas
   const minimapCanvasSize = minimapSize - 2;
   const minimapDevicePx   = Math.round(minimapCanvasSize * renderScale);
 
@@ -227,7 +229,6 @@ function bootGame() {
 // ======================== MAIN LOOP ========================
 function mainLoop(now){
   const visCache = Game.stepFrame(now);
-  Game.sampleOscilloscope(now);
   requestCanvasUpdate({ now, visCache });
   requestAnimationFrame(mainLoop);
 }

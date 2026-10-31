@@ -827,8 +827,6 @@ const Hud = {
   setAudioReady(ready){ _hudView.audioReady = Boolean(ready); },
 
   // Data-returning operations: plain data in, plain data out, Game applies.
-  refreshMinimapLabel(){ _applyHudResult(HudLib.refreshMinimapLabel(_hudView, _hudInput())); },
-  setMinimapLabel(lbl){ _applyHudResult(HudLib.setMinimapLabel(_hudView, _hudInput(), lbl)); },
   syncLayout(){ _applyHudResult(HudLib.syncLayout(_hudView, _hudInput())); },
   updateLeftWing(){ _applyHudResult(HudLib.updateLeftWing(_hudView, _hudInput())); },
   updateRightWing(){ _applyHudResult(HudLib.updateRightWing(_hudView, _hudInput())); },
@@ -843,12 +841,9 @@ const Hud = {
   renderCampaignCards(silent = false){ _applyHudResult(HudLib.renderCampaignCards(_hudView, _hudInput(), silent)); },
   showEndgameModal(isVictory){ _applyHudResult(HudLib.showEndgameModal(_hudView, _hudInput(), isVictory)); },
   hideEndgameModal(){ _applyHudResult(HudLib.hideEndgameModal(_hudView, _hudInput())); },
-  sampleOscilloscope(now){
-    const input = _hudInput();
-    input.now = now;
-    input.radioActive = now < (GameAudio.getRadioActiveUntil() || 0);
-    _applyHudResult(HudLib.sampleOscilloscope(_hudView, input));
-  },
+  toggleMenu(forceState = null){ _applyHudResult(HudLib.toggleMenu(_hudView, _hudInput(), forceState)); },
+  isMenuOpen(){ return HudLib.isMenuOpen(_hudView); },
+  toggleHelpModal(forceState = null){ _applyHudResult(HudLib.toggleHelpModal(_hudView, _hudInput(), forceState)); },
   updateAll(){ _applyHudResult(HudLib.updateAll(_hudView, _hudInput())); },
   setTheme(theme){
     // Game owns the active theme: it resolves the key and passes it down as
@@ -888,6 +883,7 @@ const InputProcessor = (() => {
     const panels = Hud.getPanelRects();
     if (!panels) return null;
     if (Hud.isIntelVisible() && _pointInRect(px, py, panels.intelOverlay)) return "intelOverlay";
+    if (_pointInRect(px, py, panels.menu)) return "menu";
     if (_pointInRect(px, py, panels.minimap)) return "minimap";
     if (_pointInRect(px, py, panels.topBar)) return "topBar";
     if (_pointInRect(px, py, panels.selectedCard)) return "selectedCard";
@@ -999,14 +995,20 @@ const InputProcessor = (() => {
       GameAudio.play("ui.invalid");
       return;
     }
-    if (btn.id === "BRIDGE"){
+    if (btn.id === "REINFORCEMENTS"){
+      Hud.toggleMenu(false);
       Hud.toggleBridgeModal();
-    } else if (btn.id === "MAP"){
+    } else if (btn.id === "MENU"){
+      Hud.toggleMenu();
+    } else if (btn.id === "MENU_MAP"){
+      Hud.toggleMenu(false);
       Hud.toggleCampaignModal(true);
-    } else if (btn.id === "THEME"){
+    } else if (btn.id === "MENU_THEME"){
+      Hud.toggleMenu(false);
       Hud.setTheme(Themes.next(State.theme));
       GameAudio.play("ui.select");
-    } else if (btn.id === "AUDIO"){
+    } else if (btn.id === "MENU_AUDIO"){
+      Hud.toggleMenu(false);
       if (!GameAudio.isReady()){
         GameAudio.unlock();
       } else {
@@ -1014,13 +1016,17 @@ const InputProcessor = (() => {
         GameAudio.play("ui.select");
       }
       Hud.syncLayout();
-    } else if (btn.id === "SHIELD"){
+    } else if (btn.id === "MENU_SHIELD"){
+      Hud.toggleMenu(false);
       const selUnit = Selection.getUnit();
       if (selUnit && selUnit.team === 1 && Actions.canShield(selUnit, { x: selUnit.x, y: selUnit.y })){
         Actions.executeShield(selUnit, false);
       } else {
         GameAudio.play("ui.invalid");
       }
+    } else if (btn.id === "MENU_HELP"){
+      Hud.toggleMenu(false);
+      Hud.toggleHelpModal(true);
     } else if (btn.id === "END_TURN"){
       if (State.activeTeam === 1 && !State.gameOver){
         Actions.consumeAPAndCheckTurn(false, Math.max(1, State.ap));
@@ -1028,6 +1034,7 @@ const InputProcessor = (() => {
     } else if (btn.id === "CLOSE_MODAL"){
       Hud.toggleBridgeModal(false);
       Hud.toggleCampaignModal(false);
+      Hud.toggleHelpModal(false);
     } else if (typeof btn.id === "string" && btn.id.indexOf("SHOP_BUY:") === 0){
       const shipName = btn.id.slice("SHOP_BUY:".length);
       const selUnit = Selection.getUnit();
@@ -1176,7 +1183,6 @@ const InputProcessor = (() => {
       State.viewX = result.viewX;
       State.viewY = result.viewY;
       MathGrid.clampViewport();
-      Hud.refreshMinimapLabel();
       GameAudio.play("ui.zoom");
       refreshHoverFromCamera();
       return;
@@ -1189,6 +1195,12 @@ const InputProcessor = (() => {
         State.buttonHovered = hitBtn.id;
         State.buttonPressed = hitBtn.id;
         _updateCursor(hitBtn, null);
+        return;
+      }
+      if (Hud.isMenuOpen()){
+        // Clicking outside the dropdown closes it without reaching the board.
+        Hud.toggleMenu(false);
+        refreshHoverFromCamera();
         return;
       }
       if (Hud.isModalOpen()) return;
@@ -1313,6 +1325,7 @@ const InputProcessor = (() => {
       if (evt.code === "Space"){
         const modal = Hud.getActiveModal();
         if (modal !== null && modal !== "bridge") return;
+        Hud.toggleMenu(false);
         Hud.toggleBridgeModal();
         refreshHoverFromCamera();
       } else if (evt.key === "i" || evt.key === "I"){
@@ -1322,9 +1335,12 @@ const InputProcessor = (() => {
           Hud.updateRightWing();
         }
       } else if (evt.code === "Escape"){
-        if (Hud.isModalOpen()){
+        if (Hud.isMenuOpen()){
+          Hud.toggleMenu(false);
+        } else if (Hud.isModalOpen()){
           Hud.toggleBridgeModal(false);
           Hud.toggleCampaignModal(false);
+          Hud.toggleHelpModal(false);
         } else if (Selection.getUnit()){
           Selection.select(null);
           GameAudio.play("ui.select");
@@ -1637,10 +1653,9 @@ const SectorGenerator = {
     MathGrid.clampViewport();
     Visibility.invalidate();
     Visibility.ensureCache();
-    Hud.refreshMinimapLabel();
 
-    State.turnReportQueue = [...result.initialIntel];
-    Hud.showIntelOverlay(result.spec.tag, State.turnReportQueue);
+    // The mission briefing (initialIntel) lives in the HELP menu — no text
+    // overlay on the board.
     State.turnReportQueue = [];
     Hud.updateAll();
 
@@ -1956,14 +1971,12 @@ const api = {
   },
 
   refreshLayout(){
-    Hud.refreshMinimapLabel();
     Hud.updateAll();
   },
 
   onResize(){
     State.zoomAnim.active = false;
     MathGrid.clampViewport();
-    Hud.refreshMinimapLabel();
     Hud.updateAll();
     InputProcessor.refreshHoverFromCamera();
   },
@@ -1988,10 +2001,6 @@ const api = {
 
     // Memoized visibility cache rebuilt only when State.visDirty is set (ISS-029).
     return Visibility.ensureCache();
-  },
-
-  sampleOscilloscope(now){
-    Hud.sampleOscilloscope(now);
   },
 
   buildFrame(overrides){

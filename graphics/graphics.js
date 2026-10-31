@@ -171,7 +171,10 @@ const Graphics = (() => {
   ];
 
   // Resolved UI font strings keyed "<weight>:<sizePx>" — plain data handed to
-  // uiRenderer (replaces the old fontHelper closure). Same sizing _uiFont used.
+  // uiRenderer. ALL UI text is one fixed size (large); the size is expressed
+  // in the 768 design grid and scaled uniformly with the canvas (uiScale), so
+  // text keeps its size relative to the game at any window size or zoom.
+  const UI_TEXT_PX = 15;
   const UI_FONT_SPECS = [
     ["bold:7", "bold", 7],
     ["regular:6", "", 6],
@@ -208,9 +211,9 @@ const Graphics = (() => {
     let out = _uiFontCache[cacheKey];
     if (!out) {
       out = {};
+      const size = Math.max(8, Math.round(UI_TEXT_PX * us));
       for (let i = 0; i < UI_FONT_SPECS.length; i++) {
-        const [k, weight, sizePx] = UI_FONT_SPECS[i];
-        const size = Math.max(8, Math.min(20, Math.round(sizePx * 1.45 * us)));
+        const [k, weight] = UI_FONT_SPECS[i];
         out[k] = (weight ? weight + " " : "") + size + "px monospace";
       }
       _uiFontCache[cacheKey] = out;

@@ -11,7 +11,7 @@ Game._registerModule("campaignData", {
   levels: [
     {
       id:101, tag:"TUTORIAL 01 // CALIBRATION RANGE", title:"TUTORIAL 01: TACTICAL CALIBRATION RANGE",
-      desc:"Master sensor sweeps, d<=1 Purple Fog Nebula spotting, Asteroid flanking, #railgun shield break, #space marines boarding, and [Space] #capital ship R:6 warp-ins.",
+      desc:"Master sensor sweeps, d<=1 Purple Fog Nebula spotting, Asteroid flanking, #railgun shield break, #space marines boarding, and REINFORCEMENTS R:6 warp-ins.",
       aiDoctrine:"DEFENSIVE_HOLD",
       asteroidClusters:{count:2,clusterSizeMin:3,clusterSizeMax:4},
       nebulaPatches:{count:2,patchSizeMin:3,patchSizeMax:5},
@@ -23,7 +23,7 @@ Game._registerModule("campaignData", {
       initialIntel:[
         "1. SENSOR SWEEP & GUNNERY: Select your Probe (R:8 scan) and move along the cyan chevron to unmask the fog. Select a warship and click a spotted enemy (orange diamond) to fire.",
         "2. NEBULA CLOAKING (d<=1) & BOARDING ('C'): Purple Nebulae reduce scan to 1 and cloak occupants until a ship moves adjacent (d<=1). Move a #space marines vessel adjacent to a non-flagship enemy and click the 'C' badge (or Shift+click) to capture, or click the hull to fire.",
-        "3. RAILGUN SHIELD BREAK & [SPACE] WARP-IN: Railgun Destroyer breaks +shield bubbles and deals full damage. Select your Flagship Battlecruiser (#capital ship), press [Space], and click a ship card to warp within R:6."
+        "3. RAILGUN SHIELD BREAK & REINFORCEMENTS: Railgun Destroyer breaks +shield bubbles and deals full damage. Click REINFORCEMENTS and pick a ship card to warp it in within R:6 of your capital ship."
       ]
     },
     {

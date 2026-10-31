@@ -37,7 +37,6 @@
 //   input.selectedUnit  plain copy of the selected unit | null
 //   input.cache     {priorityKey, priorityLabel, hoveredSpotted} — the
 //                   priority-banner memo Game stores between calls
-//   input.radioActive  bool (oscilloscope only)
 //
 // RESULT SHAPE — every operation returns one plain object (fields appear
 // only when the operation produces them):
@@ -68,18 +67,16 @@ Game._registerModule("hud", (() => {
   function _estimateTelemetryCardHeight(model, inspectMode, US) {
     if (!model || model.kind === "none") return 0;
     const padY = Math.round(6 * US);
-    const headerH = Math.max(13, Math.round(14 * US));
-    const lineH = Math.max(11, Math.round(12 * US));
+    const headerH = Math.max(16, Math.round(18 * US));
+    const lineH = Math.max(15, Math.round(17 * US));
+    // Compact card: header + HP row + stats row; flag details in inspect mode.
     let rows = 2;
     if (model.kind === "unit") {
-      if (model.locusTag) rows += 1;
-      if (inspectMode && Array.isArray(model.flags)) {
-        rows += model.flags.length * 2;
-      }
-    } else if (Array.isArray(model.lines)) {
-      rows += model.lines.length;
+      if (inspectMode) rows += 1 + (model.locusTag ? 1 : 0);
+    } else {
+      rows += 1 + (Array.isArray(model.lines) ? model.lines.length : 0);
     }
-    return Math.max(Math.round(44 * US), padY * 2 + headerH + rows * lineH);
+    return Math.max(Math.round(52 * US), padY * 2 + headerH + rows * lineH);
   }
 
   // ----------------------------------------------------------------
@@ -282,13 +279,44 @@ Game._registerModule("hud", (() => {
   }
 
   // ---- the game-owned HUD view-model (created and stored by Game) ---------
+  // ---- HELP content (kept off the HUD; shown in the HELP menu) ----------
+  const HELP_CONTROLS = [
+    "[LMB] — select a vessel, or execute the highlighted action on a cell",
+    "[SHIFT+CLICK / 'C'] — board and capture an adjacent spotted enemy",
+    "[WASD] — pan the camera    [WHEEL] — zoom    minimap: drag to pan",
+    "[I] (hold) — inspect: flag details for the selected vessel",
+    "[ESC] — close menus and clear the selection"
+  ];
+
+  // Wrap help rows to the panel width. Pure: no measuring context here, so the
+  // row budget uses the monospace advance estimate (0.64em, deliberately
+  // conservative). The renderer fits every row to the panel as a hard
+  // guarantee, so a slightly short row budget only costs an extra row.
+  function _wrapHelpRows(lines, availW, fontPx) {
+    const charW = Math.max(1, fontPx * 0.64);
+    const perRow = Math.max(12, Math.floor(availW / charW));
+    const rows = [];
+    for (let i = 0; i < lines.length; i++) {
+      const raw = String(lines[i] || "");
+      const isHead = raw.charAt(0) === "#";
+      const words = (isHead ? raw.slice(1) : raw).split(" ");
+      let cur = "";
+      let first = true;
+      for (let j = 0; j < words.length; j++) {
+        const word = words[j];
+        if (!cur.length) { cur = word; }
+        else if ((cur + " " + word).length <= perRow) { cur += " " + word; }
+        else { rows.push({ text: cur, head: isHead && first }); first = false; cur = word; }
+      }
+      rows.push({ text: cur, head: isHead && first });
+    }
+    return rows;
+  }
+
   function createInitialView() {
     return {
       levelTag: "SECTOR // INITIALIZING",
-      minimapLabel: "MINIMAP 32×32 · VIEW 32×32",
       audioReady: false,
-      radioActive: false,
-      scopeWave: new Float32Array(64),
       hoveredTelemetry: {
         coordTag: "[-- , --]",
         kind: "none",
@@ -325,6 +353,12 @@ Game._registerModule("hud", (() => {
         lines: []
       },
       activeModal: null,
+      menuOpen: false,
+      helpModal: {
+        title: "HELP",
+        lines: [],
+        rect: null
+      },
       bridgeModal: {
         locusText: "",
         protocolText: "WARP PROTOCOL: Deployed vessels arrive exhausted (ready next turn).",
@@ -347,7 +381,8 @@ Game._registerModule("hud", (() => {
         minimap: null,
         selectedCard: null,
         hoveredCard: null,
-        intelOverlay: null
+        intelOverlay: null,
+        menu: null
       }
     };
   }
@@ -399,7 +434,7 @@ Game._registerModule("hud", (() => {
             active: false
           });
         }
-        w.panelRects = { topBar: null, minimap: null, selectedCard: null, hoveredCard: null, intelOverlay: null };
+        w.panelRects = { topBar: null, minimap: null, selectedCard: null, hoveredCard: null, intelOverlay: null, menu: null };
         return { view: w, buttons };
       }
 
@@ -430,11 +465,36 @@ Game._registerModule("hud", (() => {
           mx: layout.mx, my: layout.my, mw: layout.mw, mh: layout.mh,
           hdrH: layout.hdrH, closeBtn: layout.closeBtn
         };
-        w.panelRects = { topBar: null, minimap: null, selectedCard: null, hoveredCard: null, intelOverlay: null };
+        w.panelRects = { topBar: null, minimap: null, selectedCard: null, hoveredCard: null, intelOverlay: null, menu: null };
         return { view: w, buttons };
       }
 
-      const mmPad = Math.max(8, Math.round(10 * US));
+      // HELP — fixed-size canvas panel holding the text that is otherwise
+      // hidden from the HUD: controls and the mission briefing.
+      if (w.activeModal === "help") {
+        const lines = Array.isArray(w.helpModal.lines) ? w.helpModal.lines : [];
+        const hw = Math.min(DS - Math.round(36 * US), Math.round(620 * US));
+        const lineH = Math.round(24 * US);
+        const textPx = Math.max(8, Math.round(15 * US));
+        const rows = _wrapHelpRows(lines, hw - Math.round(36 * US), textPx);
+        const hh = Math.round(88 * US) + rows.length * lineH;
+        const hx = Math.round((DS - hw) * 0.5);
+        const hy = Math.round((DS - hh) * 0.5);
+        w.helpModal.rows = rows;
+        w.helpModal.rect = { x: hx, y: hy, w: hw, h: hh };
+        const closeW = Math.round(112 * US);
+        const closeH = Math.round(30 * US);
+        const closeBtn = {
+          id: "CLOSE_MODAL", label: "CLOSE",
+          x: hx + hw - closeW - Math.round(14 * US),
+          y: hy + hh - closeH - Math.round(14 * US),
+          w: closeW, h: closeH, enabled: true, active: false
+        };
+        w.panelRects = { topBar: null, minimap: null, selectedCard: null, hoveredCard: null, intelOverlay: null, menu: null };
+        return { view: w, buttons: [closeBtn] };
+      }
+
+      const mmPad = Math.round(10 * US);
       const mmRect = { x: mmPad, y: DS - mmSize - mmPad, w: mmSize, h: mmSize };
 
       if (w.activeModal === "endgame") {
@@ -469,55 +529,82 @@ Game._registerModule("hud", (() => {
       );
       const audioMuted = Boolean(input.state.audioMuted);
       const audioReady = Boolean(w.audioReady);
-      const audioLabel = !audioReady ? "AUD:OFF" : (audioMuted ? "AUD:MUTE" : "AUD:ON");
+      const audioLabel = !audioReady ? "AUDIO: OFF" : (audioMuted ? "AUDIO: MUTE" : "AUDIO: ON");
       const themeLabel = String(input.state.theme || "default").toUpperCase();
 
-      const btnH = Math.max(22, Math.round(25 * US));
-      const gap = Math.max(5, Math.round(6 * US));
-      const padRight = Math.max(8, Math.round(10 * US));
-      const topY = Math.max(8, Math.round(10 * US));
-      const botY = DS - btnH - Math.max(8, Math.round(10 * US));
+      const btnH = Math.round(30 * US);
+      const gap = Math.round(6 * US);
+      const padRight = Math.round(10 * US);
+      const topY = Math.round(10 * US);
+      const botY = DS - btnH - Math.round(10 * US);
 
+      // The HUD is a set of fixed-size canvas objects in the 768 design grid,
+      // scaled uniformly with the canvas: two buttons top-right (reinforce +
+      // menu), one bottom-right (end turn), everything else in the dropdown.
       const topDefs = [
-        { id: "BRIDGE", label: "[SPC] BRIDGE",      w: Math.round(108 * US), enabled: isPlayerTurn, active: isCapitalSelected },
-        { id: "MAP",    label: "SECTOR MAP",        w: Math.round(94 * US),  enabled: true,         active: false },
-        { id: "THEME",  label: `THM:${themeLabel}`, w: Math.round(96 * US),  enabled: true,         active: false },
-        { id: "AUDIO",  label: audioLabel,          w: Math.round(80 * US),  enabled: true,         active: audioReady && !audioMuted }
+        { id: "REINFORCEMENTS", label: "REINFORCEMENTS", w: Math.round(156 * US), enabled: isPlayerTurn, active: false },
+        { id: "MENU",           label: w.menuOpen ? "MENU ^" : "MENU v",          w: Math.round(80 * US), enabled: true,         active: w.menuOpen }
       ];
 
       const botDefs = [
-        { id: "SHIELD",   label: "REGEN SHIELD", w: Math.round(108 * US), enabled: canShieldSelected, active: canShieldSelected },
-        { id: "END_TURN", label: "END TURN >>",  w: Math.round(98 * US),  enabled: isPlayerTurn,      active: false }
+        { id: "END_TURN", label: "END TURN", w: Math.round(112 * US), enabled: isPlayerTurn, active: false }
       ];
 
       const layout = [];
       let curRight = DS - padRight;
       for (let i = topDefs.length - 1; i >= 0; i--) {
         const d = topDefs[i];
-        const bw = Math.max(58, d.w);
+        const bw = d.w;
         const x = curRight - bw;
         layout.unshift({ id: d.id, label: d.label, x, y: topY, w: bw, h: btnH, enabled: d.enabled, active: d.active });
         curRight = x - gap;
       }
       const topButtonsLeftEdge = layout.length > 0 ? layout[0].x : (DS - padRight);
 
+      // Dropdown menu hanging under the MENU button (fixed-size rows).
+      let menuRect = null;
+      if (w.menuOpen) {
+        const itemW = Math.round(168 * US);
+        const itemH = Math.round(30 * US);
+        const itemGap = Math.round(2 * US);
+        const menuX = DS - padRight - itemW;
+        const menuY = topY + btnH + Math.round(4 * US);
+        const items = [
+          { id: "MENU_MAP",    label: "SECTOR MAP", enabled: true, active: false },
+          { id: "MENU_THEME",  label: "THEME: " + themeLabel, enabled: true, active: false },
+          { id: "MENU_AUDIO",  label: audioLabel, enabled: true, active: audioReady && !audioMuted },
+          { id: "MENU_SHIELD", label: "REGEN SHIELD", enabled: canShieldSelected, active: canShieldSelected },
+          { id: "MENU_HELP",   label: "HELP", enabled: true, active: false }
+        ];
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i];
+          layout.push({ id: it.id, label: it.label, x: menuX, y: menuY + i * (itemH + itemGap), w: itemW, h: itemH, enabled: it.enabled, active: it.active });
+        }
+        menuRect = {
+          x: menuX - Math.round(5 * US),
+          y: menuY - Math.round(5 * US),
+          w: itemW + Math.round(10 * US),
+          h: items.length * itemH + (items.length - 1) * itemGap + Math.round(10 * US)
+        };
+      }
+
       let botRight = DS - padRight;
       for (let i = botDefs.length - 1; i >= 0; i--) {
         const d = botDefs[i];
-        const bw = Math.max(66, d.w);
+        const bw = d.w;
         const x = botRight - bw;
         layout.push({ id: d.id, label: d.label, x, y: botY, w: bw, h: btnH, enabled: d.enabled, active: d.active });
         botRight = x - gap;
       }
       const buttons = layout;
 
-      const pad = Math.max(8, Math.round(10 * US));
-      const leftAvailW = Math.max(160, topButtonsLeftEdge - Math.round(18 * US));
-      const barW = Math.max(180, Math.min(Math.round(334 * US), leftAvailW));
-      const barH = Math.max(44, Math.round(50 * US));
+      const pad = Math.round(10 * US);
+      const leftAvailW = Math.max(Math.round(160 * US), topButtonsLeftEdge - Math.round(18 * US));
+      const barW = Math.min(Math.round(340 * US), leftAvailW);
+      const barH = Math.round(46 * US);
       const topBarRect = { x: pad, y: pad, w: barW, h: barH };
 
-      const cardW = Math.min(Math.round(308 * US), Math.max(190, DS - (mmRect.x + mmRect.w) - Math.round(24 * US)));
+      const cardW = Math.min(Math.round(308 * US), Math.max(Math.round(190 * US), DS - (mmRect.x + mmRect.w) - Math.round(24 * US)));
       const cardX = DS - padRight - cardW;
       let nextCardBottom = botY - Math.round(7 * US);
       let selRect = null;
@@ -539,7 +626,7 @@ Game._registerModule("hud", (() => {
         input.state.hoveredCell.x === input.state.selectedCell.x &&
         input.state.hoveredCell.y === input.state.selectedCell.y
       );
-      if (input.state.hoveredCell && !hoverSameAsSelected && w.hoveredTelemetry && w.hoveredTelemetry.kind !== "none") {
+      if (input.state.inspectMode && input.state.hoveredCell && !hoverSameAsSelected && w.hoveredTelemetry && w.hoveredTelemetry.kind !== "none") {
         const hh = (w.panelRects.hoveredCard && w.panelRects.hoveredCard.h)
           ? w.panelRects.hoveredCard.h
           : _estimateTelemetryCardHeight(w.hoveredTelemetry, input.state.inspectMode, US);
@@ -563,8 +650,9 @@ Game._registerModule("hud", (() => {
         topBar: topBarRect,
         minimap: mmRect,
         selectedCard: selRect,
-        hoveredCard: hovRect,
-        intelOverlay: intelRect
+        hoveredCard: input.state.inspectMode ? hovRect : null,
+        intelOverlay: intelRect,
+        menu: menuRect
       };
       return { view: w, buttons };
     }
@@ -638,6 +726,9 @@ Game._registerModule("hud", (() => {
         cache.priorityKey = "";
         cache.priorityLabel = null;
         cache.hoveredSpotted = false;
+        // The floating priority hint stays computed for the cache but is never
+        // shown (HUD declutter: board badges carry the action affordances).
+        w.priorityBanner.visible = false;
         return { view: w, banner: w.priorityBanner, cache };
       }
 
@@ -693,6 +784,9 @@ Game._registerModule("hud", (() => {
       } else {
         w.priorityBanner.visible = false;
       }
+      // The floating priority hint stays computed for the cache but is never
+      // shown (HUD declutter: board badges carry the action affordances).
+      w.priorityBanner.visible = false;
       return { view: w, banner: w.priorityBanner, cache };
     }
 
@@ -887,25 +981,6 @@ Game._registerModule("hud", (() => {
       return { view: w };
     }
 
-    // Oscilloscope: decorative waveform synthesized from the timestamp and
-    // the radio-active flag Game passes in (option (a) of the remediation —
-    // no audio reads). The former analyser branch was dead code anyway
-    // (Game's audio surface returns no analyser) and is gone.
-    function _sampleOscilloscope(view, input) {
-      const w = _clone(view);
-      w.radioActive = Boolean(input.radioActive);
-      const n = w.scopeWave.length;
-      const wave = new Float32Array(n);
-      const now = input.now;
-      const freq = w.radioActive ? 0.35 : 0.12;
-      const amp = w.radioActive ? 0.78 : 0.14;
-      for (let i = 0; i < n; i++) {
-        wave[i] = Math.sin(i * freq + now * 0.012) * amp * Math.sin(now * 0.003 + i * 0.06);
-      }
-      w.scopeWave = wave;
-      return { view: w };
-    }
-
     // Theme switch: recomputes the whole view and RETURNS the requested
     // theme key as data; Game applies the theme state field / body attribute /
     // audio theme command.
@@ -948,17 +1023,6 @@ Game._registerModule("hud", (() => {
         return Boolean(view.intelOverlay && view.intelOverlay.visible && view.activeModal === null);
       },
 
-      refreshMinimapLabel(view, input) {
-        const w = _clone(view);
-        const span = input.state.viewSpan;
-        w.minimapLabel = `MINIMAP 32×32 · VIEW ${span}×${span}`;
-        return _finalize({ view: w });
-      },
-      setMinimapLabel(view, input, lbl) {
-        const w = _clone(view);
-        w.minimapLabel = String(lbl || "MINIMAP 32×32");
-        return _finalize({ view: w });
-      },
       setAudioReady(view, input, ready) {
         const w = _clone(view);
         w.audioReady = Boolean(ready);
@@ -986,6 +1050,47 @@ Game._registerModule("hud", (() => {
       toggleCampaignModal(view, input, forceState = null) {
         return _finalize(_toggleCampaignModal(view, input, forceState));
       },
+      toggleMenu(view, input, forceState = null) {
+        const w = _clone(view);
+        w.menuOpen = forceState !== null ? Boolean(forceState) : !w.menuOpen;
+        return _finalize(_syncLayout(w, input));
+      },
+      isMenuOpen(view) { return Boolean(view.menuOpen); },
+      toggleHelpModal(view, input, forceState = null) {
+        const w = _clone(view);
+        const isOpen = w.activeModal === "help";
+        const next = forceState !== null ? Boolean(forceState) : !isOpen;
+        if (next && w.activeModal !== null && w.activeModal !== "help") {
+          return _finalize({ view: w });
+        }
+        if (next) {
+          w.activeModal = "help";
+          w.menuOpen = false;
+          const levels = deps.campaignLevels;
+          const spec = levels.find(l => l.id === input.state.levelId) || levels[0];
+          const lines = ["#CONTROLS"];
+          for (let i = 0; i < HELP_CONTROLS.length; i++) lines.push(HELP_CONTROLS[i]);
+          if (spec && Array.isArray(spec.initialIntel)) {
+            lines.push("#MISSION BRIEFING");
+            for (let i = 0; i < spec.initialIntel.length; i++) lines.push(spec.initialIntel[i]);
+          }
+          w.helpModal = { title: "HELP // " + (spec ? spec.tag : "SECTOR"), lines, rect: null };
+          return _finalize(_compose({
+            view: w,
+            sounds: [{ kind: "ui.modal.open", payload: {} }],
+            flags: { clearInteraction: true }
+          }, _syncLayout(w, input)));
+        }
+        if (isOpen) {
+          w.activeModal = null;
+          return _finalize(_compose({
+            view: w,
+            sounds: [{ kind: "ui.modal.close", payload: {} }],
+            flags: { clearInteraction: true }
+          }, _syncLayout(w, input)));
+        }
+        return _finalize({ view: w });
+      },
       renderCampaignCards(view, input, silent = false) {
         return _finalize(_renderCampaignCards(view, input, silent));
       },
@@ -995,7 +1100,6 @@ Game._registerModule("hud", (() => {
       },
       hideEndgameModal(view, input) { return _finalize(_hideEndgameModal(view, input)); },
 
-      sampleOscilloscope(view, input) { return _finalize(_sampleOscilloscope(view, input)); },
       applyTheme(view, input, key) { return _finalize(_applyTheme(view, input, key)); },
       updateAll(view, input) { return _finalize(_updateAll(view, input)); }
     };
