@@ -318,8 +318,8 @@
     return s;
   }
 
-  // Moved here from aiStateQueries.js: picking a retreat cell is a threat
-  // evaluation (it needs threatAt), so it belongs to the scorer layer.
+  // Moved here from the state-query layer: picking a retreat cell is a
+  // threat evaluation (it needs threatAt), so it belongs to the scorer layer.
   function findSafeRetreatCell(env, ctx, flag){
     const re = (env.priorities(ctx) && env.priorities(ctx).retreatEvaluation) || {};
     const cs = env.reachableCells(ctx, flag, re.reachableCap !== undefined ? re.reachableCap : 96);

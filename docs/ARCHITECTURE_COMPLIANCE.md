@@ -206,28 +206,137 @@ Behavior questions never resolve here; change `DESIGN.md` instead.
 
 ---
 
-## Appendix A — Conformance snapshot (v82 + working tree)
+## Appendix A — Conformance snapshot (post-v88 tree, v90 sweep)
 
-Where the current tree stands against this standard. Remediation is planned work;
-this appendix is a baseline, not an exemption.
+Where the current tree stands against this standard. Every row is a file as it
+exists in the tree; remediation that already shipped is marked with its version
+(v85 header contract, v86 `rules.js` split, v87 pure-inner extraction, v88 HUD
+decomposition, v90 AI query split). This appendix is a baseline, not an
+exemption.
+
+### Root
 
 | File | Job today | Status |
 |---|---|---|
-| `main.js` | wiring root | compliant |
-| `core/game.js` | owns state — but bundles MathGrid, Selection, Visibility, Actions executors and the render-frame build | **multi-job**; largest split candidate; frame build is an undecomposed complex builder |
-| `core/rules.js` | tactical rules queries | **library shape** — 25 exports spanning movement, LOS, visibility, combat math, endgame; split into single-job children |
-| `core/hud.js` | builds the HUD widget model | **undecomposed builder** — split per widget domain (top bar, telemetry, bridge modal, help) |
-| `core/inputs.js` | hardware → input events | compliant |
-| `core/gameState.js` | state store child | compliant |
-| `core/sectorGenerator.js` | sector/unit generation | compliant (single domain) |
-| `core/themes.js` | theme colour remap | compliant |
-| `graphics/graphics.js` | canvas + sprite caches + draw | compliant core; layers are domain children |
-| `graphics/uiRenderer.js`, `objectRenderer.js`, `backgroundRenderer.js`, `vfx.js` | one draw domain each | compliant |
-| `audio/sounds.js`, `sfx.js`, `music.js` | one audio domain each | compliant |
-| `ai/*` | one planning concern each; `aiLogic` composes | compliant; `aiStateQueries.js` is a multi-query surface to watch under the caller-domain test |
-| `interfaces/*` | one channel each | compliant |
-| `data/*` | one declarative table each | compliant |
-| `tests/*` | one owner's tests each | compliant |
+| `main.js` | create the cores and interfaces, wire them together, run the frame loop | compliant (wiring root) |
+
+### core/
+
+| File | Job today | Status |
+|---|---|---|
+| `core/game.js` | own all authoritative state, rules and turn flow — Actions executors included (see Standing decisions) | compliant core |
+| `core/frameBoard.js`, `core/frameUnits.js`, `core/frameOverlay.js`, `core/frameCursor.js`, `core/frameStatus.js` | build the render frame's per-domain slices (§3) | compliant (v89) |
+| `core/gameState.js` | operate the state store container passed in by its parent | compliant |
+| `core/inputs.js` | translate raw hardware events into plain input events | compliant |
+| `core/sectorGenerator.js` | generate a level's sector data (terrain, spawns, formation) | compliant |
+| `core/themes.js` | resolve theme keys and colour remaps | compliant |
+| `core/boardQueries.js` | answer board geometry, terrain and occupancy queries | compliant (v86 split of `rules.js`) |
+| `core/lineOfSight.js` | answer line-of-sight queries | compliant (v86) |
+| `core/visionQueries.js` | answer scan, visibility and spotting queries | compliant (v86) |
+| `core/actionLegality.js` | decide action legality from evidence | compliant (v86) |
+| `core/combatMath.js` | compute combat outcomes | compliant (v86) |
+| `core/reservePlacement.js` | choose valid reserve-entry cells | compliant (v86) |
+| `core/endgameStatus.js` | detect endgame from the unit list | compliant (v86) |
+| `core/rulesConfig.js` | expose the tactical config values from the rules data table | compliant (v86) |
+| `core/cameraMath.js` | resolve zoom and viewport geometry | compliant (v87) |
+| `core/selectionQueries.js` | answer selection queries over the unit list | compliant (v87) |
+| `core/visibilityCache.js` | compute the visibility cache over units and terrain | compliant (v87) |
+| `core/hud.js` | compose the HUD widget model and button list from per-domain pure children | compliant (v88 composition parent) |
+| `core/hudTopBar.js` | build the top-bar chrome model | compliant (v88) |
+| `core/hudTelemetry.js` | build the telemetry-card models and card rects | compliant (v88) |
+| `core/hudModals.js` | build the modal models (bridge shop, HELP, campaign starmap, endgame) | compliant (v88) |
+| `core/hudMenu.js` | build the dropdown-menu model | compliant (v88) |
+| `core/hudMinimap.js` | build the minimap panel rect model | compliant (v88) |
+| `core/hudBanner.js` | build the priority-hint banner model | compliant (v88) |
+| `core/hudIntel.js` | build the intel/turn-report overlay model | compliant (v88) |
+
+### ai/
+
+| File | Job today | Status |
+|---|---|---|
+| `ai/ai.js` | expose the single AI decision entry point and load its children | compliant |
+| `ai/aiTurnWorkflow.js` | sequence the AI turn's action beats | compliant |
+| `ai/aiLogic.js` | orchestrate the AI children into one decision (env facade) | compliant |
+| `ai/aiStateQueries.js` | answer the AI's contact-picture state queries (own units, spotted enemies, active beliefs) | compliant — **narrowed in v90**; the old multi-query surface failed the caller-domain test (see Notes) |
+| `ai/aiPositionQueries.js` | answer the AI's move-destination queries | compliant (v90 split) |
+| `ai/aiThreatQueries.js` | answer the AI's danger queries over spotted enemies | compliant (v90 split) |
+| `ai/aiPreservationQueries.js` | answer the AI's hull-preservation queries | compliant (v90 split) |
+| `ai/aiFleetQueries.js` | answer the AI's fleet queries (capability gaps, warp-in loci) | compliant (v90 split) |
+| `ai/aiBeliefMemory.js` | compute the AI's next belief map (sighting sync and decay) | compliant (v90 split) |
+| `ai/aiInvariantChecks.js` | check the AI turn state's invariants | compliant (v90 split) |
+| `ai/aiThreatScorer.js` | score threats and candidate moves and shots | compliant (one scoring domain) |
+| `ai/aiUnitPlanner.js` | generate candidate unit plans | compliant |
+| `ai/aiFleetCommander.js` | decide flagship survival reflexes and warp-in actions | compliant |
+
+### graphics/, audio/, interfaces/
+
+| File | Job today | Status |
+|---|---|---|
+| `graphics/graphics.js` | own the canvas and sprite caches and draw each frame | compliant core (state allowed); layer renderers are its children |
+| `graphics/uiRenderer.js` | draw the frame's UI layer | compliant |
+| `graphics/objectRenderer.js` | draw the frame's board-object layer | compliant |
+| `graphics/backgroundRenderer.js` | draw the frame's background layer | compliant |
+| `graphics/vfx.js` | draw the frame's effects layer | compliant |
+| `audio/sounds.js` | own the audio context and active sound nodes | compliant core (state allowed) |
+| `audio/sfx.js` | play one-shot sound effects from audio commands | compliant |
+| `audio/music.js` | manage music and ambience playback | compliant |
+| `interfaces/inputInterface.js` | carry plain input events from Inputs to Game | compliant |
+| `interfaces/graphicsInterface.js` | carry plain render frames from Game to Graphics | compliant |
+| `interfaces/audioInterface.js` | carry plain audio commands from Game to Audio | compliant |
+
+### data/ (one declarative table each) and tests/ (one owner's tests each)
+
+| File | Job today | Status |
+|---|---|---|
+| `data/rules_DATA.js` | tactical rules table | compliant (owner `core/game.js`) |
+| `data/aiPriorities_DATA.js` | AI priorities table | compliant (owner `ai/ai.js`) |
+| `data/beginningGameState_DATA.js` | initial state template | compliant (owner `core/game.js`) |
+| `data/campaign_DATA.js` | campaign and level table | compliant (owner `core/game.js`) |
+| `data/themes_DATA.js` | theme tables | compliant (owner `core/game.js`) |
+| `data/audio_DATA.js` | audio clip table | compliant (owner `audio/sounds.js`) |
+| `tests/gameTests.js` | game-side self-tests through the test bridge | compliant (owner `core/game.js`, loaded on demand) |
+| `tests/graphicsTests.js` | graphics self-tests through the test bridge | compliant (owner `graphics/graphics.js`, loaded on demand) |
+
+### Standing decisions
+
+1. **Actions executors remain in `core/game.js`.** State mutation and turn flow
+   is the core's job; the state rules (§4) forbid stateful children, so an
+   extracted Actions module would either own state (forbidden) or route every
+   mutation back through the core anyway. This supersedes the earlier
+   snapshot's note about extracting Actions from `game.js`.
+2. **The render-frame build is decomposed (v89).** `buildFrame` composes the
+   per-domain slices from `core/frame*.js` (§3 applied to the frame builder);
+   the frame DTO contract to `graphicsInterface`/`graphics` is unchanged and
+   rendering was verified identical.
+
+### Notes
+
+- **v90 caller-domain disposition (`ai/aiStateQueries.js`).** The former
+  13-export surface failed §1's caller-domain test: `aiUnitPlanner` reached in
+  for movement search, `aiThreatScorer` for threat/preservation inputs,
+  `aiFleetCommander` for reinforcement queries, and `aiLogic` for turn
+  bookkeeping — four unrelated caller domains behind one export list. The file
+  was split by real domain (contact picture stays; position, threat,
+  preservation, fleet queries, belief memory and invariant checks each get one
+  single-job file) with behavior proven identical before/after. `moveHeuristic`
+  and `shouldRetreat` have no external callers today; each is kept as the
+  natural second query of its domain file. Ownership-map rows for the six new
+  children are pending in `scripts/reference_audit.py` (orchestrator-owned).
+- **Presumption dispositions** (`structure_audit.py` size/export warnings — the
+  presumptions stand rebutted by the job tests, one line each):
+  - `ai/ai.js` (9 fns): one entry point; the rest is its priorities-normalization plumbing and child loader.
+  - `ai/aiThreatScorer.js` (377 lines, 13 fns): one scoring domain; the 13 exports are one scoring surface consumed through `aiLogic`'s env.
+  - `audio/sfx.js` (10 fns): one job (one-shot effect dispatch); the functions are its dispatch pipeline.
+  - `audio/sounds.js` (656 lines, 40 fns): core; owns the audio context and live sound nodes, so its bulk is state operations.
+  - `core/game.js` (>300 lines, >8 fns): **scheduled** — v89 frame decomposition in flight (counts also fluctuate while that work lands).
+  - `core/gameState.js` (13 fns): one job (operate the state store); the surface is the store API incl. serialization.
+  - `core/hud.js` (579 lines, 22 fns): composition parent (v88); the bulk is the parent's (view, input) → result ops that dispatch into its seven widget children.
+  - `core/hudModals.js` (334 lines, 10 fns): one widget domain (modal models) per the v88 decomposition; four modal builders share one modal surface.
+  - `core/rulesConfig.js` (11 fns): one job (config getters); one one-line getter per config key.
+  - `data/aiPriorities_DATA.js` (507 lines): declarative table — the presumption measures code, not data rows.
+  - `graphics/graphics.js` (1038 lines, 39 fns): core; owns canvas and sprite caches, layers are children.
+  - `graphics/uiRenderer.js` (996 lines, 17 fns): one job (draw the UI layer); length is per-widget draw code inside that single domain.
+  - `main.js` (368 lines, 15 fns): wiring root; boot, wiring and the frame loop are its single job.
 
 New code built to `docs/DESIGN.md` is compliant on arrival: every new file names
 its job, and every complex builder (campaign map frames, station UI, dialogue

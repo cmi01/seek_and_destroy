@@ -5,7 +5,13 @@
 // Owner: ai/ai.js. Holds no state unless it is a core.
 // ============================================================
 (() => {
-  let Q = null;
+  let Q = null;   // stateQueries (contact picture)
+  let PQ = null;  // positionQueries
+  let TQ = null;  // threatQueries
+  let PRQ = null; // preservationQueries
+  let FQ = null;  // fleetQueries
+  let BM = null;  // beliefMemory
+  let IC = null;  // invariantChecks
   let S = null;
   let buildUnitPlan = null;
   let selectFleetActionPlan = null;
@@ -24,10 +30,15 @@
     });
   }
 
-  // Loads this file's four leaf children. The registrar exists ONLY while they load.
+  // Loads this file's ten leaf children. The registrar exists ONLY while they load.
   async function load(){
     let regOpen = true;
-    const kids = { stateQueries: null, threatScorer: null, unitPlanner: null, fleetCommander: null };
+    const kids = {
+      stateQueries: null, positionQueries: null, threatQueries: null,
+      preservationQueries: null, fleetQueries: null, beliefMemory: null,
+      invariantChecks: null, threatScorer: null, unitPlanner: null,
+      fleetCommander: null
+    };
     const g = typeof window !== "undefined" ? window : globalThis;
     g.AILogic = {
       _register(name, mod){
@@ -38,6 +49,12 @@
     try {
       await _loadScripts([
         "ai/aiStateQueries.js",
+        "ai/aiPositionQueries.js",
+        "ai/aiThreatQueries.js",
+        "ai/aiPreservationQueries.js",
+        "ai/aiFleetQueries.js",
+        "ai/aiBeliefMemory.js",
+        "ai/aiInvariantChecks.js",
         "ai/aiThreatScorer.js",
         "ai/aiUnitPlanner.js",
         "ai/aiFleetCommander.js"
@@ -51,6 +68,12 @@
       throw new Error("These scripts loaded but did not register their module:\n  " + missing.join("\n  "));
     }
     Q = kids.stateQueries;
+    PQ = kids.positionQueries;
+    TQ = kids.threatQueries;
+    PRQ = kids.preservationQueries;
+    FQ = kids.fleetQueries;
+    BM = kids.beliefMemory;
+    IC = kids.invariantChecks;
     S = kids.threatScorer;
     buildUnitPlan = kids.unitPlanner;
     selectFleetActionPlan = kids.fleetCommander;
@@ -98,21 +121,27 @@
         const k = (ctx && ctx.difficulty) || rules.defaultDifficulty;
         return t[k] || t.NORMAL;
       },
-      // ---- AIStateQueries (base layer) ----
+      // ---- AIStateQueries (contact picture) ----
       myUnits(ctx){ return guard("AIStateQueries.myUnits", () => Q.myUnits(env, ctx), null) || []; },
       spottedEnemies(ctx){ return guard("AIStateQueries.spottedEnemies", () => Q.spottedEnemies(env, ctx), null) || []; },
       activeBeliefs(ctx){ return guard("AIStateQueries.activeBeliefs", () => Q.activeBeliefs(env, ctx), null) || []; },
-      moveHeuristic(ctx, u, dest){ return guard("AIStateQueries.moveHeuristic", () => Q.moveHeuristic(env, ctx, u, dest), 0); },
-      reachableCells(ctx, u, maxCells){ return guard("AIStateQueries.reachableCells", () => Q.reachableCells(env, ctx, u, maxCells), null) || []; },
-      computeSyncedMemory(ctx){ return guard("AIStateQueries.computeSyncedMemory", () => Q.computeSyncedMemory(env, ctx), null) || new Map(); },
-      railgunDangerZones(ctx){ return guard("AIStateQueries.railgunDangerZones", () => Q.railgunDangerZones(env, ctx), null) || []; },
-      preservationTier(u, ctx){ return guard("AIStateQueries.preservationTier", () => Q.preservationTier(env, ctx, u), null) || 1; },
-      shouldRetreat(u, ctx){ return Boolean(guard("AIStateQueries.shouldRetreat", () => Q.shouldRetreat(env, ctx, u), false)); },
-      fleetGap(ctx){ return guard("AIStateQueries.fleetGap", () => Q.fleetGap(env, ctx), null) || {}; },
-      warpLoci(ctx){ return guard("AIStateQueries.warpLoci", () => Q.warpLoci(env, ctx), null) || []; },
-      canEliminateAllFlagshipThreats(ctx){ return Boolean(guard("AIStateQueries.canEliminateAllFlagshipThreats", () => Q.canEliminateAllFlagshipThreats(env, ctx), false)); },
-      checkInvariants(ctx){ return guard("AIStateQueries.checkInvariants", () => Q.checkInvariants(env, ctx), null) || []; },
-      // ---- AIThreatScorer (depends on AIStateQueries directly) ----
+      // ---- AIPositionQueries ----
+      moveHeuristic(ctx, u, dest){ return guard("AIPositionQueries.moveHeuristic", () => PQ.moveHeuristic(env, ctx, u, dest), 0); },
+      reachableCells(ctx, u, maxCells){ return guard("AIPositionQueries.reachableCells", () => PQ.reachableCells(env, ctx, u, maxCells), null) || []; },
+      // ---- AIBeliefMemory ----
+      computeSyncedMemory(ctx){ return guard("AIBeliefMemory.computeSyncedMemory", () => BM.computeSyncedMemory(env, ctx), null) || new Map(); },
+      // ---- AIThreatQueries ----
+      railgunDangerZones(ctx){ return guard("AIThreatQueries.railgunDangerZones", () => TQ.railgunDangerZones(env, ctx), null) || []; },
+      canEliminateAllFlagshipThreats(ctx){ return Boolean(guard("AIThreatQueries.canEliminateAllFlagshipThreats", () => TQ.canEliminateAllFlagshipThreats(env, ctx), false)); },
+      // ---- AIPreservationQueries ----
+      preservationTier(u, ctx){ return guard("AIPreservationQueries.preservationTier", () => PRQ.preservationTier(env, ctx, u), null) || 1; },
+      shouldRetreat(u, ctx){ return Boolean(guard("AIPreservationQueries.shouldRetreat", () => PRQ.shouldRetreat(env, ctx, u), false)); },
+      // ---- AIFleetQueries ----
+      fleetGap(ctx){ return guard("AIFleetQueries.fleetGap", () => FQ.fleetGap(env, ctx), null) || {}; },
+      warpLoci(ctx){ return guard("AIFleetQueries.warpLoci", () => FQ.warpLoci(env, ctx), null) || []; },
+      // ---- AIInvariantChecks ----
+      checkInvariants(ctx){ return guard("AIInvariantChecks.checkInvariants", () => IC.checkInvariants(env, ctx), null) || []; },
+      // ---- AIThreatScorer (depends on the state queries directly) ----
       findSafeRetreatCell(ctx, flag){ return guard("AIThreatScorer.findSafeRetreatCell", () => S.findSafeRetreatCell(env, ctx, flag), null); },
       threatValue(ctx, enemy, myUnit){ return guard("AIThreatScorer.threatValue", () => S.threatValue(env, ctx, enemy, myUnit), 0); },
       threatAt(ctx, u, dest){ return guard("AIThreatScorer.threatAt", () => S.threatAt(env, ctx, u, dest), 0); },
