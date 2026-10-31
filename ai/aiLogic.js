@@ -2,7 +2,7 @@
 
 // ============================================================
 // aiLogic.js — job: orchestrate the AI children into one decision.
-// Owner: ai/ai.js. Holds no state unless it is a core.
+// Owner: ai/aiTurnWorkflow.js. Holds no state unless it is a core.
 // ============================================================
 (() => {
   let Q = null;   // stateQueries (contact picture)

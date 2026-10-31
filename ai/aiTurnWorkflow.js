@@ -2,7 +2,7 @@
 
 // ============================================================
 // aiTurnWorkflow.js — job: sequence the AI turn's action beats.
-// Owner: ai/aiLogic.js. Holds no state unless it is a core.
+// Owner: ai/ai.js. Holds no state unless it is a core.
 // ============================================================
 (() => {
   let _logic = null;
