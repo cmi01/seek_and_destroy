@@ -7,20 +7,36 @@ The governing idea: **every file knows as little as possible, and only about the
 1. **A file may be known only by its direct parent.** No file is referenced by any other file except the one that owns it. The sole exception is the relationship between a core system and its interfaces: a core may know the interfaces it connects through, and an interface may know the two cores it sits between. No core knows an interface that isn't directly between it and another core.
 2. **Cores never know each other.** Each core system knows only the interface it talks to and the shape of the data it expects from it.
 3. **Every relationship between two cores gets its own dedicated interface.** `main.js` creates the cores and the interfaces and wires them together. It knows nothing else.
-4. **Parents own their children completely.** A parent loads its own children, with its own small loader. There is no shared loader, and nothing is injected from above.
-5. **Children register privately with their direct parent.** They expose no globals. Nothing outside the parent can reach them.
-6. **Load registrars are transient.** While loading its children, a parent may expose a name-gated registration channel (e.g. `getAIAction._register`, a temporary `g.AILogic`, the `Graphics._registerLayer` load window). It is deleted after load and is never a runtime data channel.
+4. **Composition is by call.** A file's children are the pure functions it
+   calls; it references each only for its one function. Nothing travels
+   between files except arguments and plain-data returns.
+5. **A child never references its parent** — not its name, not a registration
+   channel. The child file is just its function; it exposes no globals and
+   contains no registration code.
+6. **Loading is `main.js`'s act.** `main.js` loads every file once and wires
+   the call graph. Each file exposes exactly one default export and imports
+   only its own children — `import` is the only reference edge. (The
+   parent-scoped loaders and the `X._register` handshake are retired under
+   this requirement.)
+7. **The folder tree is the ownership tree.** Root holds `index.html`,
+   `main.js`, `main.js children`, `assets` and `dev`; every file lives in its
+   parent's `<filename>.js children` folder, which sits next to the file at
+   every depth (structure standard §5).
 
 ## 2. Core Systems and Interfaces
 
-The game runs as separate core systems, connected only through interfaces.
+The game runs as four system domains, connected only through plain-data
+boundaries. Every system's files are pure functions; the imperative shell —
+the state container and the hardware (canvas context, audio context, input
+listeners, timers, storage) — lives in `main.js`, which applies the data the
+systems compute.
 
-| Core | Responsibility |
+| System | Responsibility |
 |---|---|
-| **Inputs** | Translate raw hardware events into plain input events. Nothing else. |
-| **Game** | Owns all authoritative state, rules and turn flow. Decides what every input means. |
-| **Graphics** | Owns the canvas and sprite caches. Draws whatever frame it is given. |
-| **Audio** | Owns the audio context and active sound nodes. Plays whatever commands it is given. |
+| **Inputs** | Translate raw hardware events into plain input events. Nothing else. `main.js` owns the listeners. |
+| **Game** | Compute all rules and turn flow as pure transforms of state. Decide what every input means. `main.js` owns the state container and applies returned state. |
+| **Graphics** | Compute frames and draw lists as plain data. `main.js` draws exactly what it is given. |
+| **Audio** | Compute audio command lists as plain data. `main.js` plays whatever commands it is given. |
 
 **Interfaces are purpose-built, one-way, and carry data only.**
 
@@ -38,20 +54,34 @@ Inputs ──▶ InputInterface ──▶ Game ──▶ GraphicsInterface ─�
 
 ## 3. Pure-Function Children
 
-Core systems may have children, and those children may have children of their own.
+Files compose into a call tree under `main.js`; a file's children are the pure
+functions it calls.
 
-- Every child is a **pure function library**: data in, data out.
-- A child holds **no state** and **never modifies state**.
-- **Children expose only pure functions, never state.** Nothing a child offers to its parent is a variable, a mutable object, or a handle to something that changes. The parent calls functions and gets plain data back.
+- Every file except `main.js` is **exactly one pure function** (plus its private helpers):
+  data in, data out.
+- A child holds **no state** and **never modifies state**. "State" means any
+  value held between calls — module variables, computed constants, caches,
+  memoized tables — mutable or not.
+- **Everything arrives as arguments and leaves as data** — randomness and time
+  included (seeded RNG values and timestamps are passed in by `main.js`);
+  functions capture nothing and memoize nothing.
+- **A child exposes one pure function, never state.** Nothing a child offers
+  to its parent is a variable, a mutable object, or a handle to something that
+  changes. The parent calls that one function and gets plain data back.
 - A child knows **nothing about its parent, siblings or cousins**, only its own direct children.
 - Siblings never call each other. The parent orchestrates them as a pipeline, passing one child's output to the next as plain data.
-- **State lives only in the owning core.** Caches, audio nodes, timers and the game state belong to the core, never to a child.
-- **The state store is the owning core's instrument.** The store container lives in the core (e.g. `core/game.js`); the store child (`core/gameState.js`) operates only on the container its parent passes it and returns plain data. It never returns live references to the state object: return copies, or make access parent-only.
+- **State lives only in `main.js`.** The state container, caches, audio nodes,
+  timers and hardware belong to the shell; the pure functions compute values
+  and return them. No other file holds, mutates, or aliases state.
+- **The state container is `main.js`'s instrument.** Logic receives state as an
+  argument and returns plain data (new state, events); it never returns live
+  references to the state object.
 - The AI is a pure child of Game. It receives a snapshot of only what the AI is allowed to see and returns a decision. It never reaches into live state.
 - Declarative data (rules, campaign, themes, AI priorities, audio definitions, initial state) lives in dedicated data files. Each data file has exactly one owner and references nothing.
 - Assets are split by ownership. Graphics owns its asset pack and Audio owns its own.
-- Tests are split by ownership and loaded on demand by the core they test.
-- **The test bridge is a sanctioned exception.** Tests loaded on demand by the core they test receive a parent-supplied bridge and may mutate state through it. It is the one exception to "a child never modifies state."
+- Tests are split by ownership and each is one pure function
+  (`state → results`). **The state-mutating test bridge is retired** — results
+  are plain data and `main.js`'s test entry runs them.
 
 ## 4. Narrow Surfaces
 
@@ -61,7 +91,9 @@ A wide API is a sign of a design flaw. Each boundary exposes the smallest possib
 - The AI exposes one function: given the state visible to it and its priorities, return an action and, for spawns, a coordinate.
 - Graphics receives one thing: the frame to draw.
 - State access is gated: initialize, read, and attempt a patch that is allowed to fail if the change is invalid.
-- If a caller needs many different functions from one file, question the architecture before accepting the surface.
+- A file with more than one exposed function is non-compliant: give each
+  behavior its own child, or collapse the domain to one entry function
+  selected by its arguments.
 
 ## 5. Simplicity
 
