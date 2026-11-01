@@ -373,6 +373,7 @@ const Selection = {
   sync(){
     const u = this.getUnit();
     if (!u) return this.clear();
+    if (u.team !== 1) return this.clear();
     const next = SelectionQueries.cellFor(u);
     const c = State.selectedCell;
     if (!c || c.x !== next.x || c.y !== next.y) State.selectedCell = next;
@@ -568,6 +569,7 @@ const Actions = {
     target.flags.add("-attacked"); target.flags.add("-shielded");
     Visibility.invalidate();
     Visibility.ensureCache();
+    Selection.sync();
 
     this.addAnimation({kind:"capture",duration:350,from:origin,to:dest,targetName:target.type});
     this.consumeAPAndCheckTurn(isAI,apCost);
@@ -1332,6 +1334,13 @@ const InputProcessor = (() => {
           Hud.updateAll();
           return;
         }
+      }
+
+      if (!clickedUnit && selUnit){
+        Selection.select(null);
+        GameAudio.play("ui.select");
+        Hud.updateAll();
+        return;
       }
 
       GameAudio.play("ui.invalid");
