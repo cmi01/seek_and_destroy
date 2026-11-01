@@ -108,7 +108,8 @@
     ctx.fillStyle = !b.enabled
       ? C["rgba(148, 163, 184, 0.45)"]
       : ((isHovered || isPressed) ? C["#06080e"] : (b.active ? bp.gold : C["#e2e8f0"]));
-    ctx.fillText(b.label, b.x + Math.round(13 * US), b.y + b.h * 0.5 + 0.5);
+    const labelMaxW = b.w - Math.round(13 * US) - Math.round(6 * US);
+    ctx.fillText(_fitTextToWidth(ctx, b.label, labelMaxW), b.x + Math.round(13 * US), b.y + b.h * 0.5 + 0.5);
     ctx.restore();
   }
 
@@ -366,7 +367,7 @@
     ctx.stroke();
 
     // Header
-    const hdrH = Math.round(48 * US);
+    const hdrH = Math.round(74 * US);
     ctx.fillStyle = C["rgba(10, 15, 26, 0.95)"];
     ctx.fillRect(mx + 1, my + 1, mw - 2, hdrH);
     ctx.strokeStyle = C["rgba(56, 189, 248, 0.3)"];
@@ -376,7 +377,8 @@
     ctx.stroke();
 
     // Close button & credits in header right
-    const closeW = Math.max(88, Math.round(106 * US));
+    const uiTextPx = Math.max(8, Math.round(15 * US));
+    const closeW = Math.max(88, Math.round(106 * US), Math.round(12 * 0.64 * uiTextPx) + Math.round(20 * US));
     const closeH = Math.max(22, Math.round(26 * US));
     const closeX = mx + mw - closeW - Math.round(10 * US);
     const closeY = my + Math.round(11 * US);
@@ -394,19 +396,35 @@
     ctx.textAlign = "left";
 
     const headerLeftMaxW = (credRightX - credW) - (mx + Math.round(20 * US));
+    // Header text wraps to fit the single-size UI font: title + locus +
+    // protocol stacked at a 13*US pitch (max 2 lines each — provably enough
+    // for the longest strings at every uiScale), block centered in the band.
+    const titleLines = [_fitTextToWidth(ctx, "REINFORCEMENTS // HYPERSPACE WARP LOCUS", headerLeftMaxW)];
+    const locusLines = _wrapTextLines(ctx, modal.locusText || "", headerLeftMaxW).slice(0, 2);
+    const protoLines = modal.protocolText ? _wrapTextLines(ctx, modal.protocolText, headerLeftMaxW).slice(0, 2) : [];
+    const hdrRows = titleLines.length + locusLines.length + protoLines.length;
+    const hdrPitch = Math.round(13 * US);
+    let hdrY = my + Math.round((hdrH - (hdrPitch * (hdrRows - 1) + Math.round(15 * US))) * 0.5);
     ctx.textBaseline = "top";
     ctx.font = F["bold:8"];
     ctx.fillStyle = bp.accent;
-    ctx.fillText(_fitTextToWidth(ctx, "REINFORCEMENTS // HYPERSPACE WARP LOCUS", headerLeftMaxW), mx + Math.round(12 * US), my + Math.round(6 * US));
-
+    for (let hl = 0; hl < titleLines.length; hl++) {
+      ctx.fillText(_fitTextToWidth(ctx, titleLines[hl], headerLeftMaxW), mx + Math.round(12 * US), hdrY);
+      hdrY += hdrPitch;
+    }
     ctx.font = F["bold:6.2"];
     ctx.fillStyle = modal.locusOk ? C["#34d399"] : bp.hostile;
-    ctx.fillText(_fitTextToWidth(ctx, modal.locusText || "", headerLeftMaxW), mx + Math.round(12 * US), my + Math.round(20 * US));
-
-    if (modal.protocolText) {
+    for (let hl = 0; hl < locusLines.length; hl++) {
+      ctx.fillText(_fitTextToWidth(ctx, locusLines[hl], headerLeftMaxW), mx + Math.round(12 * US), hdrY);
+      hdrY += hdrPitch;
+    }
+    if (protoLines.length) {
       ctx.font = F["regular:5.8"];
       ctx.fillStyle = C["#94a3b8"];
-      ctx.fillText(_fitTextToWidth(ctx, modal.protocolText, headerLeftMaxW), mx + Math.round(12 * US), my + Math.round(33 * US));
+      for (let hl = 0; hl < protoLines.length; hl++) {
+        ctx.fillText(_fitTextToWidth(ctx, protoLines[hl], headerLeftMaxW), mx + Math.round(12 * US), hdrY);
+        hdrY += hdrPitch;
+      }
     }
 
     // Shop Cards Grid (3 columns x 6 rows for 17 buyable ships)
@@ -487,9 +505,29 @@
       ctx.fillText(costStr, cx + cardW - Math.round(7 * US), ty);
       ctx.textAlign = "left";
 
-      // Ship name (fitted so it never collides with cost badge)
+      // Ship name — wraps to at most 2 lines so no name is ever truncated:
+      // line 1 yields to the cost badge, line 2 spans the full text column.
       ctx.fillStyle = c.affordable ? C["#e2e8f0"] : C["#64748b"];
-      ctx.fillText(_fitTextToWidth(ctx, c.shipName, textAvailW - costW - Math.round(6 * US)), tx, ty);
+      const nameW1 = textAvailW - costW - Math.round(3 * US);
+      const nameWords = String(c.shipName || "").split(/\s+/);
+      const nameLines = [];
+      let nameCur = "";
+      for (let nw = 0; nw < nameWords.length; nw++) {
+        const cand = nameCur ? nameCur + " " + nameWords[nw] : nameWords[nw];
+        const nameLimit = nameLines.length === 0 ? nameW1 : textAvailW;
+        if (!nameCur || ctx.measureText(cand).width <= nameLimit) nameCur = cand;
+        else { nameLines.push(nameCur); nameCur = nameWords[nw]; }
+      }
+      if (nameCur) nameLines.push(nameCur);
+      if (nameLines.length === 1 && ctx.measureText(nameLines[0]).width > nameW1) {
+        nameLines.unshift("");
+      }
+      for (let nl = 0; nl < Math.min(2, nameLines.length); nl++) {
+        if (nameLines[nl]) {
+          ctx.fillText(_fitTextToWidth(ctx, nameLines[nl], nl === 0 ? nameW1 : textAvailW), tx, ty + Math.round(15 * nl * US));
+        }
+      }
+      const nameRows = Math.min(2, nameLines.length);
 
       // Flags (wrapped up to 2 lines so multi-flag warships are legible)
       ctx.font = F["regular:5.8"];
@@ -497,14 +535,17 @@
       const flagLines = _wrapTextLines(ctx, c.flagsText || "STANDARD", textAvailW);
       const maxFlagLines = cardH >= Math.round(72 * US) ? 2 : 1;
       for (let fl = 0; fl < Math.min(maxFlagLines, flagLines.length); fl++) {
-        ctx.fillText(flagLines[fl], tx, ty + Math.round((15 + fl * 11) * US));
+        ctx.fillText(_fitTextToWidth(ctx, flagLines[fl], textAvailW), tx, ty + Math.round((15 * nameRows + fl * 11) * US));
       }
 
-      // Stats anchored near bottom of card
+      // Stats anchored near bottom of card — two lines so every field
+      // (incl. S:<scan>) is readable at the single-size UI font.
       ctx.font = F["regular:6"];
       ctx.fillStyle = C["#94a3b8"];
-      const statsStr = `HP:${c.hp} M:${c.move} FP:${c.fp} R:${c.range} S:${c.scan}`;
-      ctx.fillText(_fitTextToWidth(ctx, statsStr, textAvailW), tx, cy + cardH - Math.round(16 * US));
+      const statsLine1 = `HP:${c.hp} M:${c.move} FP:${c.fp}`;
+      const statsLine2 = `R:${c.range} S:${c.scan}`;
+      ctx.fillText(_fitTextToWidth(ctx, statsLine1, textAvailW), tx, cy + cardH - Math.round(27 * US));
+      ctx.fillText(_fitTextToWidth(ctx, statsLine2, textAvailW), tx, cy + cardH - Math.round(16 * US));
       ctx.restore();
     }
 

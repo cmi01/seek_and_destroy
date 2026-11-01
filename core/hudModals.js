@@ -142,8 +142,9 @@
     const pad = Math.max(12, Math.round(18 * US));
     const mx = pad, my = pad;
     const mw = DS - pad * 2, mh = DS - pad * 2;
-    const hdrH = Math.round(48 * US);
-    const closeW = Math.max(88, Math.round(106 * US));
+    const hdrH = Math.round(74 * US);
+    const uiTextPx = Math.max(8, Math.round(15 * US));
+    const closeW = Math.max(88, Math.round(106 * US), Math.round(12 * 0.64 * uiTextPx) + Math.round(20 * US));
     const closeH = Math.max(22, Math.round(26 * US));
     const closeX = mx + mw - closeW - Math.round(10 * US);
     const closeY = my + Math.round(11 * US);
