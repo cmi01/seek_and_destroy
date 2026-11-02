@@ -14,20 +14,11 @@ const _modules = {
   themes: null,
   rulesConfig: null,
   boardQueries: null,
-  lineOfSight: null,
   visionQueries: null,
   actionLegality: null,
   combatMath: null,
-  reservePlacement: null,
-  endgameStatus: null,
   cameraMath: null,
   selectionQueries: null,
-  visibilityCache: null,
-  frameBoard: null,
-  frameUnits: null,
-  frameOverlay: null,
-  frameCursor: null,
-  frameStatus: null,
   hud: null,
   sectorGenerator: null,
   ai: null,
@@ -1875,6 +1866,22 @@ const api = {
         "main.js children/game.js children/sectorGenerator.js",
         "main.js children/game.js children/ai.js"
       ]);
+
+      // The flattened children expose one plain pure function each at script
+      // scope (no registrar handshake): the loader captures them here, at
+      // load, alongside the registrar checks below. A missing capture fails
+      // exactly like an unregistered module did.
+      const kids = {
+        lineOfSight:      typeof hasLineOfSight === "function" ? hasLineOfSight : null,
+        reservePlacement: typeof getValidWarpCells === "function" ? getValidWarpCells : null,
+        endgameStatus:    typeof checkEndgameStatus === "function" ? checkEndgameStatus : null,
+        visibilityCache:  typeof computeVisCache === "function" ? computeVisCache : null,
+        frameBoard:       typeof buildBoardSlice === "function" ? buildBoardSlice : null,
+        frameUnits:       typeof buildUnitSlice === "function" ? buildUnitSlice : null,
+        frameOverlay:     typeof buildOverlaySlice === "function" ? buildOverlaySlice : null,
+        frameCursor:      typeof buildCursorSlice === "function" ? buildCursorSlice : null,
+        frameStatus:      typeof buildStatusSlice === "function" ? buildStatusSlice : null
+      };
       const missing = [
         ["main.js children/game.js children/rules_DATA.js",              _modules.rulesData],
         ["main.js children/game.js children/campaign_DATA.js",           _modules.campaignData],
@@ -1884,20 +1891,20 @@ const api = {
         ["main.js children/game.js children/themes.js",                  typeof _modules.themes === "function"],
         ["main.js children/game.js children/rulesConfig.js",             typeof _modules.rulesConfig === "function"],
         ["main.js children/game.js children/boardQueries.js",            typeof _modules.boardQueries === "function"],
-        ["main.js children/game.js children/lineOfSight.js",             typeof _modules.lineOfSight === "function"],
+        ["main.js children/game.js children/lineOfSight.js",             kids.lineOfSight],
         ["main.js children/game.js children/visionQueries.js",           typeof _modules.visionQueries === "function"],
         ["main.js children/game.js children/actionLegality.js",          typeof _modules.actionLegality === "function"],
         ["main.js children/game.js children/combatMath.js",              typeof _modules.combatMath === "function"],
-        ["main.js children/game.js children/reservePlacement.js",        typeof _modules.reservePlacement === "function"],
-        ["main.js children/game.js children/endgameStatus.js",           typeof _modules.endgameStatus === "function"],
+        ["main.js children/game.js children/reservePlacement.js",        kids.reservePlacement],
+        ["main.js children/game.js children/endgameStatus.js",           kids.endgameStatus],
         ["main.js children/game.js children/cameraMath.js",              typeof _modules.cameraMath === "function"],
         ["main.js children/game.js children/selectionQueries.js",        typeof _modules.selectionQueries === "function"],
-        ["main.js children/game.js children/visibilityCache.js",         typeof _modules.visibilityCache === "function"],
-        ["main.js children/game.js children/frameBoard.js",              typeof _modules.frameBoard === "function"],
-        ["main.js children/game.js children/frameUnits.js",              typeof _modules.frameUnits === "function"],
-        ["main.js children/game.js children/frameOverlay.js",            typeof _modules.frameOverlay === "function"],
-        ["main.js children/game.js children/frameCursor.js",             typeof _modules.frameCursor === "function"],
-        ["main.js children/game.js children/frameStatus.js",             typeof _modules.frameStatus === "function"],
+        ["main.js children/game.js children/visibilityCache.js",         kids.visibilityCache],
+        ["main.js children/game.js children/frameBoard.js",              kids.frameBoard],
+        ["main.js children/game.js children/frameUnits.js",              kids.frameUnits],
+        ["main.js children/game.js children/frameOverlay.js",            kids.frameOverlay],
+        ["main.js children/game.js children/frameCursor.js",             kids.frameCursor],
+        ["main.js children/game.js children/frameStatus.js",             kids.frameStatus],
         ["main.js children/game.js children/hud.js",                     _modules.hud && typeof _modules.hud.createHud === "function"],
         ["main.js children/game.js children/sectorGenerator.js",         _modules.sectorGenerator && typeof _modules.sectorGenerator.generateSectorData === "function"],
         ["main.js children/game.js children/ai.js",                        typeof _modules.ai === "function" && typeof _modules.ai.load === "function"]
@@ -1939,28 +1946,39 @@ const api = {
       // the AI snapshot facade and the SD debug handle read it unchanged.
       RulesConfig = _modules.rulesConfig(RULES_DATA);
       BoardQueries = _modules.boardQueries(RULES_DATA);
-      LineOfSight = _modules.lineOfSight(RULES_DATA);
+      // The flattened children are plain captured functions: the parent binds
+      // the rules data and the per-frame params, so each handle keeps exactly
+      // the surface its callers already use.
+      LineOfSight = {
+        hasLineOfSight(ctx, x0, y0, x1, y1, mode){ return kids.lineOfSight(RULES_DATA, ctx, x0, y0, x1, y1, mode); }
+      };
       VisionQueries = _modules.visionQueries(RULES_DATA);
       ActionLegality = _modules.actionLegality(RULES_DATA);
       CombatMath = _modules.combatMath(RULES_DATA);
-      ReservePlacement = _modules.reservePlacement(RULES_DATA);
-      EndgameStatus = _modules.endgameStatus(RULES_DATA);
+      ReservePlacement = {
+        getValidWarpCells(ctx, capitalUnit, radius){ return kids.reservePlacement(RULES_DATA, ctx, capitalUnit, radius); }
+      };
+      EndgameStatus = {
+        checkEndgameStatus: kids.endgameStatus
+      };
       // The pure game.js children (single job each): camera math, selection
       // queries and the visibility-cache computation. State stays here.
       CameraMath = _modules.cameraMath(RULES_DATA);
       SelectionQueries = _modules.selectionQueries(RULES_DATA);
-      VisibilityCache = _modules.visibilityCache(RULES_DATA);
+      VisibilityCache = {
+        computeVisCache(ctx, team){ return kids.visibilityCache(RULES_DATA, ctx, team); }
+      };
       // The render-frame build children (v89): one pure child per frame
       // domain. The parent's plain-copy helpers and pure rule/action queries
-      // are injected; the children receive state-shape params and return
-      // plain slice data.
-      FrameBoard = _modules.frameBoard({ frameCopy, freshCopy });
-      FrameUnits = _modules.frameUnits({
+      // travel in as the builder's deps; the children receive state-shape
+      // params and return plain slice data.
+      const frameBoardDeps = { frameCopy, freshCopy };
+      const frameUnitDeps = {
         getEffectiveScan: u => Visibility.getEffectiveScan(u),
         isUnitSpottedByTeam: (u, team) => Visibility.isUnitSpottedByTeam(u, team),
         canShield: (unitA, B) => Actions.canShield(unitA, B)
-      });
-      FrameOverlay = _modules.frameOverlay({
+      };
+      const frameOverlayDeps = {
         buildUnitIndex: units => Rules.buildUnitIndex(units),
         canMove: (ctx, unitA, B) => Rules.canMove(ctx, unitA, B),
         hasLineOfSight: (ctx, x0, y0, x1, y1, mode) => Rules.hasLineOfSight(ctx, x0, y0, x1, y1, mode),
@@ -1971,9 +1989,12 @@ const api = {
         getSpottedEnemyAt: (gx, gy, team) => Visibility.getSpottedEnemyAt(gx, gy, team),
         canCapture: (unitA, B) => Actions.canCapture(unitA, B),
         canShield: (unitA, B) => Actions.canShield(unitA, B)
-      });
-      FrameCursor = _modules.frameCursor();
-      FrameStatus = _modules.frameStatus();
+      };
+      FrameBoard = { build: p => kids.frameBoard(p, frameBoardDeps) };
+      FrameUnits = { build: p => kids.frameUnits(p, frameUnitDeps) };
+      FrameOverlay = { build: p => kids.frameOverlay(p, frameOverlayDeps) };
+      FrameCursor = { build: kids.frameCursor };
+      FrameStatus = { build: kids.frameStatus };
       Rules = {
         getState(ctx){ return (ctx && ctx.units !== undefined) ? ctx : GetGameState(); },
         initState(opts){ return InitializeGameState(opts); },

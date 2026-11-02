@@ -820,7 +820,7 @@ const Graphics = (() => {
         if (anim.kind === "glide") {
           _drawGlideShip(ctx, now, state, anim, CP);
         } else {
-          _layers.vfx.drawAnimation(vfxCmd, anim);
+          _layers.vfx(vfxCmd, anim);
         }
       });
 
@@ -956,6 +956,11 @@ const Graphics = (() => {
     if (_loadPromise) return _loadPromise;
     _loadPromise = (async () => {
       await _loadScripts(GRAPHICS_CHILDREN);
+      // The flattened child exposes one plain pure function at script scope
+      // (no registrar handshake): the loader captures the binding here, at
+      // load. A missing capture fails exactly where an unregistered module
+      // did — through the error list below.
+      _layers.vfx = typeof drawAnimation === "function" ? drawAnimation : null;
       _registrationOpen = false;
       delete api._registerLayer;
       const missing = [

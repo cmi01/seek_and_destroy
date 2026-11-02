@@ -5,8 +5,10 @@
 // Owner: game.js. Holds no state unless it is a core.
 // ============================================================
 Game._registerModule("hud", (() => {
-  // This file's direct children (one per widget domain), registered through
-  // the transient name-gated registrar below while they load.
+  // This file's direct children (one per widget domain). The three flattened
+  // children are single pure functions, so their slots hold the function
+  // itself — captured from the loaded file's binding; the rest still expose a
+  // small object surface.
   const _hudModules = {
     topBar: null,
     telemetry: null,
@@ -192,7 +194,7 @@ Game._registerModule("hud", (() => {
         return { view: w, buttons: [panel.closeBtn] };
       }
 
-      const mm = _hudModules.minimap.buildMinimapModel(input);
+      const mm = _hudModules.minimap(input);
       const mmRect = mm.rect;
 
       if (w.activeModal === "endgame") {
@@ -204,7 +206,7 @@ Game._registerModule("hud", (() => {
       // Main HUD chrome: edge buttons + top bar, the dropdown menu, the
       // right-edge telemetry cards and the intel panel under the top bar.
       const chrome = _hudModules.topBar.buildTopBarChrome(input, w.menuOpen);
-      const menu = _hudModules.menu.buildMenuModel(deps, input, w, {
+      const menu = _hudModules.menu(deps, input, w, {
         edgeX: DS - chrome.padRight,
         belowY: chrome.topY + chrome.btnH
       });
@@ -238,7 +240,7 @@ Game._registerModule("hud", (() => {
 
     function _updatePriorityBanner(view, input, recomputeAction) {
       const w = _clone(view);
-      const r = _hudModules.banner.buildPriorityBanner(deps, input, w, input.cache, recomputeAction);
+      const r = _hudModules.banner(deps, input, w, input.cache, recomputeAction);
       w.priorityBanner = r.banner;
       return { view: w, banner: r.banner, cache: r.cache };
     }
@@ -536,7 +538,9 @@ Game._registerModule("hud", (() => {
     });
   }
 
-  // Registrar exposed ONLY while this file's direct children load.
+  // Registrar exposed ONLY while this file's direct children load — used by
+  // the remaining object-shaped children (the flattened ones never call it;
+  // they are captured by name in the load body above).
   createHud._register = function(name, mod){
     if (!_regOpen || !(name in _hudModules)) throw new Error("[S&D HUD] Unexpected registration for " + name);
     _hudModules[name] = mod;
@@ -560,6 +564,13 @@ Game._registerModule("hud", (() => {
         "main.js children/game.js children/hud.js children/hudBanner.js",
         "main.js children/game.js children/hud.js children/hudIntel.js"
       ]);
+      // The flattened children are exactly one pure function each: no
+      // registration call, no factory — the file's binding is the surface, so
+      // the parent captures it here at load. A missing binding stays null and
+      // is named by the missing-slot check below.
+      _hudModules.menu = typeof g.buildMenuModel === "function" ? g.buildMenuModel : null;
+      _hudModules.minimap = typeof g.buildMinimapModel === "function" ? g.buildMinimapModel : null;
+      _hudModules.banner = typeof g.buildPriorityBanner === "function" ? g.buildPriorityBanner : null;
     } finally {
       delete g.createHud;
       _regOpen = false;

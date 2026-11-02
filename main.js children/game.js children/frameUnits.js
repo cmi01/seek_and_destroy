@@ -5,9 +5,9 @@
 // flags, effect animations and the selected unit's shield state.
 // Owner: game.js (pure child). Holds no state.
 // ============================================================
-Game._registerModule("frameUnits", deps => {
+const buildUnitSlice = function (p, deps){
   // deps = { getEffectiveScan, isUnitSpottedByTeam, canShield } — the parent's
-  // pure vision/action queries, injected so this child holds no state and
+  // pure vision/action queries, passed in so this file holds no state and
   // references nothing outside its parent.
 
   // Element DTOs for the frame arrays: only the scalar/DTO fields the
@@ -33,44 +33,40 @@ Game._registerModule("frameUnits", deps => {
     };
   }
 
-  function build(p){
-    // p = { state, selUnit, isPlayerTurn } — state-shape params in, plain
-    // unit slice out.
-    const st = p.state;
+  // p = { state, selUnit, isPlayerTurn } — state-shape params in, plain
+  // unit slice out.
+  const st = p.state;
 
-    const unitsDTO = Array.isArray(st.units) ? st.units.map(u => ({
-      id: u.id,
-      type: u.type,
-      team: u.team,
-      x: u.x,
-      y: u.y,
-      hp: u.hp,
-      maxHp: u.maxHp,
-      move: u.move,
-      firepower: u.firepower,
-      range: u.range,
-      scan: u.scan,
-      effectiveScan: deps.getEffectiveScan(u),
-      spottedByPlayer: deps.isUnitSpottedByTeam(u, 1),
-      cost: u.cost,
-      flags: new Set(u.flags)
-    })) : [];
+  const unitsDTO = Array.isArray(st.units) ? st.units.map(u => ({
+    id: u.id,
+    type: u.type,
+    team: u.team,
+    x: u.x,
+    y: u.y,
+    hp: u.hp,
+    maxHp: u.maxHp,
+    move: u.move,
+    firepower: u.firepower,
+    range: u.range,
+    scan: u.scan,
+    effectiveScan: deps.getEffectiveScan(u),
+    spottedByPlayer: deps.isUnitSpottedByTeam(u, 1),
+    cost: u.cost,
+    flags: new Set(u.flags)
+  })) : [];
 
-    const canShieldSelected = Boolean(
-      p.isPlayerTurn &&
-      p.selUnit &&
-      p.selUnit.team === 1 &&
-      st.ap > 0 &&
-      deps.canShield(p.selUnit, { x: p.selUnit.x, y: p.selUnit.y })
-    );
+  const canShieldSelected = Boolean(
+    p.isPlayerTurn &&
+    p.selUnit &&
+    p.selUnit.team === 1 &&
+    st.ap > 0 &&
+    deps.canShield(p.selUnit, { x: p.selUnit.x, y: p.selUnit.y })
+  );
 
-    return {
-      units: unitsDTO,
-      historicalVectors: Array.isArray(st.historicalVectors) ? st.historicalVectors.map(vectorDTO) : [],
-      animations: Array.isArray(st.animations) ? st.animations.map(animationDTO) : [],
-      canShieldSelected
-    };
-  }
-
-  return { build };
-});
+  return {
+    units: unitsDTO,
+    historicalVectors: Array.isArray(st.historicalVectors) ? st.historicalVectors.map(vectorDTO) : [],
+    animations: Array.isArray(st.animations) ? st.animations.map(animationDTO) : [],
+    canShieldSelected
+  };
+};

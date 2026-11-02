@@ -30,14 +30,24 @@
     });
   }
 
-  // Loads this file's ten leaf children. The registrar exists ONLY while they load.
+  // The flattened leaves expose their one function as a plain script-scope
+  // binding; load() captures each one after the load, so those files carry no
+  // registrar call of their own. The registrar below serves only the children
+  // that still publish a module object.
+  const PLAIN_KIDS = {
+    beliefMemory: "computeSyncedMemory",
+    invariantChecks: "checkInvariants",
+    unitPlanner: "buildUnitPlan",
+    fleetCommander: "selectFleetActionPlan"
+  };
+
+  // Loads this file's ten leaf children. The registrar exists ONLY while the
+  // registrar-shaped ones load.
   async function load(){
     let regOpen = true;
     const kids = {
       stateQueries: null, positionQueries: null, threatQueries: null,
-      preservationQueries: null, fleetQueries: null, beliefMemory: null,
-      invariantChecks: null, threatScorer: null, unitPlanner: null,
-      fleetCommander: null
+      preservationQueries: null, fleetQueries: null, threatScorer: null
     };
     const g = typeof window !== "undefined" ? window : globalThis;
     g.AILogic = {
@@ -62,6 +72,16 @@
     } finally {
       regOpen = false;
       delete g.AILogic;
+    }
+    const plainSlots = Object.keys(PLAIN_KIDS);
+    const unexposed = [];
+    for (let i = 0; i < plainSlots.length; i++){
+      const slot = plainSlots[i], fn = g[PLAIN_KIDS[slot]];
+      if (typeof fn === "function") kids[slot] = fn;
+      else unexposed.push(PLAIN_KIDS[slot]);
+    }
+    if (unexposed.length > 0) {
+      throw new Error("These scripts loaded but did not expose their function:\n  " + unexposed.join("\n  "));
     }
     const missing = Object.keys(kids).filter(k => kids[k] === null);
     if (missing.length > 0) {
@@ -129,7 +149,7 @@
       moveHeuristic(ctx, u, dest){ return guard("AIPositionQueries.moveHeuristic", () => PQ.moveHeuristic(env, ctx, u, dest), 0); },
       reachableCells(ctx, u, maxCells){ return guard("AIPositionQueries.reachableCells", () => PQ.reachableCells(env, ctx, u, maxCells), null) || []; },
       // ---- AIBeliefMemory ----
-      computeSyncedMemory(ctx){ return guard("AIBeliefMemory.computeSyncedMemory", () => BM.computeSyncedMemory(env, ctx), null) || new Map(); },
+      computeSyncedMemory(ctx){ return guard("AIBeliefMemory.computeSyncedMemory", () => BM(env, ctx), null) || new Map(); },
       // ---- AIThreatQueries ----
       railgunDangerZones(ctx){ return guard("AIThreatQueries.railgunDangerZones", () => TQ.railgunDangerZones(env, ctx), null) || []; },
       canEliminateAllFlagshipThreats(ctx){ return Boolean(guard("AIThreatQueries.canEliminateAllFlagshipThreats", () => TQ.canEliminateAllFlagshipThreats(env, ctx), false)); },
@@ -140,7 +160,7 @@
       fleetGap(ctx){ return guard("AIFleetQueries.fleetGap", () => FQ.fleetGap(env, ctx), null) || {}; },
       warpLoci(ctx){ return guard("AIFleetQueries.warpLoci", () => FQ.warpLoci(env, ctx), null) || []; },
       // ---- AIInvariantChecks ----
-      checkInvariants(ctx){ return guard("AIInvariantChecks.checkInvariants", () => IC.checkInvariants(env, ctx), null) || []; },
+      checkInvariants(ctx){ return guard("AIInvariantChecks.checkInvariants", () => IC(env, ctx), null) || []; },
       // ---- AIThreatScorer (depends on the state queries directly) ----
       findSafeRetreatCell(ctx, flag){ return guard("AIThreatScorer.findSafeRetreatCell", () => S.findSafeRetreatCell(env, ctx, flag), null); },
       threatValue(ctx, enemy, myUnit){ return guard("AIThreatScorer.threatValue", () => S.threatValue(env, ctx, enemy, myUnit), 0); },

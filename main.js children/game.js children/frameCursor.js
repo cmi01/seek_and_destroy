@@ -5,7 +5,7 @@
 // cursor style, hover/press state and presentation settings.
 // Owner: game.js (pure child). Holds no state.
 // ============================================================
-Game._registerModule("frameCursor", () => {
+const buildCursorSlice = function (p){
   // Button presentation DTO: only the fields the UI renderer reads.
   function buttonDTO(b){
     return {
@@ -20,23 +20,19 @@ Game._registerModule("frameCursor", () => {
     };
   }
 
-  function build(p){
-    // p = { state, cursorStyle } — state-shape params in, plain presentation
-    // slice out. cursorStyle is the cursor decision the parent resolved.
-    const st = p.state;
+  // p = { state, cursorStyle } — state-shape params in, plain presentation
+  // slice out. cursorStyle is the cursor decision the parent resolved.
+  const st = p.state;
 
-    return {
-      cursor: p.cursorStyle,
-      theme: st.theme || "default",
-      inspectMode: Boolean(st.inspectMode),
-      buttonHovered: st.buttonHovered,
-      buttonPressed: st.buttonPressed,
-      selectedCell: st.selectedCell ? { ...st.selectedCell } : null,
-      hoveredCell: st.hoveredCell ? { ...st.hoveredCell } : null,
-      canvasButtons: Array.isArray(st.canvasButtons) ? st.canvasButtons.map(buttonDTO) : [],
-      audioSettings: st.audioSettings ? { muted: Boolean(st.audioSettings.muted) } : { muted: false }
-    };
-  }
-
-  return { build };
-});
+  return {
+    cursor: p.cursorStyle,
+    theme: st.theme || "default",
+    inspectMode: Boolean(st.inspectMode),
+    buttonHovered: st.buttonHovered,
+    buttonPressed: st.buttonPressed,
+    selectedCell: st.selectedCell ? { ...st.selectedCell } : null,
+    hoveredCell: st.hoveredCell ? { ...st.hoveredCell } : null,
+    canvasButtons: Array.isArray(st.canvasButtons) ? st.canvasButtons.map(buttonDTO) : [],
+    audioSettings: st.audioSettings ? { muted: Boolean(st.audioSettings.muted) } : { muted: false }
+  };
+};
