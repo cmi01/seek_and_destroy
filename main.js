@@ -310,9 +310,9 @@ async function startGame(){
   try {
     await _loadScripts(INTERFACE_SCRIPTS);
     _verifyLoaded([
-      ["main.js children/inputInterface.js",    () => typeof InputInterface !== "undefined" && typeof InputInterface.create === "function"],
-      ["main.js children/graphicsInterface.js", () => typeof GraphicsInterface !== "undefined" && typeof GraphicsInterface.create === "function"],
-      ["main.js children/audioInterface.js",    () => typeof AudioInterface !== "undefined" && typeof AudioInterface.create === "function"]
+      ["main.js children/inputInterface.js",    () => typeof createInputInterface === "function"],
+      ["main.js children/graphicsInterface.js", () => typeof createGraphicsInterface === "function"],
+      ["main.js children/audioInterface.js",    () => typeof createAudioInterface === "function"]
     ]);
 
     await _loadScripts(PROCESS_SCRIPTS, new Set(["main.js children/sounds.js"]));
@@ -323,9 +323,9 @@ async function startGame(){
       ["main.js children/sounds.js",      () => typeof SoundEngine !== "undefined" && typeof SoundEngine.load === "function"]
     ], new Set(["main.js children/sounds.js"]));
 
-    const inputChannel = InputInterface.create();
-    const graphicsChannel = GraphicsInterface.create();
-    const audioChannel = AudioInterface.create();
+    const inputChannel = createInputInterface();
+    const graphicsChannel = createGraphicsInterface();
+    const audioChannel = createAudioInterface();
 
     await Game.load();
     await Graphics.load();

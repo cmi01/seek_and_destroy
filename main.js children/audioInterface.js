@@ -4,7 +4,7 @@
 // audioInterface.js — job: carry plain audio commands from Game to Audio.
 // Owner: main.js. Holds no state unless it is a core.
 // ============================================================
-const AudioInterface = (() => {
+const createAudioInterface = function () {
   function clonePayload(p) {
     if (!p || typeof p !== "object") return {};
     const out = {};
@@ -68,5 +68,5 @@ const AudioInterface = (() => {
     return Object.freeze({ producer, consumer });
   }
 
-  return Object.freeze({ create });
-})();
+  return create();
+};

@@ -4,7 +4,7 @@
 // gameTests.js — job: run the game-side self-tests through the test bridge.
 // Owner: game.js. Holds no state unless it is a core.
 // ============================================================
-Game._registerModule("tests", function runTest(bridge, testName) {  const suite = {
+const runGameTests = function (bridge, testName) {  const suite = {
     // Fresh state from the single template (profile kept), then only the
     // test-specific board: open space, AI has credits, player has none.
     clearBoard() {
@@ -222,4 +222,5 @@ Game._registerModule("tests", function runTest(bridge, testName) {  const suite 
     return suite[testName]();
   }
   return suite.runAll();
-});
+};
+Game._registerModule("tests", runGameTests);

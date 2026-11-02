@@ -1,11 +1,11 @@
 "use strict";
 
 // ============================================================
-// aiPriorities_DATA.js — job: hold the AI priorities table.
+// aiPriorities_DATA.js — job: return the AI priorities table.
 // Owner: ai.js. Holds no state unless it is a core.
 // ============================================================
 
-getAIAction._register("prioritiesData", {
+getAIAction._register("prioritiesData", (() => ({
   "version": "V35-1.0",
   "schema": "seek-and-destroy.ai-priorities",
   "description": "Declarative AI priority tables, tactical scoring weights, doctrine profiles, target valuation rules, threat forecasting coefficients, movement heuristics, preservation tiers, and reinforcement counter-pick orders consumed exclusively by ai.js.",
@@ -504,4 +504,4 @@ getAIAction._register("prioritiesData", {
       "10. Doctrine-Weighted Maneuver & Reinforcement: Balances kill-band positioning, objective approach, active escort screening, tiered HP retreat, nebula reconnaissance, and role-aware warp-in reinforcements."
     ]
   }
-});
+  }))());

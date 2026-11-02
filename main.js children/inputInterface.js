@@ -4,7 +4,7 @@
 // inputInterface.js — job: carry plain input events from Inputs to Game.
 // Owner: main.js. Holds no state unless it is a core.
 // ============================================================
-const InputInterface = (() => {
+const createInputInterface = function () {
   function sanitizeEvent(evt) {
     if (!evt || typeof evt !== "object") return null;
     const type = String(evt.type || "");
@@ -55,5 +55,5 @@ const InputInterface = (() => {
     return Object.freeze({ producer, consumer, setOnPush });
   }
 
-  return Object.freeze({ create });
-})();
+  return create();
+};

@@ -1,10 +1,10 @@
 "use strict";
 
 // ============================================================
-// audio_DATA.js — job: hold the audio clip table.
+// audio_DATA.js — job: return the audio clip table.
 // Owner: sounds.js. Holds no state unless it is a core.
 // ============================================================
-SoundEngine._registerModule("audioData", {
+SoundEngine._registerModule("audioData", (() => ({
   version: "V58-1.0",
   schema: "seek-and-destroy.audio-data",
   // One-shot effects: { offset, duration } in seconds, bus, optional radioMs /
@@ -62,4 +62,4 @@ SoundEngine._registerModule("audioData", {
   // audio is one-shot clips now; the generic loop machinery stays.
   musicClips: {},
   backgroundLoops: []
-});
+  }))());

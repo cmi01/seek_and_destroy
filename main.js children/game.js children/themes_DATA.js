@@ -1,10 +1,10 @@
 "use strict";
 
 // ============================================================
-// themes_DATA.js — job: hold the theme tables.
+// themes_DATA.js — job: return the theme tables.
 // Owner: game.js. Holds no state unless it is a core.
 // ============================================================
-Game._registerModule("themesData", {
+Game._registerModule("themesData", (() => ({
   version: "V58-1.0",
   schema: "seek-and-destroy.theme-data",
   // Cycle order for the THM button; the first entry is the default theme.
@@ -197,4 +197,4 @@ Game._registerModule("themesData", {
       "Battleship": 20
     }
   }
-});
+  }))());

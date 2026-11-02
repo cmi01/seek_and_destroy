@@ -1,10 +1,10 @@
 "use strict";
 
 // ============================================================
-// campaign_DATA.js — job: hold the campaign and level table.
+// campaign_DATA.js — job: return the campaign and level table.
 // Owner: game.js. Holds no state unless it is a core.
 // ============================================================
-Game._registerModule("campaignData", {
+Game._registerModule("campaignData", (() => ({
   version: "V58-1.0",
   schema: "seek-and-destroy.campaign-data",
   levels: [
@@ -74,4 +74,4 @@ Game._registerModule("campaignData", {
       ]
     }
   ]
-});
+  }))());

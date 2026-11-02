@@ -4,7 +4,7 @@
 // graphicsInterface.js — job: carry plain render frames from Game to Graphics.
 // Owner: main.js. Holds no state unless it is a core.
 // ============================================================
-const GraphicsInterface = (() => {
+const createGraphicsInterface = function () {
   const _cloneMemo = new WeakMap();
 
   // Deep plain-data clone. Functions and non-plain objects are dropped;
@@ -126,5 +126,5 @@ const GraphicsInterface = (() => {
     return Object.freeze({ producer, consumer });
   }
 
-  return Object.freeze({ create });
-})();
+  return create();
+};

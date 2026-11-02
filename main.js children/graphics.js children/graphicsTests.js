@@ -4,7 +4,7 @@
 // graphicsTests.js — job: run the graphics self-tests through the test bridge.
 // Owner: graphics.js. Holds no state unless it is a core.
 // ============================================================
-Graphics._registerLayer("tests", function runTest(bridge, testName) {
+const runGraphicsTests = function (bridge, testName) {
   const suite = {
 
     renderUnitPixels(type, team, flags, cellPx) {
@@ -201,4 +201,5 @@ Graphics._registerLayer("tests", function runTest(bridge, testName) {
     return suite[testName]();
   }
   return suite.runAll();
-});
+};
+Graphics._registerLayer("tests", runGraphicsTests);
