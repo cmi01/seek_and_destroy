@@ -10,17 +10,7 @@ const _modules = {
   campaignData: null,
   beginningGameStateData: null,
   themesData: null,
-  gameState: null,
-  themes: null,
-  rulesConfig: null,
-  boardQueries: null,
-  visionQueries: null,
-  actionLegality: null,
-  combatMath: null,
-  cameraMath: null,
-  selectionQueries: null,
   hud: null,
-  sectorGenerator: null,
   ai: null,
   tests: null
 };
@@ -61,6 +51,9 @@ let EndgameStatus = null;
 let CameraMath = null;
 let SelectionQueries = null;
 let VisibilityCache = null;
+// The sector-generation composer's handle (bound at load; Game keeps the
+// stateful orchestrator around it).
+let SectorGeneratorLib = null;
 // The render-frame build children (v89): one pure child per frame domain;
 // buildFrame composes their slices into the render-frame DTO.
 let FrameBoard = null;
@@ -1662,7 +1655,7 @@ const AI = {
 // Selection, MathGrid, Visibility, AI, Hud, and GameAudio.
 const SectorGenerator = {
   createUnit(type, team, x, y, applySpawnExhaustion = false){
-    const u = _modules.sectorGenerator.createUnitData(
+    const u = SectorGeneratorLib.createUnitData(
       SHIP_SPECS,
       State.nextUnitId++,
       type,
@@ -1681,7 +1674,7 @@ const SectorGenerator = {
     GameAudio.clearAll();
     Rules.initState({ preserve: ["profile"] });
 
-    const result = _modules.sectorGenerator.generateSectorData({
+    const result = SectorGeneratorLib.generateSectorData({
       levelId,
       campaignLevels: CAMPAIGN_LEVELS,
       shipSpecs: SHIP_SPECS,
@@ -1844,17 +1837,66 @@ const api = {
         "main.js children/game.js children/campaign_DATA.js",
         "main.js children/game.js children/beginningGameState_DATA.js",
         "main.js children/game.js children/themes_DATA.js",
+        "main.js children/game.js children/gameState.js children/initializeGameState.js",
+        "main.js children/game.js children/gameState.js children/getGameState.js",
+        "main.js children/game.js children/gameState.js children/tryPatchGameState.js",
+        "main.js children/game.js children/gameState.js children/getStateLifetimes.js",
+        "main.js children/game.js children/gameState.js children/buildStateSave.js",
+        "main.js children/game.js children/gameState.js children/restoreStateSave.js",
         "main.js children/game.js children/gameState.js",
+        "main.js children/game.js children/themes.js children/themeTables.js",
+        "main.js children/game.js children/themes.js children/normalizeThemeKey.js",
+        "main.js children/game.js children/themes.js children/nextTheme.js",
+        "main.js children/game.js children/themes.js children/themePalette.js",
+        "main.js children/game.js children/themes.js children/remapColor.js",
         "main.js children/game.js children/themes.js",
+        "main.js children/game.js children/rulesConfig.js children/getFlagDescriptions.js",
+        "main.js children/game.js children/rulesConfig.js children/getGridSize.js",
+        "main.js children/game.js children/rulesConfig.js children/getSpawnRadius.js",
+        "main.js children/game.js children/rulesConfig.js children/getMaxAp.js",
+        "main.js children/game.js children/rulesConfig.js children/getEnemyActionIntervalMs.js",
+        "main.js children/game.js children/rulesConfig.js children/getZoomLadder.js",
+        "main.js children/game.js children/rulesConfig.js children/getWheelNotchPx.js",
+        "main.js children/game.js children/rulesConfig.js children/getMaxZoomStepsPerEvent.js",
+        "main.js children/game.js children/rulesConfig.js children/getDefaultDifficulty.js",
+        "main.js children/game.js children/rulesConfig.js children/getDifficultyProfiles.js",
+        "main.js children/game.js children/rulesConfig.js children/getShipSpecs.js",
+        "main.js children/game.js children/rulesConfig.js children/getCombatRules.js",
         "main.js children/game.js children/rulesConfig.js",
+        "main.js children/game.js children/boardQueries.js children/cellOnBoard.js",
+        "main.js children/game.js children/boardQueries.js children/cellDistance.js",
+        "main.js children/game.js children/boardQueries.js children/cellsWithinRange.js",
+        "main.js children/game.js children/boardQueries.js children/terrainOfCell.js",
+        "main.js children/game.js children/boardQueries.js children/occupancyKey.js",
+        "main.js children/game.js children/boardQueries.js children/indexLivingUnits.js",
+        "main.js children/game.js children/boardQueries.js children/unitOnCell.js",
         "main.js children/game.js children/boardQueries.js",
         "main.js children/game.js children/lineOfSight.js",
+        "main.js children/game.js children/visionQueries.js children/unitScanRange.js",
+        "main.js children/game.js children/visionQueries.js children/cellVisibleToTeam.js",
+        "main.js children/game.js children/visionQueries.js children/unitSpottedByTeam.js",
         "main.js children/game.js children/visionQueries.js",
+        "main.js children/game.js children/actionLegality.js children/canUnitMove.js",
+        "main.js children/game.js children/actionLegality.js children/canUnitCapture.js",
+        "main.js children/game.js children/actionLegality.js children/canUnitShoot.js",
+        "main.js children/game.js children/actionLegality.js children/canUnitShield.js",
+        "main.js children/game.js children/actionLegality.js children/priorityActionAt.js",
         "main.js children/game.js children/actionLegality.js",
+        "main.js children/game.js children/combatMath.js children/resolveShootOutcome.js",
+        "main.js children/game.js children/combatMath.js children/resolveCollisionOutcome.js",
+        "main.js children/game.js children/combatMath.js children/isLethalShot.js",
+        "main.js children/game.js children/combatMath.js children/isShootableFrom.js",
         "main.js children/game.js children/combatMath.js",
         "main.js children/game.js children/reservePlacement.js",
         "main.js children/game.js children/endgameStatus.js",
+        "main.js children/game.js children/cameraMath.js children/resolveZoomStep.js",
+        "main.js children/game.js children/cameraMath.js children/clampViewportToBoard.js",
+        "main.js children/game.js children/cameraMath.js children/computeRenderedViewport.js",
+        "main.js children/game.js children/cameraMath.js children/pixelToCell.js",
+        "main.js children/game.js children/cameraMath.js children/computeCellCentre.js",
         "main.js children/game.js children/cameraMath.js",
+        "main.js children/game.js children/selectionQueries.js children/getSelectedUnit.js",
+        "main.js children/game.js children/selectionQueries.js children/cellForUnit.js",
         "main.js children/game.js children/selectionQueries.js",
         "main.js children/game.js children/visibilityCache.js",
         "main.js children/game.js children/frameBoard.js",
@@ -1863,6 +1905,8 @@ const api = {
         "main.js children/game.js children/frameCursor.js",
         "main.js children/game.js children/frameStatus.js",
         "main.js children/game.js children/hud.js",
+        "main.js children/game.js children/sectorGenerator.js children/buildUnitRecord.js",
+        "main.js children/game.js children/sectorGenerator.js children/buildSectorData.js",
         "main.js children/game.js children/sectorGenerator.js",
         "main.js children/game.js children/ai.js"
       ]);
@@ -1880,25 +1924,36 @@ const api = {
         frameUnits:       typeof buildUnitSlice === "function" ? buildUnitSlice : null,
         frameOverlay:     typeof buildOverlaySlice === "function" ? buildOverlaySlice : null,
         frameCursor:      typeof buildCursorSlice === "function" ? buildCursorSlice : null,
-        frameStatus:      typeof buildStatusSlice === "function" ? buildStatusSlice : null
+        frameStatus:      typeof buildStatusSlice === "function" ? buildStatusSlice : null,
+        // The composers: one plain function each, over their own children.
+        themes:           typeof themes === "function" ? themes : null,
+        rulesConfig:      typeof rulesConfig === "function" ? rulesConfig : null,
+        combatMath:       typeof combatMath === "function" ? combatMath : null,
+        cameraMath:       typeof cameraMath === "function" ? cameraMath : null,
+        selectionQueries: typeof selectionQueries === "function" ? selectionQueries : null,
+        sectorGenerator:  typeof sectorGenerator === "function" ? sectorGenerator : null,
+        gameState:        typeof gameState === "function" ? gameState : null,
+        boardQueries:     typeof boardQueries === "function" ? boardQueries : null,
+        visionQueries:    typeof visionQueries === "function" ? visionQueries : null,
+        actionLegality:   typeof actionLegality === "function" ? actionLegality : null
       };
       const missing = [
         ["main.js children/game.js children/rules_DATA.js",              _modules.rulesData],
         ["main.js children/game.js children/campaign_DATA.js",           _modules.campaignData],
         ["main.js children/game.js children/beginningGameState_DATA.js", _modules.beginningGameStateData],
         ["main.js children/game.js children/themes_DATA.js",             _modules.themesData],
-        ["main.js children/game.js children/gameState.js",               typeof _modules.gameState === "function"],
-        ["main.js children/game.js children/themes.js",                  typeof _modules.themes === "function"],
-        ["main.js children/game.js children/rulesConfig.js",             typeof _modules.rulesConfig === "function"],
-        ["main.js children/game.js children/boardQueries.js",            typeof _modules.boardQueries === "function"],
+        ["main.js children/game.js children/gameState.js",               kids.gameState],
+        ["main.js children/game.js children/themes.js",                  kids.themes],
+        ["main.js children/game.js children/rulesConfig.js",             kids.rulesConfig],
+        ["main.js children/game.js children/boardQueries.js",            kids.boardQueries],
         ["main.js children/game.js children/lineOfSight.js",             kids.lineOfSight],
-        ["main.js children/game.js children/visionQueries.js",           typeof _modules.visionQueries === "function"],
-        ["main.js children/game.js children/actionLegality.js",          typeof _modules.actionLegality === "function"],
-        ["main.js children/game.js children/combatMath.js",              typeof _modules.combatMath === "function"],
+        ["main.js children/game.js children/visionQueries.js",           kids.visionQueries],
+        ["main.js children/game.js children/actionLegality.js",          kids.actionLegality],
+        ["main.js children/game.js children/combatMath.js",              kids.combatMath],
         ["main.js children/game.js children/reservePlacement.js",        kids.reservePlacement],
         ["main.js children/game.js children/endgameStatus.js",           kids.endgameStatus],
-        ["main.js children/game.js children/cameraMath.js",              typeof _modules.cameraMath === "function"],
-        ["main.js children/game.js children/selectionQueries.js",        typeof _modules.selectionQueries === "function"],
+        ["main.js children/game.js children/cameraMath.js",              kids.cameraMath],
+        ["main.js children/game.js children/selectionQueries.js",        kids.selectionQueries],
         ["main.js children/game.js children/visibilityCache.js",         kids.visibilityCache],
         ["main.js children/game.js children/frameBoard.js",              kids.frameBoard],
         ["main.js children/game.js children/frameUnits.js",              kids.frameUnits],
@@ -1906,7 +1961,7 @@ const api = {
         ["main.js children/game.js children/frameCursor.js",             kids.frameCursor],
         ["main.js children/game.js children/frameStatus.js",             kids.frameStatus],
         ["main.js children/game.js children/hud.js",                     _modules.hud && typeof _modules.hud.createHud === "function"],
-        ["main.js children/game.js children/sectorGenerator.js",         _modules.sectorGenerator && typeof _modules.sectorGenerator.generateSectorData === "function"],
+        ["main.js children/game.js children/sectorGenerator.js",         kids.sectorGenerator],
         ["main.js children/game.js children/ai.js",                        typeof _modules.ai === "function" && typeof _modules.ai.load === "function"]
       ].filter(c => !c[1]).map(c => c[0]);
       if (missing.length > 0) {
@@ -1927,7 +1982,7 @@ const api = {
       SHIP_SPECS = RULES_DATA.shipSpecs;
       CAMPAIGN_LEVELS = CAMPAIGN_DATA.levels;
 
-      const stateLib = _modules.gameState(BEGINNING_GAME_STATE_DATA);
+      const stateLib = kids.gameState(BEGINNING_GAME_STATE_DATA);
       InitializeGameState = opts => stateLib.InitializeGameState(_stateBox, opts);
       GetGameState = () => stateLib.GetGameState(_stateBox);
       TryPatchGameState = delta => stateLib.TryPatchGameState(_stateBox, delta);
@@ -1937,24 +1992,24 @@ const api = {
 
       // Pure-function theme library: Game owns the active theme (State.theme)
       // and passes the key explicitly to every call.
-      Themes = _modules.themes(THEME_DATA);
+      Themes = kids.themes(THEME_DATA);
 
       // Bind the pure rule children (single job each) and assemble the Rules
       // handle over them: config values from rulesConfig, queries delegated
       // to the query children, and the composite decisions composed here from
       // plain evidence. The surface is exactly the pre-split rules module's —
       // the AI snapshot facade and the SD debug handle read it unchanged.
-      RulesConfig = _modules.rulesConfig(RULES_DATA);
-      BoardQueries = _modules.boardQueries(RULES_DATA);
+      RulesConfig = kids.rulesConfig(RULES_DATA);
+      BoardQueries = kids.boardQueries(RULES_DATA);
       // The flattened children are plain captured functions: the parent binds
       // the rules data and the per-frame params, so each handle keeps exactly
       // the surface its callers already use.
       LineOfSight = {
         hasLineOfSight(ctx, x0, y0, x1, y1, mode){ return kids.lineOfSight(RULES_DATA, ctx, x0, y0, x1, y1, mode); }
       };
-      VisionQueries = _modules.visionQueries(RULES_DATA);
-      ActionLegality = _modules.actionLegality(RULES_DATA);
-      CombatMath = _modules.combatMath(RULES_DATA);
+      VisionQueries = kids.visionQueries(RULES_DATA);
+      ActionLegality = kids.actionLegality();
+      CombatMath = kids.combatMath(RULES_DATA);
       ReservePlacement = {
         getValidWarpCells(ctx, capitalUnit, radius){ return kids.reservePlacement(RULES_DATA, ctx, capitalUnit, radius); }
       };
@@ -1963,8 +2018,9 @@ const api = {
       };
       // The pure game.js children (single job each): camera math, selection
       // queries and the visibility-cache computation. State stays here.
-      CameraMath = _modules.cameraMath(RULES_DATA);
-      SelectionQueries = _modules.selectionQueries(RULES_DATA);
+      CameraMath = kids.cameraMath(RULES_DATA);
+      SelectionQueries = kids.selectionQueries();
+      SectorGeneratorLib = kids.sectorGenerator();
       VisibilityCache = {
         computeVisCache(ctx, team){ return kids.visibilityCache(RULES_DATA, ctx, team); }
       };

@@ -232,13 +232,36 @@ function mainLoop(now){
 }
 
 // ======================== INLINE SCRIPT LOADER ========================
-// main.js loads ONLY its own direct children: the 3 Unidirectional Interface
-// Servers and the 4 Core System Processes. Every other parent carries its own
-// inline loader for its own children.
+// main.js is the central loader (this is an effect, so it lives here). It
+// loads the 3 Unidirectional Interface Servers, the HUD's widget children and
+// the 4 Core System Processes. A core that still carries its own inline loader
+// loads its own children.
 const INTERFACE_SCRIPTS = [
   "main.js children/inputInterface.js",
   "main.js children/graphicsInterface.js",
   "main.js children/audioInterface.js"
+];
+// The HUD composer is one pure function, so its children's loading is an effect
+// that belongs here. They are loaded BEFORE the process scripts so each child
+// binding exists by the time Game.load() asks the composer to run.
+const HUD_WIDGET_SCRIPTS = [
+  "main.js children/game.js children/hud.js children/buildLevelTag.js",
+  "main.js children/game.js children/hud.js children/buildTopBarChrome.js",
+  "main.js children/game.js children/hud.js children/buildTelemetryModels.js",
+  "main.js children/game.js children/hud.js children/buildTelemetryCardRects.js",
+  "main.js children/game.js children/hud.js children/buildHelpLines.js",
+  "main.js children/game.js children/hud.js children/buildHelpPanel.js",
+  "main.js children/game.js children/hud.js children/buildBridgeShopModel.js",
+  "main.js children/game.js children/hud.js children/buildBridgeShopButtons.js",
+  "main.js children/game.js children/hud.js children/buildCampaignCards.js",
+  "main.js children/game.js children/hud.js children/buildCampaignLayout.js",
+  "main.js children/game.js children/hud.js children/buildEndgameModel.js",
+  "main.js children/game.js children/hud.js children/buildEndgameButtons.js",
+  "main.js children/game.js children/hud.js children/buildIntelModel.js",
+  "main.js children/game.js children/hud.js children/buildIntelRect.js",
+  "main.js children/game.js children/hud.js children/hudMenu.js",
+  "main.js children/game.js children/hud.js children/hudMinimap.js",
+  "main.js children/game.js children/hud.js children/hudBanner.js"
 ];
 const PROCESS_SCRIPTS = [
   "main.js children/game.js",
@@ -313,6 +336,27 @@ async function startGame(){
       ["main.js children/inputInterface.js",    () => typeof createInputInterface === "function"],
       ["main.js children/graphicsInterface.js", () => typeof createGraphicsInterface === "function"],
       ["main.js children/audioInterface.js",    () => typeof createAudioInterface === "function"]
+    ]);
+
+    await _loadScripts(HUD_WIDGET_SCRIPTS);
+    _verifyLoaded([
+      ["main.js children/game.js children/hud.js children/buildLevelTag.js",         () => typeof buildLevelTag === "function"],
+      ["main.js children/game.js children/hud.js children/buildTopBarChrome.js",     () => typeof buildTopBarChrome === "function"],
+      ["main.js children/game.js children/hud.js children/buildTelemetryModels.js",  () => typeof buildTelemetryModels === "function"],
+      ["main.js children/game.js children/hud.js children/buildTelemetryCardRects.js", () => typeof buildTelemetryCardRects === "function"],
+      ["main.js children/game.js children/hud.js children/buildHelpLines.js",        () => typeof buildHelpLines === "function"],
+      ["main.js children/game.js children/hud.js children/buildHelpPanel.js",        () => typeof buildHelpPanel === "function"],
+      ["main.js children/game.js children/hud.js children/buildBridgeShopModel.js",  () => typeof buildBridgeShopModel === "function"],
+      ["main.js children/game.js children/hud.js children/buildBridgeShopButtons.js", () => typeof buildBridgeShopButtons === "function"],
+      ["main.js children/game.js children/hud.js children/buildCampaignCards.js",    () => typeof buildCampaignCards === "function"],
+      ["main.js children/game.js children/hud.js children/buildCampaignLayout.js",   () => typeof buildCampaignLayout === "function"],
+      ["main.js children/game.js children/hud.js children/buildEndgameModel.js",     () => typeof buildEndgameModel === "function"],
+      ["main.js children/game.js children/hud.js children/buildEndgameButtons.js",   () => typeof buildEndgameButtons === "function"],
+      ["main.js children/game.js children/hud.js children/buildIntelModel.js",       () => typeof buildIntelModel === "function"],
+      ["main.js children/game.js children/hud.js children/buildIntelRect.js",        () => typeof buildIntelRect === "function"],
+      ["main.js children/game.js children/hud.js children/hudMenu.js",               () => typeof buildMenuModel === "function"],
+      ["main.js children/game.js children/hud.js children/hudMinimap.js",            () => typeof buildMinimapModel === "function"],
+      ["main.js children/game.js children/hud.js children/hudBanner.js",             () => typeof buildPriorityBanner === "function"]
     ]);
 
     await _loadScripts(PROCESS_SCRIPTS, new Set(["main.js children/sounds.js"]));

@@ -124,12 +124,8 @@ PARENT_OF = {
     "main.js children/game.js children/endgameStatus.js": "main.js children/game.js",
     "main.js children/game.js children/hud.js": "main.js children/game.js",
     "main.js children/game.js children/hud.js children/hudBanner.js": "main.js children/game.js children/hud.js",
-    "main.js children/game.js children/hud.js children/hudIntel.js": "main.js children/game.js children/hud.js",
     "main.js children/game.js children/hud.js children/hudMenu.js": "main.js children/game.js children/hud.js",
     "main.js children/game.js children/hud.js children/hudMinimap.js": "main.js children/game.js children/hud.js",
-    "main.js children/game.js children/hud.js children/hudModals.js": "main.js children/game.js children/hud.js",
-    "main.js children/game.js children/hud.js children/hudTelemetry.js": "main.js children/game.js children/hud.js",
-    "main.js children/game.js children/hud.js children/hudTopBar.js": "main.js children/game.js children/hud.js",
     "main.js children/game.js children/sectorGenerator.js": "main.js children/game.js",
     "main.js children/game.js children/ai.js": "main.js children/game.js",
     "main.js children/game.js children/gameTests.js": "main.js children/game.js",
@@ -154,6 +150,71 @@ PARENT_OF = {
     "main.js children/graphics.js children/vfx.js": "main.js children/graphics.js",
     "main.js children/graphics.js children/uiRenderer.js": "main.js children/graphics.js",
     "main.js children/graphics.js children/graphicsTests.js": "main.js children/graphics.js",
+    "main.js children/game.js children/gameState.js children/initializeGameState.js": "main.js children/game.js children/gameState.js",
+    "main.js children/game.js children/gameState.js children/getGameState.js": "main.js children/game.js children/gameState.js",
+    "main.js children/game.js children/gameState.js children/tryPatchGameState.js": "main.js children/game.js children/gameState.js",
+    "main.js children/game.js children/gameState.js children/getStateLifetimes.js": "main.js children/game.js children/gameState.js",
+    "main.js children/game.js children/gameState.js children/buildStateSave.js": "main.js children/game.js children/gameState.js",
+    "main.js children/game.js children/gameState.js children/restoreStateSave.js": "main.js children/game.js children/gameState.js",
+    "main.js children/game.js children/boardQueries.js children/cellOnBoard.js": "main.js children/game.js children/boardQueries.js",
+    "main.js children/game.js children/boardQueries.js children/cellDistance.js": "main.js children/game.js children/boardQueries.js",
+    "main.js children/game.js children/boardQueries.js children/cellsWithinRange.js": "main.js children/game.js children/boardQueries.js",
+    "main.js children/game.js children/boardQueries.js children/terrainOfCell.js": "main.js children/game.js children/boardQueries.js",
+    "main.js children/game.js children/boardQueries.js children/occupancyKey.js": "main.js children/game.js children/boardQueries.js",
+    "main.js children/game.js children/boardQueries.js children/indexLivingUnits.js": "main.js children/game.js children/boardQueries.js",
+    "main.js children/game.js children/boardQueries.js children/unitOnCell.js": "main.js children/game.js children/boardQueries.js",
+    "main.js children/game.js children/visionQueries.js children/unitScanRange.js": "main.js children/game.js children/visionQueries.js",
+    "main.js children/game.js children/visionQueries.js children/cellVisibleToTeam.js": "main.js children/game.js children/visionQueries.js",
+    "main.js children/game.js children/visionQueries.js children/unitSpottedByTeam.js": "main.js children/game.js children/visionQueries.js",
+    "main.js children/game.js children/actionLegality.js children/canUnitMove.js": "main.js children/game.js children/actionLegality.js",
+    "main.js children/game.js children/actionLegality.js children/canUnitCapture.js": "main.js children/game.js children/actionLegality.js",
+    "main.js children/game.js children/actionLegality.js children/canUnitShoot.js": "main.js children/game.js children/actionLegality.js",
+    "main.js children/game.js children/actionLegality.js children/canUnitShield.js": "main.js children/game.js children/actionLegality.js",
+    "main.js children/game.js children/actionLegality.js children/priorityActionAt.js": "main.js children/game.js children/actionLegality.js",
+    "main.js children/game.js children/combatMath.js children/resolveShootOutcome.js": "main.js children/game.js children/combatMath.js",
+    "main.js children/game.js children/combatMath.js children/resolveCollisionOutcome.js": "main.js children/game.js children/combatMath.js",
+    "main.js children/game.js children/combatMath.js children/isLethalShot.js": "main.js children/game.js children/combatMath.js",
+    "main.js children/game.js children/combatMath.js children/isShootableFrom.js": "main.js children/game.js children/combatMath.js",
+    "main.js children/game.js children/cameraMath.js children/resolveZoomStep.js": "main.js children/game.js children/cameraMath.js",
+    "main.js children/game.js children/cameraMath.js children/clampViewportToBoard.js": "main.js children/game.js children/cameraMath.js",
+    "main.js children/game.js children/cameraMath.js children/computeRenderedViewport.js": "main.js children/game.js children/cameraMath.js",
+    "main.js children/game.js children/cameraMath.js children/pixelToCell.js": "main.js children/game.js children/cameraMath.js",
+    "main.js children/game.js children/cameraMath.js children/computeCellCentre.js": "main.js children/game.js children/cameraMath.js",
+    "main.js children/game.js children/rulesConfig.js children/getFlagDescriptions.js": "main.js children/game.js children/rulesConfig.js",
+    "main.js children/game.js children/rulesConfig.js children/getGridSize.js": "main.js children/game.js children/rulesConfig.js",
+    "main.js children/game.js children/rulesConfig.js children/getSpawnRadius.js": "main.js children/game.js children/rulesConfig.js",
+    "main.js children/game.js children/rulesConfig.js children/getMaxAp.js": "main.js children/game.js children/rulesConfig.js",
+    "main.js children/game.js children/rulesConfig.js children/getEnemyActionIntervalMs.js": "main.js children/game.js children/rulesConfig.js",
+    "main.js children/game.js children/rulesConfig.js children/getZoomLadder.js": "main.js children/game.js children/rulesConfig.js",
+    "main.js children/game.js children/rulesConfig.js children/getWheelNotchPx.js": "main.js children/game.js children/rulesConfig.js",
+    "main.js children/game.js children/rulesConfig.js children/getMaxZoomStepsPerEvent.js": "main.js children/game.js children/rulesConfig.js",
+    "main.js children/game.js children/rulesConfig.js children/getDefaultDifficulty.js": "main.js children/game.js children/rulesConfig.js",
+    "main.js children/game.js children/rulesConfig.js children/getDifficultyProfiles.js": "main.js children/game.js children/rulesConfig.js",
+    "main.js children/game.js children/rulesConfig.js children/getShipSpecs.js": "main.js children/game.js children/rulesConfig.js",
+    "main.js children/game.js children/rulesConfig.js children/getCombatRules.js": "main.js children/game.js children/rulesConfig.js",
+    "main.js children/game.js children/selectionQueries.js children/getSelectedUnit.js": "main.js children/game.js children/selectionQueries.js",
+    "main.js children/game.js children/selectionQueries.js children/cellForUnit.js": "main.js children/game.js children/selectionQueries.js",
+    "main.js children/game.js children/themes.js children/themeTables.js": "main.js children/game.js children/themes.js",
+    "main.js children/game.js children/themes.js children/normalizeThemeKey.js": "main.js children/game.js children/themes.js",
+    "main.js children/game.js children/themes.js children/nextTheme.js": "main.js children/game.js children/themes.js",
+    "main.js children/game.js children/themes.js children/themePalette.js": "main.js children/game.js children/themes.js",
+    "main.js children/game.js children/themes.js children/remapColor.js": "main.js children/game.js children/themes.js",
+    "main.js children/game.js children/sectorGenerator.js children/buildUnitRecord.js": "main.js children/game.js children/sectorGenerator.js",
+    "main.js children/game.js children/sectorGenerator.js children/buildSectorData.js": "main.js children/game.js children/sectorGenerator.js",
+    "main.js children/game.js children/hud.js children/buildLevelTag.js": "main.js children/game.js children/hud.js",
+    "main.js children/game.js children/hud.js children/buildTopBarChrome.js": "main.js children/game.js children/hud.js",
+    "main.js children/game.js children/hud.js children/buildTelemetryModels.js": "main.js children/game.js children/hud.js",
+    "main.js children/game.js children/hud.js children/buildTelemetryCardRects.js": "main.js children/game.js children/hud.js",
+    "main.js children/game.js children/hud.js children/buildBridgeShopModel.js": "main.js children/game.js children/hud.js",
+    "main.js children/game.js children/hud.js children/buildBridgeShopButtons.js": "main.js children/game.js children/hud.js",
+    "main.js children/game.js children/hud.js children/buildHelpLines.js": "main.js children/game.js children/hud.js",
+    "main.js children/game.js children/hud.js children/buildHelpPanel.js": "main.js children/game.js children/hud.js",
+    "main.js children/game.js children/hud.js children/buildCampaignCards.js": "main.js children/game.js children/hud.js",
+    "main.js children/game.js children/hud.js children/buildCampaignLayout.js": "main.js children/game.js children/hud.js",
+    "main.js children/game.js children/hud.js children/buildEndgameModel.js": "main.js children/game.js children/hud.js",
+    "main.js children/game.js children/hud.js children/buildEndgameButtons.js": "main.js children/game.js children/hud.js",
+    "main.js children/game.js children/hud.js children/buildIntelModel.js": "main.js children/game.js children/hud.js",
+    "main.js children/game.js children/hud.js children/buildIntelRect.js": "main.js children/game.js children/hud.js",
 }
 
 # §1.1 interface carve-out: an interface may also be known by (and may know)
@@ -756,6 +817,9 @@ def check_filenames(raw_by_path):
         for path, raw in sorted(raw_by_path.items()):
             if path in ok:
                 continue
+            if path == "main.js":
+                continue  # central loader (§5): main.js names every load
+                # target and binding; the ownership edge remains the parent's
             lines = raw.splitlines()
             head = header_line_count(lines)
             for i, line in enumerate(lines):
@@ -782,6 +846,8 @@ def check_symbols(code_by_path, clean_by_path, claims, params_of, globals_of,
         code_join[p] = "\n".join(lines)
         info[p] = declaration_info(code_join[p])
     for path in sorted(code_by_path):
+        if path == "main.js":
+            continue  # central loader (§5): may name any binding it loads
         lines = code_by_path[path]
         bound, given, handles, dto_handles, spans = info[path]
         given = given | params_of.get(path, set())
