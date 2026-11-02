@@ -12,6 +12,11 @@ Thumbs.db
 # Logs & runtime
 *.log
 server.pid
+dev/deploy/.logs/
+
+# Python bytecode
+__pycache__/
+*.pyc
 
 # Build / temp output
 dist/

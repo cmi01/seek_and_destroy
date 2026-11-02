@@ -93,8 +93,8 @@ function requestCanvasUpdate(overrides){
 
 // ============================================================
 // TEST HARNESS & DEBUG HANDLE
-// Each core owns its own tests (Game -> tests/gameTests.js,
-// Graphics -> tests/graphicsTests.js); main.js only routes to them.
+// Each core owns its own tests (Game -> gameTests.js,
+// Graphics -> graphicsTests.js); main.js only routes to them.
 // ============================================================
 const Harness = {
   async runAll(){
@@ -236,15 +236,15 @@ function mainLoop(now){
 // Servers and the 4 Core System Processes. Every other parent carries its own
 // inline loader for its own children.
 const INTERFACE_SCRIPTS = [
-  "interfaces/inputInterface.js",
-  "interfaces/graphicsInterface.js",
-  "interfaces/audioInterface.js"
+  "main.js children/inputInterface.js",
+  "main.js children/graphicsInterface.js",
+  "main.js children/audioInterface.js"
 ];
 const PROCESS_SCRIPTS = [
-  "core/game.js",
-  "graphics/graphics.js",
-  "core/inputs.js",
-  "audio/sounds.js"
+  "main.js children/game.js",
+  "main.js children/graphics.js",
+  "main.js children/inputs.js",
+  "main.js children/sounds.js"
 ];
 const TOP_LEVEL_SCRIPTS = INTERFACE_SCRIPTS.concat(PROCESS_SCRIPTS);
 
@@ -310,18 +310,18 @@ async function startGame(){
   try {
     await _loadScripts(INTERFACE_SCRIPTS);
     _verifyLoaded([
-      ["interfaces/inputInterface.js",    () => typeof InputInterface !== "undefined" && typeof InputInterface.create === "function"],
-      ["interfaces/graphicsInterface.js", () => typeof GraphicsInterface !== "undefined" && typeof GraphicsInterface.create === "function"],
-      ["interfaces/audioInterface.js",    () => typeof AudioInterface !== "undefined" && typeof AudioInterface.create === "function"]
+      ["main.js children/inputInterface.js",    () => typeof InputInterface !== "undefined" && typeof InputInterface.create === "function"],
+      ["main.js children/graphicsInterface.js", () => typeof GraphicsInterface !== "undefined" && typeof GraphicsInterface.create === "function"],
+      ["main.js children/audioInterface.js",    () => typeof AudioInterface !== "undefined" && typeof AudioInterface.create === "function"]
     ]);
 
-    await _loadScripts(PROCESS_SCRIPTS, new Set(["audio/sounds.js"]));
+    await _loadScripts(PROCESS_SCRIPTS, new Set(["main.js children/sounds.js"]));
     _verifyLoaded([
-      ["core/game.js",         () => typeof Game !== "undefined" && typeof Game.load === "function"],
-      ["graphics/graphics.js", () => typeof Graphics !== "undefined" && typeof Graphics.load === "function"],
-      ["core/inputs.js",       () => typeof Inputs !== "undefined"],
-      ["audio/sounds.js",      () => typeof SoundEngine !== "undefined" && typeof SoundEngine.load === "function"]
-    ], new Set(["audio/sounds.js"]));
+      ["main.js children/game.js",         () => typeof Game !== "undefined" && typeof Game.load === "function"],
+      ["main.js children/graphics.js", () => typeof Graphics !== "undefined" && typeof Graphics.load === "function"],
+      ["main.js children/inputs.js",       () => typeof Inputs !== "undefined"],
+      ["main.js children/sounds.js",      () => typeof SoundEngine !== "undefined" && typeof SoundEngine.load === "function"]
+    ], new Set(["main.js children/sounds.js"]));
 
     const inputChannel = InputInterface.create();
     const graphicsChannel = GraphicsInterface.create();
