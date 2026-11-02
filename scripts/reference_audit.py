@@ -54,13 +54,23 @@ Checks (each violation printed as 'file:line: message'; exit code 1 if any):
     When several files claim the same symbol word, a reference is accepted if
     any claimant allows the referencing file.
  3. No 'window.', 'localStorage', 'document.', 'new Image' in child files.
-    main.js and graphics/graphics.js may use document/window; the four core
-    systems are exempt from the pure-function rules (checks 3 and 4).  A
-    parent's inline child-loader (§1.4: document.createElement("script") and
-    friends) is sanctioned.  graphics/objectRenderer.js is a known violator
-    today — reported, not excused.
+   The four core systems are exempt from the legacy pure-function checks;
+   the new §8.9 doc-window check below is NOT exempt.  A parent's inline
+   child-loader (§1.4: document.createElement("script") and friends) is
+   sanctioned.  graphics/objectRenderer.js is a known violator today —
+   reported, not excused.
  4. data/*_DATA.js files must contain no 'function' or '=>' outside their
     registration call.
+
+ §8.9 additions (reported in their own blocks so the legacy verdict above is
+ unchanged):
+ A. child-names-parent — a child's body must never name its parent file.
+ B. doc-window-main-only — document./window. is allowed in main.js ONLY
+    (effects leave graphics/graphics.js in the migration).
+ C. import-direction — references flow parent→child only: a child may name
+    only itself and its own descendants (never its parent, siblings, cousins
+    or grandparents).  The §1.1 interface carve-out (ADJACENT_CORES) is
+    sanctioned.  main.js has no parent and is the root, so it is exempt.
 
 For checks 2-4, matches inside comments and string literals are excluded
 where trivially detectable (a '//' tail, a '/* */' block, or a quoted string
@@ -152,7 +162,7 @@ ADJACENT_CORES = {
 
 CORES = {"main.js", "core/game.js", "core/inputs.js",
          "graphics/graphics.js", "audio/sounds.js"}
-DOC_WINDOW_ALLOWED = {"main.js", "graphics/graphics.js"}
+DOC_WINDOW_ALLOWED = {"main.js"}   # §8.9: effects are confined to main.js
 GLOBAL_TOKENS = ("window.", "localStorage", "document.", "new Image")
 # sanctioned §1.4 inline child-loader lines inside a parent's _loadScripts()
 LOADER_LINE_RE = re.compile(r"createElement\(\s*['\"]script|"
@@ -828,7 +838,7 @@ def check_globals(code_by_path, clean_by_path, parents):
                     out.append((path, i + 1,
                                 "global use '%s' in child file (§1.5: children "
                                 "expose and touch no globals; document/window "
-                                "allowed only in main.js and graphics/graphics.js)"
+                                "allowed only in main.js)"
                                 % tok))
     return out
 
@@ -854,6 +864,89 @@ def check_data_files(code_by_path, clean_by_path):
                             "data file contains '%s' outside its registration "
                             "call (data modules must be pure data)"
                             % m2.group(0)))
+    return out
+
+
+def subtree_of(child):
+    """The child itself plus every file below it in the ownership tree."""
+    out, stack = {child}, [child]
+    while stack:
+        cur = stack.pop()
+        for node, parent in PARENT_OF.items():
+            if parent == cur and node not in out:
+                out.add(node)
+                stack.append(node)
+    return out
+
+
+def _name_patterns(path):
+    base = os.path.basename(path)
+    stem = base[:-3] if base.endswith(".js") else base
+    pats = [base]
+    if any(ch.isupper() for ch in stem):     # module-style bare name
+        pats.append(stem)
+    return base, pats
+
+
+def check_child_names_parent(raw_by_path):
+    """§8.9-A: a child never names its parent file in its body."""
+    out = []
+    for child in sorted(PARENT_OF):
+        parent = PARENT_OF[child]
+        base, pats = _name_patterns(parent)
+        lines = raw_by_path[child].splitlines()
+        head = header_line_count(lines)
+        for i, line in enumerate(lines):
+            if i < head:
+                continue  # the header banner names the owner by convention
+            if any(p in line for p in pats):
+                out.append((child, i + 1,
+                            "child names its parent ('%s' is referenced); "
+                            "references flow parent -> child only" % base))
+    return out
+
+
+def check_doc_window_scope(code_by_path):
+    """§8.9-B: document./window. only in main.js — no core exemption."""
+    out = []
+    for path in sorted(code_by_path):
+        if path == "main.js":
+            continue
+        for i, line in enumerate(code_by_path[path]):
+            for tok in ("window.", "document."):
+                for _ in find_all(line, tok):
+                    out.append((path, i + 1,
+                                "%s outside main.js (§8.9: effects are "
+                                "confined to main.js)" % tok))
+    return out
+
+
+def check_import_direction(raw_by_path):
+    """§8.9-C: a child names only itself and its descendants, never an
+    ancestor, sibling, cousin or grandparent."""
+    out = []
+    tracked = set(PARENT_OF) | {"main.js"}
+    for child in sorted(PARENT_OF):
+        allowed = subtree_of(child) | ADJACENT_CORES.get(child, set())
+        lines = raw_by_path[child].splitlines()
+        head = header_line_count(lines)
+        seen = set()
+        for i, line in enumerate(lines):
+            if i < head:
+                continue
+            for target in tracked:
+                if target in allowed or target == PARENT_OF[child]:
+                    continue
+                base, pats = _name_patterns(target)
+                if any(p in line for p in pats):
+                    key = (i + 1, target)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    out.append((child, i + 1,
+                                "names '%s' (%s); imports/mentions must flow "
+                                "parent -> child only, and %s is not a "
+                                "descendant" % (base, target, target)))
     return out
 
 
@@ -909,9 +1002,23 @@ def main(argv):
         print("%s:%d: %s" % (path, line, msg))
     if viols:
         print("reference_audit: %d violation(s)" % len(viols))
-        return 1
-    print("reference_audit: clean")
-    return 0
+    else:
+        print("reference_audit: clean")
+    # §8.9 additions — separate blocks so the legacy verdict above is untouched
+    # and its count can be tracked against the v94 baseline.
+    new_checks = [
+        ("child-names-parent", check_child_names_parent(raw_by_path)),
+        ("doc-window-main-only", check_doc_window_scope(code_by_path)),
+        ("import-direction", check_import_direction(raw_by_path)),
+    ]
+    failed = bool(viols)
+    for label, items in new_checks:
+        items.sort()
+        for path, line, msg in items:
+            print("%s: %s:%d: %s" % (label, path, line, msg))
+        print("%s check: %d violation(s)" % (label, len(items)))
+        failed = failed or bool(items)
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

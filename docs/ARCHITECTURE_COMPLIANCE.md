@@ -245,6 +245,10 @@ Run this checklist against every touched file before calling a version done:
 7. Is its parent the only referrer, and only for that function?
 8. Any globals, parent/sibling references, or names of other files outside its
    own header? (→ `reference_audit.py`)
+9. **Import direction:** do all of its imports/mentions point downward — only
+   itself and its own descendants? Does it name its parent or a
+   sibling/cousin/grandparent anywhere in its body? (→ `reference_audit.py`,
+   child-names-parent and import-direction checks)
 
 ### 7.3 Measurement and presumption rules
 
@@ -253,14 +257,26 @@ Run this checklist against every touched file before calling a version done:
   than one function, is **presumed multi-job until proven otherwise** — the
   proof is the job tests.
 - `scripts/structure_audit.py` machine-checks the checkable structural rules:
-  the filename blocklist, the header contract (`— job:` + `Owner:`), and the
-  size presumptions (printed as warnings). `scripts/reference_audit.py` exempts
-  declared header lines.
-- **Proposed checker additions** (pending; the checker scripts are updated
-  separately): a one-export-per-file check (every file except `main.js`) in
-  `structure_audit.py`; in `reference_audit.py`, a child-never-names-parent
-  check, and shrinking the document/window allowance to `main.js` only
-  (effects leave `graphics/graphics.js`).
+  the filename blocklist, the header contract (`— job:` + `Owner:`), the
+  size presumptions (printed as warnings), and the **one-function-per-file**
+  check (`one-function-per-file` block): every file except `main.js` exposes
+  exactly one function/export; two or more is a violation. Pure-data
+  `data/*_DATA.js` declarations are exempt (they are one data table, not a
+  function).
+  `scripts/reference_audit.py` exempts declared header lines.
+- **Checker additions (landed, §8.9).** `reference_audit.py` now also reports,
+  in separate blocks so the legacy verdict is untouched:
+  - `child-names-parent` — a child's body never names its parent file;
+  - `doc-window-main-only` — `document.`/`window.` is allowed in `main.js`
+    only (no core exemption; effects leave `graphics/graphics.js`);
+  - `import-direction` — references flow parent→child only: a child may name
+    only itself and its own descendants, never an ancestor, sibling, cousin or
+    grandparent. The §1.1 interface carve-out (`ADJACENT_CORES`) is
+    sanctioned; `main.js` is the root and is exempt.
+- **Baseline.** The additions are baselined against the v94 tree (commit
+  `fa266dc`) in `/tmp/hermes-verify-a01/baseline.json`. That tree predates the
+  one-function bar, so the new checks have non-zero counts there; no later
+  change may raise them.
 
 ## 8. Mechanics and Contracts
 
@@ -302,11 +318,14 @@ The mechanical contracts the refactor executes against — adopted defaults
   `state → results` function returning plain data in a fixed shape —
   `{ name, pass, detail[] }`. Tests nest under their owner (§5) and run from
   `main.js`'s test entry.
-- **8.9 Checker sequencing.** The checker additions proposed in §7.3 —
-  one-export check, child-never-names-parent, effects/globals confined to
-  `main.js`, and an import-direction check — land **before or with the first
-  migration version**, so the refactor is machine-guarded. The review gate
-  (§7.2) gains the import-direction question.
+- **8.9 Checker sequencing.** The checker additions of §7.3 have landed ahead
+  of the first migration version, so the refactor is machine-guarded from the
+  start: the one-function-per-file check in `structure_audit.py`, and
+  child-names-parent, doc-window-main-only, and import-direction in
+  `reference_audit.py`. Each new check prints its own block and count so the
+  legacy verdict stays traceable; the v94 baseline lives in
+  `/tmp/hermes-verify-a01/baseline.json` and counts may only fall. The review
+  gate (§7.2, question 9) carries the import-direction question.
 - **8.10 `main.js` sectioning (soft rule).** The shell keeps named sections —
   loader/wiring, state container, effect drivers, frame loop, test entry — so
   the exempt file stays reviewable.
