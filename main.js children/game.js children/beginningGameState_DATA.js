@@ -8,6 +8,9 @@ Game._registerModule("beginningGameStateData", (() => ({
   version: "V58-1.0",
   schema: "seek-and-destroy.beginning-game-state",
   initialState: {
+    // ---- campaign: the M1 campaign section (fleet/wallet/cargo/reputation/clock/map) ----
+    campaign: null,
+
     // ---- profile: survives sector changes ----
     completedLevels: [],
     theme: "default",
@@ -20,8 +23,8 @@ Game._registerModule("beginningGameStateData", (() => ({
     turnNumber: 1,
     activeTeam: 1,
     ap: 4,
-    credits: { 1: 35, 2: 0 },
-    income: { 1: 5, 2: 0 },
+    credits: { 1: 3500, 2: 0 },
+    income: { 1: 500, 2: 0 },
     terrain: [],
     exploredCells: [],
     asteroidSeeds: [],
@@ -79,6 +82,7 @@ Game._registerModule("beginningGameStateData", (() => ({
   },
 
   lifetimes: {
+    campaign: ["campaign"],
     profile: ["completedLevels", "theme", "audioSettings", "rng", "rngSeed"],
     match: ["levelId", "turnNumber", "activeTeam", "ap", "credits", "income", "terrain", "exploredCells", "asteroidSeeds",
             "units", "nextUnitId", "aiDoctrine", "historicalVectors", "turnReportQueue", "gameOver"],

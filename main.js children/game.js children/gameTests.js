@@ -13,7 +13,7 @@ const runGameTests = function (bridge, testName) {  const suite = {
       const gridSize = bridge.gridSize;
       st.terrain = Array.from({ length: gridSize }, () => Array(gridSize).fill("EMPTY"));
       st.asteroidSeeds = Array.from({ length: gridSize }, (_, x) => Array.from({ length: gridSize }, (__, y) => ((x * 73 + y * 37) % 100) / 100));
-      st.credits = { 1: 0, 2: 200 }; st.income = { 1: 0, 2: 0 };
+      st.credits = { 1: 0, 2: 20000 }; st.income = { 1: 0, 2: 0 };
     },
 
     aiTurnSync(maxBeats) {
@@ -199,8 +199,95 @@ const runGameTests = function (bridge, testName) {  const suite = {
       };
     },
 
+    // M1 (roadmap AC-1): every hull row satisfies the DESIGN §3.1 invariants —
+    // crew = ⌈cost ÷ 100⌉, flagship = 2.5× base with scan 8, Dreadnought =
+    // 2× Battleship — and every default loadout fits its hull's slot capacity,
+    // with weapon slot sizes = round(dmg × range), ×1.5 railguns.
+    testCampaignRosterConformance() {
+      const specs = bridge.shipSpecs;
+      const weapons = bridge.weapons;
+      const bad = [];
+      const fail = (why) => bad.push(why);
+
+      const hulls = Object.keys(specs);
+      if (hulls.length !== 22) fail("hull count " + hulls.length + " != 22");
+      const weaponNames = Object.keys(weapons);
+      if (weaponNames.length !== 15) fail("weapon count " + weaponNames.length + " != 15");
+
+      // Slot-size formula per DESIGN §3.2.
+      weaponNames.forEach(w => {
+        const wp = weapons[w];
+        const expect = Math.round(wp.dmg * wp.range * (wp.class === "railgun" ? 1.5 : 1));
+        if (wp.slots !== expect) fail(w + " slots " + wp.slots + " != " + expect);
+      });
+
+      hulls.forEach(name => {
+        const s = specs[name];
+        if (s.crew !== Math.ceil(s.cost / 100)) fail(name + " crew " + s.crew + " != ⌈" + s.cost + "/100⌉");
+        // Default loadout fits capacity, and capacity equals its slot total (§3.3).
+        const slotTotal = s.defaultLoadout.reduce((n, w) => n + (weapons[w] ? weapons[w].slots : 0), 0);
+        if (slotTotal !== s.capacity) fail(name + " capacity " + s.capacity + " != loadout slots " + slotTotal);
+        // Unarmed hulls have 0 slots; armed hulls' battle firepower/range match the weapon.
+        if (s.defaultLoadout.length === 0) {
+          if (s.capacity !== 0 || s.firepower !== 0) fail(name + " unarmed hull must have 0 slots/firepower");
+        } else {
+          const w = weapons[s.defaultLoadout[0]];
+          if (!w) fail(name + " default weapon unknown");
+          else if (w.dmg !== s.firepower || w.range !== s.range) fail(name + " fp/range != weapon dmg/range");
+        }
+        // Flagship invariants: 2.5× base cost, scan 8.
+        if (s.flags.includes("!flagship")) {
+          const baseName = name.startsWith("Flagship ") ? name.slice("Flagship ".length) : name.replace(/ Flagship$/, "");
+          const base = specs[baseName];
+          if (!base) fail(name + " has no base hull " + baseName);
+          else {
+            if (s.cost !== base.cost * 2.5) fail(name + " cost " + s.cost + " != 2.5×" + base.cost);
+            if (s.scan !== 8) fail(name + " scan " + s.scan + " != 8");
+          }
+        }
+      });
+
+      // Dreadnought = 2× Battleship; flagship price default Q7 (8,750).
+      if (specs["Dreadnought"].cost !== specs["Battleship"].cost * 2) fail("Dreadnought != 2× Battleship");
+      if (specs["Flagship Battlecruiser"].cost !== 8750) fail("Flagship Battlecruiser cost != 8750");
+
+      return {
+        name: "CAMPAIGN ROSTER CONFORMANCE (M1)",
+        pass: bad.length === 0,
+        detail: bad.length ? bad.slice(0, 4).join("; ") : "22 hulls / 15 weapons conform to DESIGN §3"
+      };
+    },
+
+    // M1 (roadmap AC-2): save → restore deep-equals (JSON) a campaign state
+    // containing fleet, wallet, cargo, reputation and clock.
+    testCampaignStateRoundTrip() {
+      bridge.initializeCampaign();
+      const before = bridge.campaign;
+      const ok = Boolean(before && Array.isArray(before.fleet) && before.fleet.length === 5 &&
+        before.wallet === 25000 && before.cargo && before.reputation && before.clock);
+      if (!ok) return { name: "CAMPAIGN STATE ROUND-TRIP (M1)", pass: false, detail: "campaign state missing or wrong shape" };
+
+      const snapshot = JSON.stringify(before);
+      const save = bridge.saveState();
+      const savedJson = JSON.stringify(save.state.campaign);
+
+      bridge.resetState();                       // campaign section cleared (profile kept)
+      if (bridge.campaign !== null) return { name: "CAMPAIGN STATE ROUND-TRIP (M1)", pass: false, detail: "reset did not clear campaign section" };
+
+      const loadOk = bridge.loadState(save);
+      const restoredJson = loadOk ? JSON.stringify(bridge.campaign) : "null";
+      const pass = loadOk && savedJson === snapshot && restoredJson === snapshot;
+
+      return {
+        name: "CAMPAIGN STATE ROUND-TRIP (M1)",
+        pass,
+        detail: pass ? "save → restore JSON-identical (fleet/wallet/cargo/reputation/clock)" : "mismatch: " + (savedJson === snapshot ? "restore" : "save")
+      };
+    },
+
     runAll() {
       const results = [
+        this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
         this.testKiting(), this.testFlagshipGuard(), this.testFocusFire(), this.testDoctrine(),
         this.testFlagshipShieldAlwaysUp(), this.testRailgunAvoidance(), this.testFleeWhenOutgunned(),
         this.testRecedingHorizon(), this.testBudgetAwarePlanning(),
