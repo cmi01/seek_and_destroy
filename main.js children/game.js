@@ -32,6 +32,7 @@ let THEME_DATA = null;
 let InitializeGameState = null;
 let InitializeCampaign = null;
 let CampaignLib = null;
+let CampaignMapLib = null;
 let GetGameState = null;
 let TryPatchGameState = null;
 let GetStateLifetimes = null;
@@ -1938,6 +1939,7 @@ const api = {
         "main.js children/game.js children/themes_DATA.js",
         "main.js children/game.js children/gameState.js",
         "main.js children/game.js children/campaignState.js",
+        "main.js children/game.js children/campaignMap.js",
         "main.js children/game.js children/themes.js",
         "main.js children/game.js children/rulesConfig.js",
         "main.js children/game.js children/boardQueries.js",
@@ -1985,6 +1987,7 @@ const api = {
         sectorGenerator:  typeof sectorGenerator === "function" ? sectorGenerator : null,
         gameState:        typeof gameState === "function" ? gameState : null,
         campaignState:    typeof campaignState === "function" ? campaignState : null,
+        campaignMap:      typeof campaignMap === "function" ? campaignMap : null,
         boardQueries:     typeof boardQueries === "function" ? boardQueries : null,
         visionQueries:    typeof visionQueries === "function" ? visionQueries : null,
         actionLegality:   typeof actionLegality === "function" ? actionLegality : null
@@ -2007,6 +2010,7 @@ const api = {
         ["main.js children/game.js children/themes_DATA.js",             _modules.themesData],
         ["main.js children/game.js children/gameState.js",               kids.gameState],
         ["main.js children/game.js children/campaignState.js",           kids.campaignState],
+        ["main.js children/game.js children/campaignMap.js",             kids.campaignMap],
         ["main.js children/game.js children/themes.js",                  kids.themes],
         ["main.js children/game.js children/rulesConfig.js",             kids.rulesConfig],
         ["main.js children/game.js children/boardQueries.js",            kids.boardQueries],
@@ -2053,16 +2057,23 @@ const api = {
       TryPatchGameState = delta => stateLib.TryPatchGameState(_stateBox, delta);
       GetStateLifetimes = () => stateLib.GetStateLifetimes();
       SerializeGameState = () => stateLib.SerializeGameState(_stateBox);
-      DeserializeGameState = data => stateLib.DeserializeGameState(_stateBox, data);
+      // The map-state builder bound over the frozen map table + roster — one
+      // closure, injected wherever a sibling transform needs map state built
+      // (campaign init and the pre-map save migration).
+      const buildMapSection = () => CampaignMapLib.BuildMapState(CAMPAIGN_DATA.campaign, SHIP_SPECS, null);
+      DeserializeGameState = data => stateLib.DeserializeGameState(_stateBox, data, buildMapSection);
 
       // M1 campaign state: pure children over the campaign section only.
       // initializeCampaign() rebuilds State.campaign from the frozen
       // campaign_DATA starting package; persistence flows through the
-      // gameState campaign lifetime.
+      // gameState campaign lifetime. M3: the map section comes from the
+      // campaign-map subtree's builder (injected — siblings never name each
+      // other).
       const campaignLib = kids.campaignState();
       CampaignLib = campaignLib;
+      CampaignMapLib = kids.campaignMap();
       InitializeCampaign = () => {
-        const fresh = campaignLib.InitializeCampaignState(CAMPAIGN_DATA.campaign, SHIP_SPECS);
+        const fresh = campaignLib.InitializeCampaignState(CAMPAIGN_DATA.campaign, SHIP_SPECS, buildMapSection);
         if (!TryPatchGameState({ campaign: fresh })) {
           console.error("[S&D campaign] initializeCampaign: patch rejected.");
           return null;
@@ -2431,6 +2442,12 @@ const api = {
       crewKilled(damage, maxHp, crew){
         return CombatMath.crewLostFromDamage(damage, maxHp, crew);
       },
+      mapSection(){ return (GetGameState().campaign && GetGameState().campaign.map) || null; },
+      mapFromTable(){ return CampaignMapLib.BuildMapState(CAMPAIGN_DATA.campaign, SHIP_SPECS, null); },
+      mapRules(){ return (CAMPAIGN_DATA && CAMPAIGN_DATA.campaign && CAMPAIGN_DATA.campaign.map) || null; },
+      travel(mapState, fleetId, dest, opts){ return CampaignMapLib.MoveFleet(mapState, fleetId, dest, opts); },
+      travelCost(fleet, distance, space){ return CampaignMapLib.FuelCost(fleet, distance, space); },
+      merchantQuote(mapState, fleetId, reason){ return CampaignMapLib.MerchantOffer(mapState, fleetId, reason); },
       solidifyMirages(state){ return materializeMirages(state); },
       checkEndgameStatus(units){ return EndgameStatus.checkEndgameStatus(units); },
       executeWarpIn(unit, shipType, isAI, apCost, opts){

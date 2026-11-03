@@ -563,6 +563,174 @@ const runGameTests = function (bridge, testName) {  const suite = {
       };
     },
 
+
+    // M3 AC: the exact move cost — ships x distance x 1 unit per ship per
+    // distance unit, hyperspace x3 (Q5). Asserted on the query and on a real
+    // move's event + fuel decrement.
+    testMapFuelFormula() {
+      const fleet = { ships: [{}, {}, {}] };
+      const normal = bridge.travelCost(fleet, 4, "normal");
+      const hyper = bridge.travelCost(fleet, 4, "hyperspace");
+      const zero = bridge.travelCost(fleet, 0, "hyperspace");
+      const m = bridge.mapFromTable();
+      const pf = m.fleets.find(f => f.faction === "player");
+      const res = bridge.travel(m, "player", { x: pf.x + 3, y: pf.y });
+      const ev = res.events[0] || {};
+      const movedFleet = res.mapState.fleets.find(f => f.id === "player");
+      const moveCost = pf.ships.length * 3;
+      const pass = normal === 12 && hyper === 36 && zero === 0 &&
+        ev.kind === "fleetMoved" && ev.space === "normal" && ev.cost === moveCost &&
+        movedFleet.fuel === pf.fuel - moveCost && ev.fuelLeft === movedFleet.fuel;
+      return {
+        name: "M3 FUEL FORMULA (ships x distance x space)",
+        pass,
+        detail: pass
+          ? "3 ships x 4 -> 12 normal / 36 hyper; 5-ship move of 3 cost exactly 15"
+          : ("q=" + normal + "/" + hyper + "/" + zero + " ev=" + ev.kind + ":" + ev.space + ":" + ev.cost + " fuel=" + movedFleet.fuel)
+      };
+    },
+
+    // M3 AC: an unfuelled fleet's move is rejected and produces the
+    // merchant-fleet event with the placeholder offer model attached.
+    testMapUnfuelledMoveRejected() {
+      const m = bridge.mapFromTable();
+      const pf = m.fleets.find(f => f.faction === "player");
+      const dry = { ...m, fleets: m.fleets.map(f => f.id === pf.id ? { ...f, fuel: 0 } : f) };
+      const res = bridge.travel(dry, "player", { x: pf.x + 3, y: pf.y });
+      const ev = res.events[0] || {};
+      const still = res.mapState.fleets.find(f => f.id === "player");
+      const offer = ev.offer || {};
+      const pass = ev.kind === "merchantFleetEvent" && ev.reason === "no-fuel" &&
+        ev.needed === pf.ships.length * 3 && ev.held === 0 &&
+        still.x === pf.x && still.y === pf.y && res.mapState.turn === m.turn &&
+        offer.kind === "merchant" && offer.buyMultiplier === 1.3 && offer.sellMultiplier === 0.7 &&
+        offer.fuelUnitPrice === 500 && Array.isArray(offer.wares);
+      return {
+        name: "M3 UNFUELLED MOVE REJECTED + MERCHANT EVENT",
+        pass,
+        detail: pass
+          ? "move refused (fuel 0), merchant offer attached (buy x1.3 / sell x0.7)"
+          : ("ev=" + ev.kind + ":" + ev.reason + " offer=" + offer.kind + " pos=" + still.x + "," + still.y)
+      };
+    },
+
+    // M3: a flagship under 50% crew cannot move — the move is rejected with
+    // the merchant event (roadmap M3 fuel paragraph).
+    testMapFlagshipCrewGate() {
+      const m = bridge.mapFromTable();
+      const pf = m.fleets.find(f => f.faction === "player");
+      const hurt = {
+        ...m,
+        fleets: m.fleets.map(f => f.id === pf.id
+          ? { ...f, fuel: 999, ships: f.ships.map(s => s.flagship ? { ...s, crew: Math.floor(s.maxCrew * 0.49) } : s) }
+          : f)
+      };
+      const res = bridge.travel(hurt, "player", { x: pf.x + 3, y: pf.y });
+      const ev = res.events[0] || {};
+      const still = res.mapState.fleets.find(f => f.id === "player");
+      const pass = ev.kind === "merchantFleetEvent" && ev.reason === "flagship-crew-low" &&
+        still.x === pf.x && Boolean(ev.offer);
+      return {
+        name: "M3 FLAGSHIP UNDER 50% CREW CANNOT MOVE",
+        pass,
+        detail: pass ? "move refused at 49% crew, merchant event produced" : ("ev=" + ev.kind + ":" + ev.reason)
+      };
+    },
+
+    // M3: fleet speed = slowest ship — the travelled distance is capped.
+    testMapSlowestShipCapsMove() {
+      const m = bridge.mapFromTable();
+      const pf = m.fleets.find(f => f.faction === "player");
+      const speeds = pf.ships.map(s => s.speed);
+      const slowest = Math.min.apply(null, speeds);
+      const res = bridge.travel(m, "player", { x: pf.x + 50, y: pf.y });
+      const ev = res.events[0] || {};
+      const pass = ev.kind === "fleetMoved" && ev.distance === slowest && ev.capped === true &&
+        ev.to.x === pf.x + slowest;
+      return {
+        name: "M3 FLEET SPEED = SLOWEST SHIP",
+        pass,
+        detail: pass
+          ? "long haul capped at " + slowest + " (speeds " + speeds.join(",") + ")"
+          : ("ev=" + ev.kind + " d=" + ev.distance + " capped=" + ev.capped)
+      };
+    },
+
+    // M3 (Q4): the map is frozen while a battle is active — no movement and
+    // no merchant event, just the refusal.
+    testMapFrozenDuringBattle() {
+      const m = bridge.mapFromTable();
+      const pf = m.fleets.find(f => f.faction === "player");
+      const frozen = { ...m, battleActive: true };
+      const res = bridge.travel(frozen, "player", { x: pf.x + 3, y: pf.y });
+      const ev = res.events[0] || {};
+      const pass = res.events.length === 1 && ev.kind === "moveRejected" && ev.reason === "map-frozen";
+      return {
+        name: "M3 MAP FROZEN DURING BATTLE (Q4)",
+        pass,
+        detail: pass ? "move refused while a battle is active" : ("ev=" + ev.kind + ":" + ev.reason)
+      };
+    },
+
+    // M3 AC: save/restore round-trip includes the map, and a pre-map (M2-era)
+    // save migrates onto the map schema with the saved anchor kept as the
+    // fleet's location.
+    testMapSaveRoundTripAndMigration() {
+      const bad = [];
+      const fail = (why) => bad.push(why);
+      bridge.initializeCampaign();
+      const before = bridge.campaign.map;
+      if (!before || !Array.isArray(before.locations) || before.locations.length === 0) fail("init map has no locations");
+      if (!Array.isArray(before.fleets) || before.fleets.length === 0) fail("init map has no fleets");
+      const snapshot = JSON.stringify(before);
+
+      const save = bridge.saveState();
+      bridge.resetState();
+      const loadOk = bridge.loadState(save);
+      const restored = loadOk ? JSON.stringify(bridge.campaign.map) : "null";
+      if (restored !== snapshot) fail("map not JSON-identical across save/restore");
+
+      const fixture = {
+        schema: "seek-and-destroy.beginning-game-state",
+        version: "M1-1.0",
+        state: {
+          theme: "default",
+          levelId: 101,
+          turnNumber: 2,
+          activeTeam: 1,
+          ap: 4,
+          credits: { 1: 1200, 2: 0 },
+          income: { 1: 100, 2: 0 },
+          gameOver: false,
+          viewX: 0,
+          viewY: 0,
+          viewSpan: 16,
+          campaign: {
+            fleet: [{ hull: "Fighter", loadout: ["Dual Light Assault Cannon"], hp: 2, maxHp: 2, crew: 5 }],
+            wallet: 25000,
+            cargo: { goods: 0, fuel: 20, crew: 0, parts: 5 },
+            reputation: {},
+            clock: { month: 1, year: 2401 },
+            map: { locationId: "khepri-station" }
+          }
+        }
+      };
+      if (!bridge.loadState(fixture)) fail("pre-map fixture rejected");
+      const migrated = bridge.campaign.map;
+      const anchor = bridge.mapFromTable().locations.find(l => l.id === "khepri-station");
+      const pf = migrated && Array.isArray(migrated.fleets) ? migrated.fleets.find(f => f.faction === "player") : null;
+      if (!migrated || !Array.isArray(migrated.locations) || migrated.locations.length === 0) fail("migrated map has no locations");
+      if (!pf) fail("migrated map has no player fleet");
+      if (pf && anchor && (pf.x !== anchor.x || pf.y !== anchor.y)) fail("player fleet not placed at the saved anchor");
+      if (migrated && migrated.locationId !== "khepri-station") fail("saved anchor lost: " + (migrated && migrated.locationId));
+
+      return {
+        name: "M3 MAP SAVE ROUND-TRIP + MIGRATION",
+        pass: bad.length === 0,
+        detail: bad.length ? bad.slice(0, 4).join("; ") : "map JSON-identical across save/restore; pre-map save migrated to the anchor"
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -575,7 +743,10 @@ const runGameTests = function (bridge, testName) {  const suite = {
         this.testFlagshipShieldAlwaysUp(), this.testRailgunAvoidance(), this.testFleeWhenOutgunned(),
         this.testRecedingHorizon(), this.testBudgetAwarePlanning(),
         this.testZoomAnchor(), this.testZoomClamp(),
-        this.testShieldReraiseRule()
+        this.testShieldReraiseRule(),
+        this.testMapFuelFormula(), this.testMapUnfuelledMoveRejected(),
+        this.testMapFlagshipCrewGate(), this.testMapSlowestShipCapsMove(),
+        this.testMapFrozenDuringBattle(), this.testMapSaveRoundTripAndMigration()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;

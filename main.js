@@ -477,7 +477,11 @@ const GAME_LEAF_SCRIPTS = [
   "main.js children/game.js children/campaignState.js children/beginBattle.js",
   "main.js children/game.js children/campaignState.js children/applyBattleResult.js",
   "main.js children/game.js children/campaignState.js children/buildEncounterFromLevel.js",
-  "main.js children/game.js children/campaignState.js children/collectBattleResult.js"
+  "main.js children/game.js children/campaignState.js children/collectBattleResult.js",
+  "main.js children/game.js children/campaignMap.js children/buildMapState.js",
+  "main.js children/game.js children/campaignMap.js children/fuelCost.js",
+  "main.js children/game.js children/campaignMap.js children/merchantOffer.js",
+  "main.js children/game.js children/campaignMap.js children/moveFleet.js"
 ];
 
 async function startGame(){
@@ -631,7 +635,11 @@ async function startGame(){
       ["main.js children/game.js children/campaignState.js children/beginBattle.js", () => typeof beginBattle === "function"],
       ["main.js children/game.js children/campaignState.js children/applyBattleResult.js", () => typeof applyBattleResult === "function"],
       ["main.js children/game.js children/campaignState.js children/buildEncounterFromLevel.js", () => typeof buildEncounterFromLevel === "function"],
-      ["main.js children/game.js children/campaignState.js children/collectBattleResult.js", () => typeof collectBattleResult === "function"]
+      ["main.js children/game.js children/campaignState.js children/collectBattleResult.js", () => typeof collectBattleResult === "function"],
+      ["main.js children/game.js children/campaignMap.js children/buildMapState.js", () => typeof buildMapState === "function"],
+      ["main.js children/game.js children/campaignMap.js children/fuelCost.js", () => typeof fuelCost === "function"],
+      ["main.js children/game.js children/campaignMap.js children/merchantOffer.js", () => typeof merchantOffer === "function"],
+      ["main.js children/game.js children/campaignMap.js children/moveFleet.js", () => typeof moveFleet === "function"]
     ]);
 
     await Game.load();
