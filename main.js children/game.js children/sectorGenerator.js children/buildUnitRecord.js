@@ -12,7 +12,6 @@ const buildUnitRecord = function (shipSpecs, nextId, type, team, x, y, applySpaw
     flags.add("-moved");
     flags.add("-sent boarding party");
     flags.add("-attacked");
-    flags.add("-shielded");
   }
   return {
     id: nextId,

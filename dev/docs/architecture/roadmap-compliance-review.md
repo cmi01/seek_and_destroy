@@ -291,7 +291,7 @@ Roadmap still says “16/16 game”; the live `SD.runTests()` total is **24** (1
 | ID | Work |
 |----|------|
 | **F2** | Regenerate `dev/docs/game_balance.md` from the ×100 `rules_DATA` / `campaign_DATA` tables. |
-| **F4** | Grep+harness on `-shielded` vs DESIGN §2.5; remove or keep with a written ruling. Not silently “already done”. |
+| **F4** | **DONE (v113), latch REMOVED per DESIGN §2.5.** Ruling — DESIGN §2.5 is explicit: “There is no cooldown: a ship can raise its shield again later in the same turn if it was stripped (each raise costs 1 AP), and re-raising is blocked only by an already raised shield, no shield generator, or no AP. Shielding matters at the end of a faction's turn, so raising more than once per turn is allowed.” No once-per-X shield lockout is mandated, so the latch is gone end-to-end: raise action no longer sets it, turn clears no longer track it, the legality gate blocks only on an already raised bubble / no generator / no AP, capture and warp-in spawn-exhaustion no longer seed it, the flag table entry is deleted (`#shield generator` text now records the no-cooldown rule), the AI belief tracks observed bubble state (`+shield`) instead, and the AI flagship shield gate no longer checks it. Zero `-shielded` occurrences remain in `.js`. Rule test `T-12 SHIELD RE-RAISE (DESIGN 2.5)`; A/B vs pre-change tag v112 in `/tmp/hermes-verify-t_fb967eff/verify.js` (re-raise after strip: blocked pre → allowed post; parity on the raised/no-generator/no-AP blocks and plain raise). |
 
 ### Next milestone batch (roadmap order)
 

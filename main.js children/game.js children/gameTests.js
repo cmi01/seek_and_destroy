@@ -527,6 +527,42 @@ const runGameTests = function (bridge, testName) {  const suite = {
       };
     },
 
+    // Rule test (DESIGN 2.5, no cooldown): a ship may raise its shield again
+    // later in the same turn after its bubble was stripped (1 AP each raise).
+    // A raise is blocked only by an already raised bubble, no shield generator,
+    // or no AP.
+    testShieldReraiseRule() {
+      this.clearBoard();
+      const st = bridge.state;
+      st.activeTeam = 1;
+      const u = bridge.createUnit("Light Cruiser", 1, 16, 16, false);
+      u.flags.delete("+shield");
+      st.ap = 4;
+      const me = { x: u.x, y: u.y };
+      const first = bridge.canShield(u, me);
+      bridge.executeShield(u, false, 1);
+      const raised = u.flags.has("+shield");
+      const tgt = bridge.createUnit("Shuttle", 2, 16, 14, false);
+      tgt.hp = 10;
+      bridge.executeShoot(u, tgt, false, 1);
+      const dropped = !u.flags.has("+shield");
+      const second = bridge.canShield(u, me);
+      bridge.executeShield(u, false, 1);
+      const reRaised = u.flags.has("+shield");
+      const blockedWhileRaised = !bridge.canShield(u, me);
+      const noGen = bridge.createUnit("Railgun Destroyer", 1, 10, 10, false);
+      const blockedNoGenerator = !bridge.canShield(noGen, { x: noGen.x, y: noGen.y });
+      u.flags.delete("+shield");
+      st.ap = 0;
+      const blockedNoAp = !bridge.canShield(u, me);
+      const pass = first && raised && dropped && second && reRaised && blockedWhileRaised && blockedNoGenerator && blockedNoAp;
+      return {
+        name: "T-12 SHIELD RE-RAISE (DESIGN 2.5)",
+        pass: pass,
+        detail: pass ? "re-raise after strip OK; blocks: raised / no-generator / no-AP" : JSON.stringify({ first, raised, dropped, second, reRaised, blockedWhileRaised, blockedNoGenerator, blockedNoAp })
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -538,7 +574,8 @@ const runGameTests = function (bridge, testName) {  const suite = {
         this.testKiting(), this.testFlagshipGuard(), this.testFocusFire(), this.testDoctrine(),
         this.testFlagshipShieldAlwaysUp(), this.testRailgunAvoidance(), this.testFleeWhenOutgunned(),
         this.testRecedingHorizon(), this.testBudgetAwarePlanning(),
-        this.testZoomAnchor(), this.testZoomClamp()
+        this.testZoomAnchor(), this.testZoomClamp(),
+        this.testShieldReraiseRule()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;

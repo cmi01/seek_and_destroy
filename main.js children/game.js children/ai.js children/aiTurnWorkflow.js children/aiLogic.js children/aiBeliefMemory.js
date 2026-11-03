@@ -32,7 +32,7 @@ function computeSyncedMemory(env, ctx){
         turnSeen: turn, advancedTurn: turn, confidence: 1,
         hasFired: u.flags.has("-attacked"),
         hasMoved: u.flags.has("-moved"),
-        hasShielded: u.flags.has("-shielded")
+        hasShielded: u.flags.has("+shield")
       });
     }
   }

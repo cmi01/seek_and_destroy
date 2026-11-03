@@ -554,7 +554,7 @@ const Actions = {
     unitA.flags.add("-sent boarding party");
     target.team=unitA.team;
     target.flags.add("-moved"); target.flags.add("-sent boarding party");
-    target.flags.add("-attacked"); target.flags.add("-shielded");
+    target.flags.add("-attacked");
     Visibility.invalidate();
     Visibility.ensureCache();
     Selection.sync();
@@ -625,7 +625,6 @@ const Actions = {
     GameAudio.play("unit.shieldUp", {from:cell, to:cell, team:unitA.team, unitType:unitA.type, isVisible:vis});
 
     unitA.flags.add("+shield");
-    unitA.flags.add("-shielded");
     this.addAnimation({kind:"shieldup",duration:250,cell});
     this.consumeAPAndCheckTurn(isAI,apCost);
   },
@@ -744,7 +743,7 @@ const Actions = {
     State.units.forEach(u=>{
       if(u.team===2){
         u.flags.delete("-moved"); u.flags.delete("-sent boarding party");
-        u.flags.delete("-attacked"); u.flags.delete("-shielded");
+        u.flags.delete("-attacked");
       }
     });
     Hud.updateAll();
@@ -765,7 +764,7 @@ const Actions = {
     State.units.forEach(u=>{
       if(u.team===1){
         u.flags.delete("-moved"); u.flags.delete("-sent boarding party");
-        u.flags.delete("-attacked"); u.flags.delete("-shielded");
+        u.flags.delete("-attacked");
       }
     });
     GameAudio.play("turn.aiEnd", { delaySec: 0.18 });
@@ -2439,6 +2438,12 @@ const api = {
       },
       executeShoot(unit, target, isAI, apCost){
         return Actions.executeShoot(unit, target, isAI, apCost);
+      },
+      executeShield(unit, isAI, apCost){
+        return Actions.executeShield(unit, isAI, apCost);
+      },
+      canShield(unit, B){
+        return Actions.canShield(unit, B);
       },
       executeMove(unit, dest, isAI, apCost){
         return Actions.executeMove(unit, dest, isAI, apCost);

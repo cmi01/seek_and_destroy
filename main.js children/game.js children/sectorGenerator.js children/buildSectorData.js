@@ -15,7 +15,6 @@ const buildSectorData = function (params) {
       flags.add("-moved");
       flags.add("-sent boarding party");
       flags.add("-attacked");
-      flags.add("-shielded");
     }
     return {
       id: nextId,

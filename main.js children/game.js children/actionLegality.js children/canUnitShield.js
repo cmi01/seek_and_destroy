@@ -17,6 +17,6 @@ const canUnitShield = function (unitA, B, ev){
   if (typeof ev.ap === "number" && ev.ap <= 0) return false;
   if (unitA.x !== B.x || unitA.y !== B.y) return false;
   if (!hasFlag(unitA, "#shield generator")) return false;
-  if (hasFlag(unitA, "+shield") || hasFlag(unitA, "-shielded")) return false;
+  if (hasFlag(unitA, "+shield")) return false;
   return true;
 };

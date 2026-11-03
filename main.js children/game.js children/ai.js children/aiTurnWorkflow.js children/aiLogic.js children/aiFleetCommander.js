@@ -33,7 +33,7 @@ function selectFleetActionPlan(env, ctx) {
   const mine = env.myUnits(sCtx), fl = mine.find(u => u.flags.has("!flagship"));
   const ap = (sCtx && sCtx.ap !== undefined) ? sCtx.ap : 0;
   const pt = (sCtx && sCtx.aiScoreTrace) ? sCtx.aiScoreTrace.slice() : [];
-  if (fsCfg.enabled !== false && fl && !fl.flags.has("+shield") && !fl.flags.has("-shielded") && fl.flags.has("#shield generator") && ap > 0){
+  if (fsCfg.enabled !== false && fl && !fl.flags.has("+shield") && fl.flags.has("#shield generator") && ap > 0){
     if (env.threatAt(sCtx, fl, { x: fl.x, y: fl.y }) > 0 || env.projectedThreatAt(sCtx, fl, { x: fl.x, y: fl.y }) > 0){
       return {
         plan: {
