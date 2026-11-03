@@ -89,6 +89,12 @@ These are written into the checker, not left to reviewer judgement:
 6. **Registry indirection is not an automatic escape.** A registry layer is
    a file too; it satisfies R1 only when exactly one file references it. See
    §5 remedy D.
+7. **CI dispatch allowance.** Files under `.github/workflows/` are exempt as
+   *referrers* (R1 contributions and R2 dev-boundary edges). GitHub Actions
+   requires workflows to live at that path, and a workflow necessarily names
+   the dev/ tooling it dispatches — same declaration-not-reference shape as
+   the central-loader allowance (item 1). The gate that enforces this policy
+   is dispatched exactly this way.
 
 ## 5. Remedies (canonical, in preference order)
 

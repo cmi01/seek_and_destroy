@@ -71,6 +71,21 @@ python3 dev/scripts/structure_audit.py
 python3 dev/scripts/reference_audit.py
 ```
 
+### Reference-policy check (CI gate)
+
+Every pull request and every push to `main` runs the reference-policy gate
+(`.github/workflows/reference-policy.yml`); the `reference-policy` check is a
+required status check, so a violating change cannot merge. Run it locally
+before pushing:
+
+```bash
+python3 dev/scripts/reference_policy_gate.py
+```
+
+On failure it lists each violating file, the files referencing it, the
+violated rule and the approved remedy. The rule and remedies are documented
+for contributors in `docs/REFERENCE_POLICY_CI.md`.
+
 ### Reference-graph analyzer (`dev/scripts/reference_graph.py`)
 
 Computes, for every file in the repo, the files that reference it (inbound)

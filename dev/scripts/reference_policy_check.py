@@ -36,6 +36,10 @@ INTERPRETATIONS (see dev/docs/REFERENCE_POLICY_VIOLATIONS.md §2):
     files broad referencing latitude).  Pass --count-dev-referrers to include.
   - comment and string mentions count as references (a file being NAMED is the
     policy's concern), with the context recorded so remedies can say "reword".
+  - CI dispatch allowance: files under .github/workflows/ are exempt as
+    REFERRERS (the workflow layer lives there by platform mandate and names
+    the tooling it dispatches — same declaration-not-reference shape as the
+    central-loader allowance).
 
 Exit codes: 0 = clean, 1 = violations found, 2 = usage/IO error.
 
@@ -299,12 +303,22 @@ def build_graph(root, count_main_js, count_dev_referrers):
     }
 
 
+def is_ci_dispatch(src):
+    """CI dispatch allowance: GitHub Actions workflow files live under
+    .github/workflows/ by platform mandate and necessarily name the dev/
+    tooling (or other files) they dispatch — the same declaration-not-
+    reference shape as the main.js central-loader allowance."""
+    return src.startswith(".github/workflows/")
+
+
 def count_edges(edges, count_main_js, count_dev_referrers):
     """Distinct (src, dst) pairs that count toward fan-in, after allowances."""
     pairs = set()
     for e in edges:
         src, dst = e["from"], e["to"]
         if not count_main_js and src == "main.js":
+            continue
+        if is_ci_dispatch(src):
             continue
         if not count_dev_referrers and tag_of(src) == "dev":
             continue
@@ -411,6 +425,8 @@ def check_policy(graph, exemptions):
         src, dst = e["from"], e["to"]
         if tags.get(src) == "dev" or tags.get(dst) != "dev":
             continue
+        if is_ci_dispatch(src):
+            continue  # CI dispatch of dev tooling is a declaration, not a dependency
         if (dst, src) in exempt_pairs or (dst, None) in exempt_pairs:
             continue
         r2_pairs.setdefault((src, dst), []).append(e)
@@ -527,8 +543,12 @@ def render_report(violations, graph, args, exemptions):
       "this (the raw count is given in appendix A).")
     a("6. R1 caps game files only, per the violation-category definition "
       "('game file with more than one inbound reference').")
+    a("7. **CI dispatch allowance**: files under `.github/workflows/` are "
+      "exempt as *referrers* — the workflow layer lives there by platform "
+      "mandate and necessarily names the dev/ tooling it dispatches (same "
+      "declaration-not-reference shape as the central-loader allowance).")
     if exemptions:
-        a("7. Pair exemptions applied: %d (see `--exemptions`)." % len(exemptions))
+        a("8. Pair exemptions applied: %d (see `--exemptions`)." % len(exemptions))
     a("")
     a("## 3. Summary per directory")
     a("")

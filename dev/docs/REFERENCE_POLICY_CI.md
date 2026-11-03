@@ -84,6 +84,9 @@ python3 dev/scripts/reference_policy_check.py \
   status check on `main`.
 - The run log repeats the same actionable violation listing the local command
   prints, so a contributor can fix a red PR without reading the policy doc.
+- The workflow file itself is covered by the policy's CI-dispatch allowance
+  (`REFERENCE_POLICY.md` §4.7): a workflow naming the dev/ tooling it
+  dispatches is a declaration, not a reference.
 
 ## Checking a single change quickly
 
