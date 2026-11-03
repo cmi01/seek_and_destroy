@@ -681,7 +681,32 @@ const Actions = {
       if (CampaignLib && State.campaign){
         const packed=CampaignLib.CollectResult(State.units, State.battleReserve, _battleSnapshot, status);
         const folded=CampaignLib.ApplyBattleResult(State.campaign, packed, SHIP_SPECS, CombatMath.crewLostFromDamage);
-        if (folded && folded.state) TryPatchGameState({ campaign: folded.state });
+        if (folded && folded.state){
+          // M3: the result folds back onto the map — the map screen returns,
+          // the freeze lifts, and the map fleet mirrors the post-battle roster.
+          const s = folded.state;
+          if (s.map){
+            const ships = (Array.isArray(s.fleet) ? s.fleet : []).map(function (e){
+              const spec = SHIP_SPECS[e.hull] || {};
+              return {
+                hull: e.hull,
+                crew: (typeof e.crew === "number") ? e.crew : 0,
+                maxCrew: (typeof spec.crew === "number") ? spec.crew : 0,
+                speed: (typeof spec.move === "number") ? spec.move : 1,
+                flagship: Boolean(e.flagship) || (Array.isArray(spec.flags) && spec.flags.indexOf("!flagship") !== -1)
+              };
+            });
+            s.map = Object.assign({}, s.map, {
+              screen: "map",
+              battleActive: false,
+              pendingEncounter: null,
+              fleets: Array.isArray(s.map.fleets)
+                ? s.map.fleets.map(function (f){ return f.faction === "player" ? Object.assign({}, f, { ships: ships }) : f; })
+                : s.map.fleets
+            });
+          }
+          TryPatchGameState({ campaign: s });
+        }
       }
     }
 
@@ -1814,6 +1839,14 @@ const SectorGenerator = {
     State.turnReportQueue = [];
     Hud.updateAll();
 
+    // M3: a launched battle owns the canvas screen; the map freezes (Q4).
+    const curCampaign = GetGameState().campaign;
+    if (curCampaign && curCampaign.map){
+      TryPatchGameState({ campaign: Object.assign({}, curCampaign, {
+        map: Object.assign({}, curCampaign.map, { screen: "battle", battleActive: true })
+      }) });
+    }
+
     GameAudio.play("level.start", { levelId: result.spec.id });
   }
 };
@@ -1924,6 +1957,33 @@ function freshCopy(src){
 
 
 let _gameLoadPromise = null;
+
+// A fresh plain copy of the live layout metrics per publish. The channel's
+// clone memo keys on object identity and the shared metrics singleton mutates
+// on every resize — handing it straight to the channel would freeze the
+// renderer at the boot-time snapshot (visible as a stale-scale canvas after a
+// live window resize). Fresh identity per frame defeats that memo.
+function _metricsSnapshot(){
+  const m = (_host && _host.metrics) ? _host.metrics : null;
+  if (!m) return null;
+  return {
+    displaySize: m.displaySize,
+    viewportWidth: m.viewportWidth,
+    viewportHeight: m.viewportHeight,
+    isWidescreen: m.isWidescreen,
+    renderScale: m.renderScale,
+    devicePx: m.devicePx,
+    cellPx: m.cellPx,
+    fontScale: m.fontScale,
+    textScale: m.textScale,
+    uiScale: m.uiScale,
+    minimapSize: m.minimapSize,
+    minimapCanvasSize: m.minimapCanvasSize,
+    minimapDevicePx: m.minimapDevicePx,
+    ui: m.ui
+  };
+}
+
 const api = {
 
   async load(){
@@ -2330,6 +2390,64 @@ const api = {
     const nowVal = (overrides && typeof overrides.now === "number")
       ? overrides.now
       : ((typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now());
+
+    // M3: when the map screen is active, compose the map DTO (the map
+    // domain's one render exit) and publish a kind:"map" frame. The HUD
+    // chrome keeps working — only the world layer swaps to the map scene.
+    const mapSection = (GetGameState().campaign && GetGameState().campaign.map) || null;
+    if (mapSection && mapSection.screen === "map") {
+      const mapDto = CampaignMapLib.MapFrame(mapSection, { x: 0, y: 0, span: 64 });
+      const mapCursor = FrameCursor.build({ state: State, cursorStyle: InputProcessor.getCursor() });
+      const mapStatus = FrameStatus.build({ state: State, maxAp: MAX_AP });
+      const mapStateDTO = {
+        ...mapStatus,
+        theme: mapCursor.theme,
+        viewX: 0,
+        viewY: 0,
+        viewSpan: mapDto.span,
+        zoomAnim: State.zoomAnim,
+        inspectMode: mapCursor.inspectMode,
+        buttonHovered: mapCursor.buttonHovered,
+        buttonPressed: mapCursor.buttonPressed,
+        selectedCell: null,
+        hoveredCell: null,
+        terrain: [],
+        asteroidSeeds: [],
+        exploredCells: [],
+        units: [],
+        historicalVectors: [],
+        animations: [],
+        canvasButtons: mapCursor.canvasButtons,
+        audioSettings: mapCursor.audioSettings,
+        canShieldSelected: false,
+        tacticalOverlays: []
+      };
+      const mapFrameDTO = {
+        kind: "map",
+        GRID_SIZE: GRID_SIZE,
+        SPAWN_RADIUS: SPAWN_RADIUS,
+        SHIP_SPECS,
+        CAMPAIGN_LEVELS,
+        MAX_AP: mapStatus.maxAp,
+        state: mapStateDTO,
+        viewport: { dx0: 0, dx1: 0, dy0: 0, dy1: 0, renderViewSpan: mapDto.span, renderViewX: 0, renderViewY: 0 },
+        cursor: mapCursor.cursor,
+        metrics: _metricsSnapshot(),
+        theme: mapCursor.theme,
+        now: nowVal,
+        visCache: [],
+        map: mapDto,
+        uiHud: Hud.getSnapshot(nowVal)
+      };
+      if (overrides && typeof overrides === "object") {
+        Object.assign(mapFrameDTO, overrides);
+      }
+      if (_graphicsProducer && typeof _graphicsProducer.publishFrame === "function"){
+        _graphicsProducer.publishFrame(mapFrameDTO);
+      }
+      return mapFrameDTO;
+    }
+
     const rawVis = (overrides && overrides.visCache) || State.visCache || Visibility.ensureCache();
     const selUnit = Selection.getUnit();
     const isPlayerTurn = State.activeTeam === 1 && !State.gameOver;
@@ -2340,7 +2458,7 @@ const api = {
       state: State,
       visCache: rawVis,
       renderedViewport: MathGrid.getRenderedViewport(nowVal),
-      metrics: (_host && _host.metrics) ? _host.metrics : null
+      metrics: _metricsSnapshot()
     });
     const units = FrameUnits.build({ state: State, selUnit, isPlayerTurn });
     const overlay = FrameOverlay.build({
@@ -2447,6 +2565,8 @@ const api = {
       mapRules(){ return (CAMPAIGN_DATA && CAMPAIGN_DATA.campaign && CAMPAIGN_DATA.campaign.map) || null; },
       travel(mapState, fleetId, dest, opts){ return CampaignMapLib.MoveFleet(mapState, fleetId, dest, opts); },
       travelCost(fleet, distance, space){ return CampaignMapLib.FuelCost(fleet, distance, space); },
+      mapJump(mapState, fleetId, target, opts){ return CampaignMapLib.HyperspaceJump(mapState, fleetId, target, opts); },
+      mapView(mapState, view){ return CampaignMapLib.MapFrame(mapState, view); },
       merchantQuote(mapState, fleetId, reason){ return CampaignMapLib.MerchantOffer(mapState, fleetId, reason); },
       solidifyMirages(state){ return materializeMirages(state); },
       checkEndgameStatus(units){ return EndgameStatus.checkEndgameStatus(units); },
@@ -2550,6 +2670,32 @@ const api = {
       },
       clearSeed(){ State.rng = null; State.rngSeed = null; },
       getRawState(){ return GetGameState(); },
+      Map: {
+        state(){ return (GetGameState().campaign && GetGameState().campaign.map) || null; },
+        travel(fleetId, dest){
+          const c = GetGameState().campaign;
+          if (!c || !c.map) return null;
+          const res = CampaignMapLib.MoveFleet(c.map, fleetId, dest);
+          if (res.mapState) TryPatchGameState({ campaign: Object.assign({}, c, { map: res.mapState }) });
+          return res.events;
+        },
+        jump(fleetId, target){
+          const c = GetGameState().campaign;
+          if (!c || !c.map) return null;
+          const res = CampaignMapLib.HyperspaceJump(c.map, fleetId, target);
+          if (res.mapState) TryPatchGameState({ campaign: Object.assign({}, c, { map: res.mapState }) });
+          return res.events;
+        },
+        show(mode){
+          const c = GetGameState().campaign;
+          if (!c || !c.map) return null;
+          const battle = mode === "battle";
+          TryPatchGameState({ campaign: Object.assign({}, c, {
+            map: Object.assign({}, c.map, { screen: battle ? "battle" : "map", battleActive: battle })
+          }) });
+          return battle ? "battle" : "map";
+        }
+      },
       help(){
         console.log("%cSEEK & DESTROY DEBUG HANDLE","color:#38bdf8;font-size:14px;");
         console.log("SD.State            — the whole game memory");

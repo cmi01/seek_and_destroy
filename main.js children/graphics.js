@@ -61,6 +61,12 @@ const Graphics = (() => {
     return null;
   }
 
+  // M3 campaign-map palette (theme data, one shared table).
+  function _mapColors() {
+    const td = _getThemesData();
+    return (td && td.map) ? td.map : {};
+  }
+
   function _normalizeTheme(raw) {
     const td = _getThemesData();
     const order = (td && Array.isArray(td.order)) ? td.order : ["default", "retro", "alien"];
@@ -959,6 +965,35 @@ const Graphics = (() => {
       });
     },
 
+    // M3 campaign map scene (kind "map" frames): red hyperspace field +
+    // gravity wells only, then the screen-space HUD over it.
+    drawMapScene(now) {
+      if (!_graphicsBridge || !_areChildrenReady()) return;
+      const canvas = _getBattleCanvas();
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      const metrics = _graphicsBridge.metrics;
+      const DS = metrics.displaySize;
+      const RS = metrics.renderScale;
+      const map = _graphicsBridge.map || {};
+      const colors = _mapColors();
+      ctx.setTransform(RS, 0, 0, RS, 0, 0);
+      _layers.background.drawMapBackground({ ctx, DS, map, colors });
+      _layers.object.drawMapObjects({ ctx, DS, map, colors });
+      const uiHud = _graphicsBridge.uiHud || null;
+      const US = metrics.uiScale || 1;
+      _layers.ui.drawHud({
+        ctx, now, state: _graphicsBridge.state || {}, bp: _boardPalette(), theme: _activeTheme,
+        DS, US,
+        metrics,
+        minimapCanvas: null,
+        uiHud,
+        iconSprites: _iconSprites(uiHud),
+        fonts: _uiFonts(US),
+        colors: _uiColors()
+      });
+    },
+
     drawMinimap(now, visCache) {
       if (!_graphicsBridge || !_areChildrenReady()) return;
       const state = _graphicsBridge.state || _graphicsBridge.State;
@@ -1011,6 +1046,15 @@ const Graphics = (() => {
 
     if (frame.skipBoard) return;
     if (!stateObj) return;
+
+    // M3: map frames render the campaign map scene (no board, no minimap).
+    if (frame.kind === "map") {
+      const mapNow = (typeof frame.now === "number")
+        ? frame.now
+        : ((typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now());
+      Renderer.drawMapScene(mapNow);
+      return;
+    }
 
     const now = (typeof frame.now === "number")
       ? frame.now

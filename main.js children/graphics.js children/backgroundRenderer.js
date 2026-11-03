@@ -254,11 +254,71 @@
     ctx.stroke();
   }
 
+  // M3 campaign map: the red hyperspace field (Star Control 2-style).
+  // Gravity wells are the only features; the field is dark from first paint
+  // (screen-flash policy — no bright fills, the wells are the light).
+  // cmd: { ctx, DS, map, colors } where map is the plain map DTO.
+  function drawMapBackground(cmd) {
+    const ctx = cmd.ctx;
+    const DS = cmd.DS;
+    const map = cmd.map || {};
+    const C = cmd.colors || {};
+    if (!ctx || !DS) return;
+
+    const g = ctx.createRadialGradient(DS / 2, DS / 2, DS * 0.08, DS / 2, DS / 2, DS * 0.78);
+    g.addColorStop(0, C.hyperBg1 || "#2a0912");
+    g.addColorStop(1, C.hyperBg0 || "#160509");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, DS, DS);
+
+    const span = map.span || 64;
+    const scale = DS / span;
+    const locs = map.locations || [];
+    for (let i = 0; i < locs.length; i++) {
+      const L = locs[i];
+      const cx = (L.x - (map.x || 0)) * scale;
+      const cy = (L.y - (map.y || 0)) * scale;
+      const r = Math.max(6, (L.well || 6) * scale);
+
+      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      glow.addColorStop(0, C.starGlow || "rgba(255, 180, 110, 0.30)");
+      glow.addColorStop(0.55, C.wellGlow || "rgba(255, 130, 90, 0.12)");
+      glow.addColorStop(1, "rgba(255, 130, 90, 0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = C.wellRing || "rgba(255, 150, 100, 0.55)";
+      ctx.lineWidth = Math.max(1, r * 0.045);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      const core = Math.max(3, r * 0.16);
+      if (L.kind === "station") {
+        ctx.fillStyle = C.station || "#7dd3fc";
+        ctx.fillRect(cx - core, cy - core, core * 2, core * 2);
+      } else if (L.kind === "nebula") {
+        ctx.fillStyle = C.nebula || "rgba(190, 110, 225, 0.75)";
+        ctx.beginPath();
+        ctx.arc(cx, cy, core * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = C.planet || "#f0a070";
+        ctx.beginPath();
+        ctx.arc(cx, cy, core, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
   const layerApi = {
     paintTerrain,
     drawBattleGridAndTerrain,
     drawBattleFog,
-    drawMinimapBackground
+    drawMinimapBackground,
+    drawMapBackground
   };
   globalThis.backgroundLayerApi = layerApi;
 })();

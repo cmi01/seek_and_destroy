@@ -95,6 +95,9 @@ const buildMapState = function (campaignData, shipSpecs, rng){
   return {
     locationId: inWell ? inWell.id : anchor,
     turn: 1,
+    // The map is the campaign's main screen; the flag selects the canvas
+    // screen ("map" | "battle") and freezes movement while a battle runs.
+    screen: "map",
     battleActive: false,
     pendingEncounter: null,
     rules: {
