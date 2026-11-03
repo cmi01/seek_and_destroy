@@ -15,5 +15,14 @@ const checkEndgameStatus = function (units){
     }
   }
   const anyFlagships = (t1 + t2) > 0;
-  return { t1Flagships: t1, t2Flagships: t2, t1Defeated: anyFlagships && t1 === 0, t2Defeated: anyFlagships && t2 === 0 };
+  const t1Defeated = anyFlagships && t1 === 0;
+  const t2Defeated = anyFlagships && t2 === 0;
+  return {
+    t1Flagships: t1,
+    t2Flagships: t2,
+    t1Defeated: t1Defeated,
+    t2Defeated: t2Defeated,
+    over: t1Defeated,
+    reason: t1Defeated ? "flagship-lost" : null
+  };
 };

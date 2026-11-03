@@ -1,15 +1,11 @@
 "use strict";
 
 // ============================================================
-// buildBridgeShopButtons.js — job: build the bridge shop's button grid — resume button plus one cell per ship card.
+// buildReserveButtons.js — job: build the reserve-view button grid — resume
+// plus one cell per reserve hull (summon, 1 AP, 0 credits).
 // Owner: hud.js. Holds no state.
 // ============================================================
-
-// The shop's button grid: resume button plus one grid cell per ship card.
-// Pure: input + the card list in, plain button list out. This file is just
-// this one function; the composing parent captures the binding when it loads
-// the file.
-const buildBridgeShopButtons = function (input, bridgeModal) {
+const buildReserveButtons = function (input, bridgeModal) {
   const DS = input.metrics.displaySize;
   const US = input.metrics.uiScale;
   const ui = input.metrics.ui || null;
@@ -41,7 +37,7 @@ const buildBridgeShopButtons = function (input, bridgeModal) {
     const col = i % cols;
     const row = Math.floor(i / cols);
     buttons.push({
-      id: "SHOP_BUY:" + c.shipName,
+      id: "RESERVE_SUMMON:" + c.shipName,
       label: c.shipName,
       x: gridX + col * (cardW + gap),
       y: gridY + row * (cardH + gap),

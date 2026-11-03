@@ -29,6 +29,7 @@ let THEME_DATA = null;
 
 let InitializeGameState = null;
 let InitializeCampaign = null;
+let CampaignLib = null;
 let GetGameState = null;
 let TryPatchGameState = null;
 let GetStateLifetimes = null;
@@ -628,25 +629,40 @@ const Actions = {
   },
 
   executeWarpIn(capitalUnit,shipType,isAI=false,apCost=1,opts={}){
-    const radius=(opts.radius===undefined)?SPAWN_RADIUS:opts.radius;
-    const costMult=(opts.costMult===undefined)?1:opts.costMult;
+    const radius=(opts.radius===undefined)?3:opts.radius;
     const spec=SHIP_SPECS[shipType];
-    const team=capitalUnit.team;
-    const validCells=this.getValidWarpCells(capitalUnit,radius);
-    const effectiveCost=Math.ceil(spec.cost*costMult);
-    if(!spec||State.credits[team]<effectiveCost||validCells.length===0){
+    const team=capitalUnit ? capitalUnit.team : 1;
+    let locus=capitalUnit;
+    if (!locus || !locus.flags || !locus.flags.has("!flagship")){
+      const us=State.units||[];
+      locus=null;
+      for (let i=0;i<us.length;i++){
+        const u=us[i];
+        if (u.hp>0 && u.team===team && u.flags.has("!flagship")){ locus=u; break; }
+      }
+    }
+    const validCells=locus ? this.getValidWarpCells(locus,radius) : [];
+    const reserve=Array.isArray(State.battleReserve) ? State.battleReserve : [];
+    let ri=-1;
+    for (let i=0;i<reserve.length;i++){
+      if ((reserve[i].hull||reserve[i].type)===shipType){ ri=i; break; }
+    }
+    if(!spec||ri<0||validCells.length===0){
       if(!isAI) GameAudio.play("ui.invalid", {});
       return false;
     }
 
     const pick=validCells[Math.floor(RND()*validCells.length)];
-    State.credits[team]-=effectiveCost;
+    const nextReserve=[];
+    for (let i=0;i<reserve.length;i++){ if (i!==ri) nextReserve.push(reserve[i]); }
+    State.battleReserve=nextReserve;
     const spawned=SectorGenerator.createUnit(shipType,team,pick.x,pick.y,true);
+    spawned.kind="mirage";
     Visibility.invalidate();
     Visibility.ensureCache();
     const vis=Visibility.isCellVisibleToTeam(pick.x,pick.y,1);
 
-    if(isAI&&vis) State.turnReportQueue.push(`WARP SIGNATURE: Syndicate warped in ${shipType} at [${pick.x},${pick.y}].`);
+    if(isAI&&vis) State.turnReportQueue.push("WARP SIGNATURE: Syndicate warped in "+shipType+" at ["+pick.x+","+pick.y+"].");
 
     GameAudio.play("unit.warpIn", {from:pick, to:pick, team, unitType:shipType, isVisible:vis});
 
@@ -712,6 +728,10 @@ const Actions = {
     State.ap=MAX_AP;
     State.credits[2]+=State.income[2];
     State.historicalVectors=[];
+    if (typeof materializeMirages === "function"){
+      const out=materializeMirages({ units: State.units, team: 2 });
+      State.units=out.state.units;
+    }
     State.units.forEach(u=>{
       if(u.team===2){
         u.flags.delete("-moved"); u.flags.delete("-sent boarding party");
@@ -730,6 +750,10 @@ const Actions = {
     State.activeTeam=1;
     State.ap=MAX_AP;
     State.credits[1]+=State.income[1];
+    if (typeof materializeMirages === "function"){
+      const out=materializeMirages({ units: State.units, team: 1 });
+      State.units=out.state.units;
+    }
     State.units.forEach(u=>{
       if(u.team===1){
         u.flags.delete("-moved"); u.flags.delete("-sent boarding party");
@@ -795,7 +819,8 @@ function _hudInput(){
       selectedCell: State.selectedCell ? { x: State.selectedCell.x, y: State.selectedCell.y } : null,
       inspectMode: Boolean(State.inspectMode),
       audioMuted: Boolean(State.audioSettings && State.audioSettings.muted),
-      completedLevels: State.completedLevels ? Array.from(State.completedLevels) : []
+      completedLevels: State.completedLevels ? Array.from(State.completedLevels) : [],
+      battleReserve: Array.isArray(State.battleReserve) ? State.battleReserve : []
     },
     metrics: {
       displaySize: DS,
@@ -1079,12 +1104,29 @@ const InputProcessor = (() => {
       Hud.toggleBridgeModal(false);
       Hud.toggleCampaignModal(false);
       Hud.toggleHelpModal(false);
+    } else if (typeof btn.id === "string" && btn.id.indexOf("RESERVE_SUMMON:") === 0){
+      const shipName = btn.id.slice("RESERVE_SUMMON:".length);
+      const us = State.units || [];
+      let flag = null;
+      for (let i = 0; i < us.length; i++){
+        if (us[i].hp > 0 && us[i].team === 1 && us[i].flags.has("!flagship")){ flag = us[i]; break; }
+      }
+      if (flag){
+        Hud.toggleBridgeModal(false);
+        Actions.executeWarpIn(flag, shipName, false);
+      } else {
+        GameAudio.play("ui.invalid");
+      }
     } else if (typeof btn.id === "string" && btn.id.indexOf("SHOP_BUY:") === 0){
       const shipName = btn.id.slice("SHOP_BUY:".length);
-      const selUnit = Selection.getUnit();
-      if (selUnit && selUnit.team === 1){
+      const us = State.units || [];
+      let flag = null;
+      for (let i = 0; i < us.length; i++){
+        if (us[i].hp > 0 && us[i].team === 1 && us[i].flags.has("!flagship")){ flag = us[i]; break; }
+      }
+      if (flag){
         Hud.toggleBridgeModal(false);
-        Actions.executeWarpIn(selUnit, shipName, false);
+        Actions.executeWarpIn(flag, shipName, false);
       } else {
         GameAudio.play("ui.invalid");
       }
@@ -1844,6 +1886,7 @@ const api = {
         "main.js children/game.js children/combatMath.js",
         "main.js children/game.js children/reservePlacement.js",
         "main.js children/game.js children/endgameStatus.js",
+        "main.js children/game.js children/materializeMirages.js",
         "main.js children/game.js children/cameraMath.js",
         "main.js children/game.js children/selectionQueries.js",
         "main.js children/game.js children/visibilityCache.js",
@@ -1863,8 +1906,9 @@ const api = {
       // exactly like an unregistered module did.
       const kids = {
         lineOfSight:      typeof hasLineOfSight === "function" ? hasLineOfSight : null,
-        reservePlacement: typeof getValidWarpCells === "function" ? getValidWarpCells : null,
+        reservePlacement: typeof reservePlacement === "function" ? reservePlacement : null,
         endgameStatus:    typeof checkEndgameStatus === "function" ? checkEndgameStatus : null,
+        materializeMirages: typeof materializeMirages === "function" ? materializeMirages : null,
         visibilityCache:  typeof computeVisCache === "function" ? computeVisCache : null,
         frameBoard:       typeof buildBoardSlice === "function" ? buildBoardSlice : null,
         frameUnits:       typeof buildUnitSlice === "function" ? buildUnitSlice : null,
@@ -1911,6 +1955,7 @@ const api = {
         ["main.js children/game.js children/combatMath.js",              kids.combatMath],
         ["main.js children/game.js children/reservePlacement.js",        kids.reservePlacement],
         ["main.js children/game.js children/endgameStatus.js",           kids.endgameStatus],
+        ["main.js children/game.js children/materializeMirages.js",      kids.materializeMirages],
         ["main.js children/game.js children/cameraMath.js",              kids.cameraMath],
         ["main.js children/game.js children/selectionQueries.js",        kids.selectionQueries],
         ["main.js children/game.js children/visibilityCache.js",         kids.visibilityCache],
@@ -1954,6 +1999,7 @@ const api = {
       // campaign_DATA starting package; persistence flows through the
       // gameState campaign lifetime.
       const campaignLib = kids.campaignState();
+      CampaignLib = campaignLib;
       InitializeCampaign = () => {
         const fresh = campaignLib.InitializeCampaignState(CAMPAIGN_DATA.campaign, SHIP_SPECS);
         if (!TryPatchGameState({ campaign: fresh })) {
@@ -1983,9 +2029,7 @@ const api = {
       VisionQueries = kids.visionQueries(RULES_DATA);
       ActionLegality = kids.actionLegality();
       CombatMath = kids.combatMath(RULES_DATA);
-      ReservePlacement = {
-        getValidWarpCells(ctx, capitalUnit, radius){ return kids.reservePlacement(RULES_DATA, ctx, capitalUnit, radius); }
-      };
+      ReservePlacement = kids.reservePlacement(RULES_DATA);
       EndgameStatus = {
         checkEndgameStatus: kids.endgameStatus
       };
@@ -2107,7 +2151,7 @@ const api = {
         isSpotted(unit){ return Visibility.isUnitSpottedByTeam(unit, 1); },
         cellVisible(gx, gy){ return Visibility.isCellVisibleToTeam(gx, gy, 1); },
         effectiveScan(unit){ return Visibility.getEffectiveScan(unit); },
-        validWarpCells(unit){ return Actions.getValidWarpCells(unit).map(c => ({ x: c.x, y: c.y })); },
+        validWarpCells(unit){ return Actions.getValidWarpCells(unit, 3).map(c => ({ x: c.x, y: c.y })); },
         canShield(unit, pos){ return Actions.canShield(unit, pos); },
         canCapture(unit, pos){ return Actions.canCapture(unit, pos); },
         canShoot(unit, pos){ return Actions.canShoot(unit, pos); },
@@ -2301,7 +2345,28 @@ const api = {
       get state(){ return State; },
       get campaign(){ return State.campaign; },
       initializeCampaign(){ return InitializeCampaign(); },
+      openBattle(section, encounter){
+        return CampaignLib.BeginBattle(section, encounter, ReservePlacement.splitOverflow);
+      },
+      foldBattle(section, battleResult){
+        return CampaignLib.ApplyBattleResult(section, battleResult, SHIP_SPECS, CombatMath.crewLostFromDamage);
+      },
+      crewKilled(damage, maxHp, crew){
+        return CombatMath.crewLostFromDamage(damage, maxHp, crew);
+      },
+      solidifyMirages(state){ return materializeMirages(state); },
+      checkEndgameStatus(units){ return EndgameStatus.checkEndgameStatus(units); },
+      executeWarpIn(unit, shipType, isAI, apCost, opts){
+        return Actions.executeWarpIn(unit, shipType, isAI, apCost, opts);
+      },
+      executeShoot(unit, target, isAI, apCost){
+        return Actions.executeShoot(unit, target, isAI, apCost);
+      },
+      executeMove(unit, dest, isAI, apCost){
+        return Actions.executeMove(unit, dest, isAI, apCost);
+      },
       saveState(){ return SerializeGameState(); },
+      getLifetimes(){ return GetStateLifetimes(); },
       loadState(data){
         const ok = DeserializeGameState(data);
         if (ok) { Visibility.invalidate(); Visibility.ensureCache(); }

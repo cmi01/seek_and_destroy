@@ -12,7 +12,7 @@ const listWarpLoci = function (env, ctx){
   const emMult = (rf.emergencyLocusCostMultiplier !== undefined) ? rf.emergencyLocusCostMultiplier : 1.5;
   const sr = (ctx && ctx.spawnRadius !== undefined) ? ctx.spawnRadius : env.spawnRadius;
   const mine = env.myUnits(ctx);
-  const caps = mine.filter(u => u.flags.has("#capital ship") && env.getValidWarpCells(ctx, u, sr).length > 0);
-  if (caps.length > 0) return caps.map(u => ({ unit: u, radius: sr, costMult: capMult }));
+  const caps = mine.filter(u => u.flags.has("!flagship") && env.getValidWarpCells(ctx, u, 3).length > 0);
+  if (caps.length > 0) return caps.map(u => ({ unit: u, radius: 3, costMult: capMult }));
   return mine.filter(u => env.getValidWarpCells(ctx, u, emRad).length > 0).map(u => ({ unit: u, radius: emRad, costMult: emMult }));
 };

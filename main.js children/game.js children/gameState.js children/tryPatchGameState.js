@@ -43,6 +43,7 @@ const tryPatchGameState = function (DATA, stateBox, delta){
         k === "exploredCells" ||
         k === "asteroidSeeds" ||
         k === "units" ||
+        k === "battleReserve" ||
         k === "historicalVectors" ||
         k === "animations" ||
         k === "turnReportQueue" ||

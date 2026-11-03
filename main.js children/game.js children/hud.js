@@ -149,7 +149,7 @@ const createHud = function (deps) {
     const DS = input.metrics.displaySize;
 
     if (w.activeModal === "bridge") {
-      const shop = buildBridgeShopButtons(input, w.bridgeModal);
+      const shop = buildReserveButtons(input, w.bridgeModal);
       w.bridgeModal.layout = shop.layout;
       w.panelRects = { topBar: null, minimap: null, selectedCard: null, hoveredCard: null, intelOverlay: null, menu: null };
       return { view: w, buttons: shop.buttons };
@@ -300,7 +300,7 @@ const createHud = function (deps) {
 
   function _renderBridgeShop(view, input, silent) {
     const w = _clone(view);
-    const m = buildBridgeShopModel(deps, input);
+    const m = buildReserveModel(deps, input);
     w.bridgeModal.credits = m.credits;
     w.bridgeModal.locusOk = m.locusOk;
     w.bridgeModal.locusText = m.locusText;
