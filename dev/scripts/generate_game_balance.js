@@ -140,7 +140,7 @@ function generateGameBalance(version) {
   return L.join("\n") + "\n";
 }
 
-function main() {
+function runCli() {
   const arg = process.argv[2];
   const outPath = path.join(REPO_ROOT, OUT_REL);
   if (arg === "--check") {
@@ -166,5 +166,5 @@ function main() {
   console.log("wrote " + OUT_REL + " (" + arg + ")");
 }
 
-if (require.main === module) main();
+if (require.main === module) runCli();
 module.exports = { generateGameBalance };

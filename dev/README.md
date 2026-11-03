@@ -94,8 +94,12 @@ python3 dev/scripts/reference_policy_gate.py
 ```
 
 On failure it lists each violating file, the files referencing it, the
-violated rule and the approved remedy. The rule and remedies are documented
-for contributors in `docs/REFERENCE_POLICY_CI.md`.
+violated rule and the approved remedy.
+
+**Reference policy:** the rule (one pure function per file, state only in
+`main.js`, exactly one referrer per file), why it holds, how to run the check
+locally, what CI enforces, and the approved remedies are documented for
+contributors in [`dev/docs/REFERENCE_POLICY_CI.md`](docs/REFERENCE_POLICY_CI.md).
 
 ### Reference-graph analyzer (`dev/scripts/reference_graph.py`)
 
