@@ -1,7 +1,20 @@
 # Seek & Destroy — Test Architecture
 
-Status: **decided**. Every choice below is final; there are no open options.
+Status: **implemented** (full suite green at v127: 26 tests / 10 spec files,
+`npm test` exit 0 in ~50-70 s). Every choice below is final; there are no open options.
 Basis: the testable-surfaces audit (`origin/main` @ v114, in-page suites re-verified green at v118: 29/29 `SD.runTests()` + 5/5 `SD.runAudioTests()`). Evidence cited as "audit §n" refers to that report.
+
+## 0. Running the suite
+
+```
+npm install && npx playwright install chromium   # once per machine
+npm test                                          # the one command: full suite
+```
+
+`npm test` runs `playwright test` (tests/specs, Chromium, 2 workers) with the
+game served automatically by the `webServer` block (§5) — no manual server, no
+build step. The full suite is 26 named behaviour tests across the 10 scenario
+files of §2 and runs in under a minute locally.
 
 ## 1. Tool choice — Playwright (TypeScript)
 
@@ -16,8 +29,8 @@ package.json                  # root; devDependencies: @playwright/test (does no
 playwright.config.ts          # root; see §3
 tests/
   fixtures/
-    seeds.json                # canonical RNG seeds and their expected deterministic sector layouts (pure data)
-    audio-settings.json       # localStorage payloads for sd.audio.settings.v2 (pure data)
+    seeds.json                # canonical RNG seeds and their expected deterministic sector layouts (pure data; the seed-42 layout is pinned against observed output)
+    audio-settings.json       # localStorage payloads for sd.audio.settings.v2 (pure data; canonical shape pinned against observed output)
   pages/
     gamePage.ts               # page object: boot URL + query params, canvas box, SD state reads, click a canvas button by id (Hud rect → normalized u,v)
   helpers/
@@ -102,6 +115,8 @@ The whole UI (HUD, modals, buttons, minimap) is drawn on the single `#battle-can
 - **Time** — `page.clock.install()` before page load; advance with `clock.runFor(...)` to fire `State.aiTimers` (endgame modal timer) and `audioTimers`. No assertion depends on wall-clock time.
 - **Waits** — `await expect(...).toPass()` / `expect.poll(...)` for state convergence; auto-retrying assertions only. `waitForTimeout` is banned in this suite.
 - **Isolation** — one scenario per spec file; every test gets a fresh Playwright page (default fixture); `tests/` holds no module-level mutable state; each test seeds its own RNG and state at start, so files run in any order and in parallel (`workers: 2`).
+- **Input dispatch** — the input helpers send REAL browser events (Playwright mouse/keyboard) matching inputs.js's DOM listeners, never synthetic events; the game's input DTOs are produced by the game itself. Interaction helpers advance the virtual clock (`helpers/time.ts step()`) after each dispatch so frame-sliced work completes; the timer constants the advance helpers encode are grounded in game code (endgame modal 450 ms, AI beats 500 ms × 12 + 500 ms start + 460 ms handoff).
+- **Known UI semantics the suite encodes** — deployment auto-selects a unit; clicking the already-selected unit DESELECTS it (game.js POINTER_DOWN); clicking a cell under a HUD panel is swallowed by panel hit-testing; zoom anchoring (AC-1) is only exact away from viewport clamps. Specs assert around these by design, not by accident.
 
 ## Follow-up (out of scope for this doc)
 

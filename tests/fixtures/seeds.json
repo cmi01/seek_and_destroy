@@ -1,7 +1,91 @@
 {
-  "$comment": "Canonical RNG seeds and their expected deterministic sector layouts (test-architecture doc §2, §7). Pure data. TODO(02-sector-generation.spec.ts): fill in canonical seeds (SD.setSeed(n) / mulberry32) and the expected unit layouts each seed generates; do not invent expected layouts until that spec is written against observed output.",
+  "$comment": "Canonical RNG seeds and their expected deterministic sector layouts (test-architecture doc §2, §7). Pure data. expectedLayouts[seed] is the unit-layout fingerprint produced by SD.setSeed(seed) + SD.SectorGenerator.generate(101) (captured from observed output at v125, re-verified at v127, level 101): units sorted by id with flags sorted — the exact shape tests/specs/02-sector-generation.spec.ts compares against.",
   "seeds": {
     "sectorDeterminism": 42
   },
-  "expectedLayouts": {}
+  "expectedLayouts": {
+    "42": [
+      {
+        "id": 1,
+        "type": "Flagship Battlecruiser",
+        "team": 1,
+        "x": 4,
+        "y": 15,
+        "hp": 12,
+        "flags": ["!flagship", "#capital ship", "#shield generator", "+shield"]
+      },
+      {
+        "id": 2,
+        "type": "Fighter",
+        "team": 1,
+        "x": 3,
+        "y": 17,
+        "hp": 2,
+        "flags": ["buyable"]
+      },
+      {
+        "id": 3,
+        "type": "Fighter",
+        "team": 1,
+        "x": 2,
+        "y": 15,
+        "hp": 2,
+        "flags": ["buyable"]
+      },
+      {
+        "id": 4,
+        "type": "Attack Frigate",
+        "team": 1,
+        "x": 3,
+        "y": 13,
+        "hp": 4,
+        "flags": ["#shield generator", "+shield", "buyable"]
+      },
+      {
+        "id": 5,
+        "type": "Probe",
+        "team": 2,
+        "x": 13,
+        "y": 19,
+        "hp": 1,
+        "flags": ["buyable"]
+      },
+      {
+        "id": 6,
+        "type": "Shuttle",
+        "team": 2,
+        "x": 12,
+        "y": 11,
+        "hp": 1,
+        "flags": ["buyable"]
+      },
+      {
+        "id": 7,
+        "type": "Light Cruiser",
+        "team": 2,
+        "x": 23,
+        "y": 24,
+        "hp": 6,
+        "flags": ["#shield generator", "+shield", "buyable"]
+      },
+      {
+        "id": 8,
+        "type": "Heavy Cruiser",
+        "team": 2,
+        "x": 18,
+        "y": 8,
+        "hp": 12,
+        "flags": ["#railgun", "#shield generator", "+shield", "buyable"]
+      },
+      {
+        "id": 9,
+        "type": "Flagship Battlecruiser",
+        "team": 2,
+        "x": 24,
+        "y": 11,
+        "hp": 12,
+        "flags": ["!flagship", "#capital ship", "#shield generator", "+shield"]
+      }
+    ]
+  }
 }
