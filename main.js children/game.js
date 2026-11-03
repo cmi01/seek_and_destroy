@@ -14,7 +14,7 @@ const _modules = {
   ai: null,
   tests: null
 };
-let _registrationOpen = true;
+
 const _stateBox = { current: null };
 // Game-owned HUD view-model + priority-banner memo (state lives in the core,
 // §3): hud.js is pure — it computes replacements as plain data and Game
@@ -150,7 +150,7 @@ function mulberry32(seed){
 function RND(){ return State.rng ? State.rng() : Math.random(); }
 
 // ---- Host & Interface services ------------------------------------------
-// main.js injects the platform host and the 3 unidirectional Interface Server
+// The central shell injects the platform host and the 3 unidirectional Interface Server
 // endpoints (input consumer, graphics producer, audio producer).
 let _host = null;
 let _inputConsumer = null;
@@ -1757,17 +1757,12 @@ function _loadScripts(list){
 let _testsPromise = null;
 function _loadTests(){
   if (_modules.tests) return Promise.resolve();
-  if (!_testsPromise){
-    _registrationOpen = true;
-    api._registerModule = function(name, mod){
-      if (!_registrationOpen || name !== "tests") throw new Error("[S&D Game] Unexpected module registration for " + name);
-      _modules.tests = mod;
-    };
+  if (!_testsPromise) {
+    // Parent-captures-child-at-load: gameTests.js defines runGameTests at
+    // script scope; the loader captures it here (no registrar handshake).
     _testsPromise = _loadScripts(["main.js children/game.js children/gameTests.js"]).then(() => {
-      if (!_modules.tests) throw new Error("main.js children/game.js children/gameTests.js loaded but did not register its module.");
-    }).finally(() => {
-      _registrationOpen = false;
-      delete api._registerModule;
+      if (typeof runGameTests !== "function") throw new Error("main.js children/game.js children/gameTests.js loaded but did not define runGameTests.");
+      _modules.tests = runGameTests;
     }).catch(err => {
       _testsPromise = null;
       throw err;
@@ -1803,7 +1798,8 @@ function deepCopy(o){
 // visCache wholesale (TryPatchGameState, Visibility.ensureCache) and never
 // mutates them in place, so their frozen deep copies are rebuilt only when the
 // source identity changes. A stable copy identity between frames also keeps
-// graphics-side caches keyed on it (backgroundRenderer._terrainCache.ref) valid.
+// graphics-side caches keyed on it (the terrain cache reference in the
+// background renderer) valid.
 // exploredCells IS mutated in place (Visibility.ensureCache) and is re-copied
 // on every publish.
 const _frameCopyCache = new WeakMap();
@@ -1822,12 +1818,6 @@ function freshCopy(src){
 
 let _gameLoadPromise = null;
 const api = {
-  _registerModule(name, mod){
-    if (!_registrationOpen || !(name in _modules)) {
-      throw new Error("[S&D Game] Unexpected module registration for " + name);
-    }
-    _modules[name] = mod;
-  },
 
   async load(){
     if (_gameLoadPromise) return _gameLoadPromise;
@@ -1889,6 +1879,17 @@ const api = {
         visionQueries:    typeof visionQueries === "function" ? visionQueries : null,
         actionLegality:   typeof actionLegality === "function" ? actionLegality : null
       };
+      // DATA payloads + the two remaining registrar children (hud, ai):
+      // parent-captures-child-at-load, no registrar handshake.
+      _modules.rulesData =   typeof rulesDataPayload !== "undefined" ? rulesDataPayload : null;
+      _modules.campaignData = typeof campaignDataPayload !== "undefined" ? campaignDataPayload : null;
+      _modules.beginningGameStateData = typeof beginningGameStateDataPayload !== "undefined" ? beginningGameStateDataPayload : null;
+      _modules.themesData =  typeof themesDataPayload !== "undefined" ? themesDataPayload : null;
+      _modules.hud = typeof createHud === "function"
+        ? { createHud, createInitialView: createHud.createInitialView }
+        : null;
+      _modules.ai = typeof decideAIAction === "function" ? decideAIAction : null;
+
       const missing = [
         ["main.js children/game.js children/rules_DATA.js",              _modules.rulesData],
         ["main.js children/game.js children/campaign_DATA.js",           _modules.campaignData],
@@ -2107,8 +2108,6 @@ const api = {
         return rawAI(snap);
       };
 
-      _registrationOpen = false;
-      delete api._registerModule;
     })();
     return _gameLoadPromise;
   },

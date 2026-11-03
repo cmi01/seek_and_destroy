@@ -8,7 +8,7 @@
 getAIAction._register("prioritiesData", (() => ({
   "version": "V35-1.0",
   "schema": "seek-and-destroy.ai-priorities",
-  "description": "Declarative AI priority tables, tactical scoring weights, doctrine profiles, target valuation rules, threat forecasting coefficients, movement heuristics, preservation tiers, and reinforcement counter-pick orders consumed exclusively by ai.js.",
+  "description": "Declarative AI priority tables, tactical scoring weights, doctrine profiles, target valuation rules, threat forecasting coefficients, movement heuristics, preservation tiers, and reinforcement counter-pick orders consumed exclusively by the AI turn composer.",
   "tuning": {
     "compositeApCost": 2,
     "seqCost": 35,

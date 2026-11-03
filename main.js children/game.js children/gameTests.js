@@ -223,4 +223,5 @@ const runGameTests = function (bridge, testName) {  const suite = {
   }
   return suite.runAll();
 };
-Game._registerModule("tests", runGameTests);
+// Loading convention: this file defines runGameTests at top level; the owner
+// captures it after the boot list resolves.

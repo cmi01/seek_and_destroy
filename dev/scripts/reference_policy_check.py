@@ -279,6 +279,15 @@ def build_graph(root, count_main_js, count_dev_referrers):
                     edge = {"from": src, "to": dst, "kind": kind, "line": line_no,
                             "context": mask[off]}
                     if kind == "binding-mention":
+                        # v102 scrub refinement: an object-literal method key
+                        # (`GetGameState(box) { ... }`) is a declaration of the
+                        # composer surface, not a use of the parent binding —
+                        # policy §2.2 scrubs declarations. Only a call tail that
+                        # closes into a block start matches this shape; a plain
+                        # call (statement or argument) never does.
+                        if re.match(r"\s*\([^)]{0,50}\)\s*\{",
+                                    text[m.end():m.end() + 60]):
+                            continue
                         after = text[m.end():m.end() + 20]
                         if re.match(r"\s*\.\s*_register\b", after):
                             edge["note"] = "X._register handshake"

@@ -4,7 +4,7 @@
 // beginningGameState_DATA.js — job: return the initial state template.
 // Owner: game.js. Holds no state unless it is a core.
 // ============================================================
-Game._registerModule("beginningGameStateData", (() => ({
+const beginningGameStateDataPayload = (() => ({
   version: "V58-1.0",
   schema: "seek-and-destroy.beginning-game-state",
   initialState: {
@@ -93,4 +93,4 @@ Game._registerModule("beginningGameStateData", (() => ({
     maps: ["lastSeenEnemies", "aiPlan.reservations"],
     sets: ["completedLevels", "keysDown"]
   }
-  }))());
+  }))();

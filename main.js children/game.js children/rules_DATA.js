@@ -4,7 +4,7 @@
 // rules_DATA.js — job: return the tactical rules table (specs, combat rules, flags).
 // Owner: game.js. Holds no state unless it is a core.
 // ============================================================
-Game._registerModule("rulesData", (() => ({
+const rulesDataPayload = (() => ({
   version: "V58-1.0",
   schema: "seek-and-destroy.rules-data",
   gridSize: 32,
@@ -61,4 +61,4 @@ Game._registerModule("rulesData", (() => ({
     "-attacked": "Ordnance Cycled: Weapons offline for the rest of this turn.",
     "-shielded": "Capacitors Cycled: Shield generator cannot regenerate again this turn."
   }
-}))());
+}))();

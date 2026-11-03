@@ -4,7 +4,7 @@
 // themes_DATA.js — job: return the theme tables.
 // Owner: game.js. Holds no state unless it is a core.
 // ============================================================
-Game._registerModule("themesData", (() => ({
+const themesDataPayload = (() => ({
   version: "V58-1.0",
   schema: "seek-and-destroy.theme-data",
   // Cycle order for the THM button; the first entry is the default theme.
@@ -12,7 +12,7 @@ Game._registerModule("themesData", (() => ({
   // Legacy names accepted from saved state / old builds.
   aliases: { b: "default", iron_dusk: "default" },
 
-  // Board palettes (formerly graphics.js _boardPalette()).
+  // Board palettes (formerly the renderer's private boardPalette()).
   palettes: {
     default: {
       bg: "#06080e",
@@ -197,4 +197,4 @@ Game._registerModule("themesData", (() => ({
       "Battleship": 20
     }
   }
-  }))());
+  }))();

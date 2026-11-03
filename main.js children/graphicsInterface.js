@@ -8,7 +8,7 @@ const createGraphicsInterface = function () {
   const _cloneMemo = new WeakMap();
 
   // Deep plain-data clone. Functions and non-plain objects are dropped;
-  // Set/Map/typed arrays keep their types (like hud.js's DTO copies).
+  // Set/Map/typed arrays keep their types (like the HUD layer's DTO copies).
   function cloneData(v) {
     if (v === null || typeof v !== "object") {
       return typeof v === "function" ? undefined : v;

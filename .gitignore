@@ -22,5 +22,6 @@ __pycache__/
 dist/
 tmp/
 *.bkp.*
+dev/reference_graph.json
 
 # Platform identity file is intentionally NOT ignored — keep it tracked.

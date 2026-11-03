@@ -6,7 +6,7 @@
 // ============================================================
 
 // ONE composing function. Its direct children are classic scripts loaded by
-// the central loader (main.js) before this file's function is ever called, so
+// the central loader (the shell) before this file's function is ever called, so
 // each child's single pure function is visible here by name — no load
 // handshake, no registrar, no transient globals in this file.
 //
@@ -482,7 +482,5 @@ const createHud = function (deps) {
 // second exposed function — one job, one function, one file). The parent
 // captures this payload when it loads the file.
 createHud.createInitialView = createInitialView;
-Game._registerModule("hud", {
-  createHud,
-  createInitialView: createHud.createInitialView
-});
+// Loading convention: this file defines createHud at top level (with the
+// initial-view payload attached); the owner captures it after the boot list.

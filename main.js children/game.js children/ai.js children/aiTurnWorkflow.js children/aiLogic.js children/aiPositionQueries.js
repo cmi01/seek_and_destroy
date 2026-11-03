@@ -2,45 +2,18 @@
 
 // ============================================================
 // aiPositionQueries.js — job: answer the AI's move-destination queries (reachable cells, ranked toward contacts).
-// Owner: aiLogic.js. Holds no state unless it is a core.
+// Owner: aiLogic.js. Holds no state.
 // ============================================================
-(() => {
-  // Ranks candidate cells by closeness to the nearest spotted enemy (or, if
-  // none are spotted, the nearest remembered belief or coarse sector contact).
-  function moveHeuristic(env, ctx, u, dest){
-    const sp = env.spottedEnemies(ctx);
-    let objs = sp.length ? sp : env.activeBeliefs(ctx);
-    if (!objs.length){
-      objs = ((ctx && ctx.units) || []).filter(p => p.hp > 0 && p.team === 1);
-    }
-    if (!objs.length) return 0;
-    let best = Infinity;
-    for (let i = 0; i < objs.length; i++){
-      const d = env.dist(dest, objs[i]);
-      if (d < best) best = d;
-    }
-    return -best;
-  }
 
-  function reachableCells(env, ctx, u, maxCells){
-    const pg = (env.priorities(ctx) && env.priorities(ctx).planGeneration) || {};
-    const cap = (maxCells === undefined) ? (pg.defaultReachableCap || 48) : maxCells;
-    if (!u || u.hp <= 0 || u.flags.has("-moved") || u.move <= 0) return [];
-    const s = (ctx && ctx.gridSize) || env.gridSize;
-    const r = Math.ceil(u.move);
-    const out = [];
-    for (let gx = Math.max(0, u.x - r); gx <= Math.min(s - 1, u.x + r); gx++){
-      for (let gy = Math.max(0, u.y - r); gy <= Math.min(s - 1, u.y + r); gy++){
-        const d = { x: gx, y: gy };
-        if (env.canMove(ctx, u, d)) out.push(d);
-      }
-    }
-    out.sort((a, b) => moveHeuristic(env, ctx, u, b) - moveHeuristic(env, ctx, u, a));
-    return out.slice(0, cap);
-  }
+// ONE composing function. The operation name selects which of this file's
+// single-function children answers — the two move-destination views. Each
+// child is a classic script loaded by the central loader before this function
+// is ever called, so each is visible here by name: no registrar, no globals.
+// `arg` is the ranking destination for one operation and the cell cap for the
+// other; every child returns plain data and nothing is held between calls.
 
-  AILogic._register("positionQueries", {
-    moveHeuristic,
-    reachableCells
-  });
-})();
+const queryAIMoveOptions = function (env, ctx, operation, u, arg){
+  if (operation === "moveHeuristic") return rankMoveTargets(env, ctx, u, arg);
+  if (operation === "reachableCells") return listReachableCells(env, ctx, u, arg);
+  throw new Error("[S&D AI] Unknown move-destination query: " + operation);
+};

@@ -4,7 +4,7 @@
 // sfx.js — job: play one-shot sound effects from audio commands.
 // Owner: sounds.js. Holds no state unless it is a core.
 // ============================================================
-SoundEngine._registerModule("sfx", AUDIO => {
+const SFXFactory = AUDIO => {
   if (!AUDIO) console.error("[S&D audio] audio data manifest is not loaded; sound effects are disabled.");
   const SFX_CLIPS = AUDIO ? AUDIO.sfxClips : {};
 
@@ -250,4 +250,4 @@ SoundEngine._registerModule("sfx", AUDIO => {
       playOneShot(ctxObj, clipKey, cell, isPassiveHover, delaySec, ignoreGameOver),
     dispatchEvent: (ctxObj, eventName, payload) => dispatchEvent(ctxObj, eventName, payload || {})
   };
-});
+};

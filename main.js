@@ -263,6 +263,39 @@ const HUD_WIDGET_SCRIPTS = [
   "main.js children/game.js children/hud.js children/hudMinimap.js",
   "main.js children/game.js children/hud.js children/hudBanner.js"
 ];
+// The AI subtree is one function per file too, so its loading is an effect
+// that belongs here: every file below ai.js (its children, their children and
+// the query composers' leaves) is a classic script loaded BEFORE the process
+// scripts, so each binding exists by the time game.js loads ai.js and asks it
+// for a decision. Leaves first, composers after.
+const AI_TREE_SCRIPTS = [
+  "main.js children/game.js children/ai.js children/aiPriorities_DATA.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/computeUpdatedReservations.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiStateQueries.js children/listMyUnits.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiStateQueries.js children/listSpottedEnemies.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiStateQueries.js children/listActiveBeliefs.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiStateQueries.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiPositionQueries.js children/rankMoveTargets.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiPositionQueries.js children/listReachableCells.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiPositionQueries.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiThreatQueries.js children/listRailgunDangerZones.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiThreatQueries.js children/canClearFlagshipThreats.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiThreatQueries.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiPreservationQueries.js children/hullPreservationTier.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiPreservationQueries.js children/shouldHullRetreat.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiPreservationQueries.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiFleetQueries.js children/assessFleetGap.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiFleetQueries.js children/listWarpLoci.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiFleetQueries.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiBeliefMemory.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiInvariantChecks.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiThreatScorer.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiUnitPlanner.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiFleetCommander.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js",
+  "main.js children/game.js children/ai.js children/aiTurnWorkflow.js"
+];
+
 const PROCESS_SCRIPTS = [
   "main.js children/game.js",
   "main.js children/graphics.js",
@@ -314,6 +347,16 @@ function _verifyLoaded(checks, optionalSet){
   if (missing.length > 0) {
     throw new Error("These scripts loaded but did not register their module (see earlier errors):\n  " + missing.join("\n  "));
   }
+}
+
+// Frozen at receipt: a data table handed to a pure function is frozen here,
+// so any later write into it throws instead of silently corrupting it.
+function _freezeTree(value){
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    Object.keys(value).forEach(function(key){ _freezeTree(value[key]); });
+  }
+  return value;
 }
 
 function wantsTestsAtBoot(){
@@ -415,6 +458,48 @@ async function startGame(){
       ["main.js children/game.js children/hud.js children/hudMenu.js",               () => typeof buildMenuModel === "function"],
       ["main.js children/game.js children/hud.js children/hudMinimap.js",            () => typeof buildMinimapModel === "function"],
       ["main.js children/game.js children/hud.js children/hudBanner.js",             () => typeof buildPriorityBanner === "function"]
+    ]);
+
+    // One AI member still publishes through the load channel: the priorities
+    // table, which follows the *_DATA.js convention. The shell opens that
+    // channel for the batch, then hands the frozen table on as a plain script
+    // binding, so no AI file sees a registrar after load and none is left
+    // behind. Everything else in the subtree is a plain script-scope binding.
+    const aiPublished = {};
+    window.getAIAction = { _register: function(name, mod){ aiPublished[name] = mod; } };
+    try {
+      await _loadScripts(AI_TREE_SCRIPTS);
+    } finally {
+      delete window.getAIAction;
+    }
+    window.aiPrioritiesData = _freezeTree(aiPublished.prioritiesData || {});
+    _verifyLoaded([
+      ["main.js children/game.js children/ai.js children/aiPriorities_DATA.js", () => typeof aiPrioritiesData === "object" && aiPrioritiesData !== null],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/computeUpdatedReservations.js", () => typeof computeUpdatedReservations === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiStateQueries.js children/listMyUnits.js", () => typeof listMyUnits === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiStateQueries.js children/listSpottedEnemies.js", () => typeof listSpottedEnemies === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiStateQueries.js children/listActiveBeliefs.js", () => typeof listActiveBeliefs === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiStateQueries.js", () => typeof queryAIState === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiPositionQueries.js children/rankMoveTargets.js", () => typeof rankMoveTargets === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiPositionQueries.js children/listReachableCells.js", () => typeof listReachableCells === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiPositionQueries.js", () => typeof queryAIMoveOptions === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiThreatQueries.js children/listRailgunDangerZones.js", () => typeof listRailgunDangerZones === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiThreatQueries.js children/canClearFlagshipThreats.js", () => typeof canClearFlagshipThreats === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiThreatQueries.js", () => typeof queryAIDanger === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiPreservationQueries.js children/hullPreservationTier.js", () => typeof hullPreservationTier === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiPreservationQueries.js children/shouldHullRetreat.js", () => typeof shouldHullRetreat === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiPreservationQueries.js", () => typeof queryAIHullPreservation === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiFleetQueries.js children/assessFleetGap.js", () => typeof assessFleetGap === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiFleetQueries.js children/listWarpLoci.js", () => typeof listWarpLoci === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiFleetQueries.js", () => typeof queryAIFleet === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiBeliefMemory.js", () => typeof computeSyncedMemory === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiInvariantChecks.js", () => typeof checkInvariants === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiThreatScorer.js",
+       () => typeof aiThreatScorer === "function" || (typeof threatScorer !== "undefined" && Boolean(threatScorer))],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiUnitPlanner.js", () => typeof buildUnitPlan === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js children/aiFleetCommander.js", () => typeof selectFleetActionPlan === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/aiLogic.js", () => typeof evaluateAITurn === "function"],
+      ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js", () => typeof evaluateTurnStep === "function"]
     ]);
 
     await _loadScripts(PROCESS_SCRIPTS, new Set(["main.js children/sounds.js"]));

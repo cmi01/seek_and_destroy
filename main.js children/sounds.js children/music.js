@@ -4,7 +4,7 @@
 // music.js — job: manage music and ambience playback.
 // Owner: sounds.js. Holds no state unless it is a core.
 // ============================================================
-SoundEngine._registerModule("music", AUDIO => {
+const MusicFactory = AUDIO => {
   if (!AUDIO) console.error("[S&D audio] audio data manifest is not loaded; ambience/music are disabled.");
   const MUSIC_AND_AMBIENCE_CLIPS = AUDIO ? AUDIO.musicClips : {};
 
@@ -81,4 +81,4 @@ SoundEngine._registerModule("music", AUDIO => {
     makeLoopNodes,
     teardownEntry
   };
-});
+};

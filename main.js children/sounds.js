@@ -15,7 +15,6 @@ const SoundEngine = (() => {
   const BAKED_BUFFER_SECONDS = 28;
   const STORAGE_KEY = "sd.audio.settings.v2";
 
-  let _registrationOpen = true;
   let _loadPromise = null;
   let _audioData = null;
   let _sfxFactory = null;
@@ -33,13 +32,8 @@ const SoundEngine = (() => {
     return o;
   }
 
-  function _registerModule(name, mod) {
-    if (!_registrationOpen) return;
-    if (name === "audioData") _audioData = deepFreeze(mod);
-    else if (name === "sfx") _sfxFactory = mod;
-    else if (name === "music") _musicFactory = mod;
-    else if (name === "assets") _bakedSounds = mod;
-  }
+  // Children define top-level globals (AUDIO_DATA, SFXFactory, MusicFactory,
+  // BAKED_SOUNDS); this file captures them after its loader resolves them.
 
   // Inline loader: this file loads ONLY its own direct children.
   function _loadScripts(list, optional) {
@@ -619,8 +613,10 @@ const SoundEngine = (() => {
     if (_loadPromise) return _loadPromise;
     _loadPromise = (async () => {
       await _loadScripts(AUDIO_CHILDREN, true);
-      _registrationOpen = false;
-      delete api._registerModule;
+      _audioData = typeof AUDIO_DATA !== "undefined" ? deepFreeze(AUDIO_DATA) : null;
+      _sfxFactory = typeof SFXFactory === "function" ? SFXFactory : null;
+      _musicFactory = typeof MusicFactory === "function" ? MusicFactory : null;
+      _bakedSounds = typeof BAKED_SOUNDS !== "undefined" ? BAKED_SOUNDS : null;
       if (typeof _sfxFactory === "function") _sfx = _sfxFactory(_audioData);
       if (typeof _musicFactory === "function") _music = _musicFactory(_audioData);
       if (!hasSfx() || !hasMusic()) {
@@ -631,7 +627,6 @@ const SoundEngine = (() => {
   }
 
   const api = {
-    _registerModule,
     load,
     bindInterface,
     step,
