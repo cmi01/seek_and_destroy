@@ -1,5 +1,10 @@
 # Reference Policy — Violation Baseline and Remediation Plan
 
+**Status (v106): checker exits 0.** P0 landed in v102 (docs move), P1 in v104
+(boot-list collapse), P2 in v106 (comment rewords + registrar retirement).
+The listing below is the pre-remediation record, not a live scan. Re-run
+`python3 dev/scripts/reference_policy_check.py` — exit 0 is the gate.
+
 Committed baseline for the normative ruleset in `REFERENCE_POLICY.md`.
 
 | Field | Value |
