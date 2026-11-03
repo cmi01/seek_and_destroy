@@ -65,6 +65,8 @@ Red damage numbers (the exact damage the attack would deal):
 - The number **flashes once per second** and fills most of its cell. It is an
   in-cell visual object: it scales with the game camera exactly like a ship,
   asteroid or shield bubble, and it must not change size with the browser zoom.
+  HUD chrome is a separate 768-grid (`uiScale`); contributor rules are in
+  `dev/docs/gui-scaling-strategy.md`.
 - A ship may only attack a cell showing a damage number. Attacks into fog are not
   allowed: only **spotted** targets can be attacked.
 - Shielded targets: a **non-railgun** attack shows a flashing **yellow "1"** instead

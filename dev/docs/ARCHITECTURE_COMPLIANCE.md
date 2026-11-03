@@ -257,6 +257,10 @@ Run this checklist against every touched file before calling a version done:
    itself and its own descendants? Does it name its parent or a
    sibling/cousin/grandparent anywhere in its body? (→ `reference_audit.py`,
    child-names-parent and import-direction checks)
+10. **UI scale:** does the diff add a numeric size literal to a renderer, a
+    `Math.max(<const>` on UI geometry, a `devicePixelRatio` read outside
+    `main.js`, or a rect computed in both a HUD child and the renderer?
+    Shared sizes belong in `metrics.ui` (see `dev/docs/gui-scaling-strategy.md`).
 
 ### 7.3 Measurement and presumption rules
 
