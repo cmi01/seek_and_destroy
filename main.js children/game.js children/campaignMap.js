@@ -12,22 +12,32 @@
 // ============================================================
 
 const campaignMap = function (){
+  // The composer's own glue: rejection events carry the placeholder offer.
+  function withOffers(res){
+    const events = res.events.map(function (e){
+      return (e && e.kind === "merchantFleetEvent")
+        ? Object.assign({}, e, { offer: merchantOffer(res.mapState, e.fleetId, e.reason) })
+        : e;
+    });
+    return { mapState: res.mapState, events: events };
+  }
+  function costOpts(opts){
+    const o = opts || {};
+    return {
+      mult: o.mult,
+      costFn: function (fleet, distance, space, mult){ return fuelCost(fleet, distance, space, mult); }
+    };
+  }
   return {
     BuildMapState(campaignData, shipSpecs, rng){ return buildMapState(campaignData, shipSpecs, rng); },
     FuelCost(fleet, distance, space, mult){ return fuelCost(fleet, distance, space, mult); },
     MerchantOffer(mapState, fleetId, reason){ return merchantOffer(mapState, fleetId, reason); },
     MoveFleet(mapState, fleetId, dest, opts){
-      const o = opts || {};
-      const res = moveFleet(mapState, fleetId, dest, {
-        mult: o.mult,
-        costFn: function (fleet, distance, space, mult){ return fuelCost(fleet, distance, space, mult); }
-      });
-      const events = res.events.map(function (e){
-        return (e && e.kind === "merchantFleetEvent")
-          ? Object.assign({}, e, { offer: merchantOffer(res.mapState, e.fleetId, e.reason) })
-          : e;
-      });
-      return { mapState: res.mapState, events: events };
-    }
+      return withOffers(moveFleet(mapState, fleetId, dest, costOpts(opts)));
+    },
+    HyperspaceJump(mapState, fleetId, target, opts){
+      return withOffers(hyperspaceJump(mapState, fleetId, target, costOpts(opts)));
+    },
+    MapFrame(mapState, view){ return mapFrame(mapState, view); }
   };
 };

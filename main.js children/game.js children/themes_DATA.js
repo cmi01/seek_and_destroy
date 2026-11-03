@@ -34,6 +34,25 @@ const themesDataPayload = (() => ({
   // Legacy names accepted from saved state / old builds.
   aliases: { b: "default", iron_dusk: "default" },
 
+  // Campaign-map palette (M3): the red Star Control 2-style hyperspace
+  // field with gravity wells as the only features. Dark from first paint —
+  // the screen-flash policy forbids bright fills; the wells are the light.
+  map: {
+    hyperBg0: "#160509",
+    hyperBg1: "#2a0912",
+    wellGlow: "rgba(255, 130, 90, 0.12)",
+    wellRing: "rgba(255, 150, 100, 0.55)",
+    starCore: "#ffd9a0",
+    starGlow: "rgba(255, 180, 110, 0.30)",
+    planet: "#f0a070",
+    station: "#7dd3fc",
+    nebula: "rgba(190, 110, 225, 0.75)",
+    jumpMark: "rgba(255, 165, 115, 0.85)",
+    playerPip: "#38bdf8",
+    fleetPip: "#f97316",
+    label: "rgba(255, 214, 196, 0.9)"
+  },
+
   // Board palettes (formerly the renderer's private boardPalette()).
   palettes: {
     default: {

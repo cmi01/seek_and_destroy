@@ -172,6 +172,8 @@ PARENT_OF = {
     "main.js children/game.js children/campaignMap.js children/fuelCost.js": "main.js children/game.js children/campaignMap.js",
     "main.js children/game.js children/campaignMap.js children/merchantOffer.js": "main.js children/game.js children/campaignMap.js",
     "main.js children/game.js children/campaignMap.js children/moveFleet.js": "main.js children/game.js children/campaignMap.js",
+    "main.js children/game.js children/campaignMap.js children/hyperspaceJump.js": "main.js children/game.js children/campaignMap.js",
+    "main.js children/game.js children/campaignMap.js children/mapFrame.js": "main.js children/game.js children/campaignMap.js",
     "main.js children/game.js children/boardQueries.js children/cellOnBoard.js": "main.js children/game.js children/boardQueries.js",
     "main.js children/game.js children/boardQueries.js children/cellDistance.js": "main.js children/game.js children/boardQueries.js",
     "main.js children/game.js children/boardQueries.js children/cellsWithinRange.js": "main.js children/game.js children/boardQueries.js",

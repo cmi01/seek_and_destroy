@@ -481,7 +481,9 @@ const GAME_LEAF_SCRIPTS = [
   "main.js children/game.js children/campaignMap.js children/buildMapState.js",
   "main.js children/game.js children/campaignMap.js children/fuelCost.js",
   "main.js children/game.js children/campaignMap.js children/merchantOffer.js",
-  "main.js children/game.js children/campaignMap.js children/moveFleet.js"
+  "main.js children/game.js children/campaignMap.js children/moveFleet.js",
+  "main.js children/game.js children/campaignMap.js children/hyperspaceJump.js",
+  "main.js children/game.js children/campaignMap.js children/mapFrame.js"
 ];
 
 async function startGame(){
@@ -639,7 +641,9 @@ async function startGame(){
       ["main.js children/game.js children/campaignMap.js children/buildMapState.js", () => typeof buildMapState === "function"],
       ["main.js children/game.js children/campaignMap.js children/fuelCost.js", () => typeof fuelCost === "function"],
       ["main.js children/game.js children/campaignMap.js children/merchantOffer.js", () => typeof merchantOffer === "function"],
-      ["main.js children/game.js children/campaignMap.js children/moveFleet.js", () => typeof moveFleet === "function"]
+      ["main.js children/game.js children/campaignMap.js children/moveFleet.js", () => typeof moveFleet === "function"],
+      ["main.js children/game.js children/campaignMap.js children/hyperspaceJump.js", () => typeof hyperspaceJump === "function"],
+      ["main.js children/game.js children/campaignMap.js children/mapFrame.js", () => typeof mapFrame === "function"]
     ]);
 
     await Game.load();

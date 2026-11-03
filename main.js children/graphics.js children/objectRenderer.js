@@ -283,13 +283,81 @@
     });
   }
 
+  // M3 campaign map objects: jump-point marks at the well edges, fleet pips
+  // and location labels over the red field. cmd: { ctx, DS, map, colors }.
+  function drawMapObjects(cmd) {
+    const ctx = cmd.ctx;
+    const DS = cmd.DS;
+    const map = cmd.map || {};
+    const C = cmd.colors || {};
+    if (!ctx || !DS) return;
+
+    const span = map.span || 64;
+    const scale = DS / span;
+    const labelPx = Math.max(9, Math.round(DS * 0.016));
+    ctx.font = "600 " + labelPx + "px ui-monospace, monospace";
+    ctx.textAlign = "center";
+
+    const locs = map.locations || [];
+    for (let i = 0; i < locs.length; i++) {
+      const L = locs[i];
+      const cx = (L.x - (map.x || 0)) * scale;
+      const cy = (L.y - (map.y || 0)) * scale;
+      const r = Math.max(6, (L.well || 6) * scale);
+
+      // Jump points at the system edge (Q5): four ticks on the well ring.
+      ctx.strokeStyle = C.jumpMark || "rgba(255, 165, 115, 0.85)";
+      ctx.lineWidth = Math.max(1.2, r * 0.06);
+      for (let k = 0; k < 4; k++) {
+        const a = k * Math.PI / 2 + Math.PI / 4;
+        const x0 = cx + Math.cos(a) * r * 0.92;
+        const y0 = cy + Math.sin(a) * r * 0.92;
+        const x1 = cx + Math.cos(a) * r * 1.1;
+        const y1 = cy + Math.sin(a) * r * 1.1;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = C.label || "rgba(255, 214, 196, 0.9)";
+      ctx.fillText(String(L.name || L.id).toUpperCase(), cx, cy + r + labelPx * 1.2);
+    }
+
+    const fleets = map.fleets || [];
+    for (let i = 0; i < fleets.length; i++) {
+      const f = fleets[i];
+      const cx = (f.x - (map.x || 0)) * scale;
+      const cy = (f.y - (map.y || 0)) * scale;
+      const pip = Math.max(4, DS * 0.009);
+      const col = f.isPlayer ? (C.playerPip || "#38bdf8") : (C.fleetPip || "#f97316");
+      if (f.isPlayer) {
+        ctx.strokeStyle = col;
+        ctx.lineWidth = Math.max(1.2, pip * 0.35);
+        ctx.beginPath();
+        ctx.arc(cx, cy, pip * 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - pip * 1.3);
+      ctx.lineTo(cx + pip, cy + pip);
+      ctx.lineTo(cx - pip, cy + pip);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = C.label || "rgba(255, 214, 196, 0.9)";
+      ctx.fillText(String(f.ships || 0), cx, cy + pip * 2.8 + labelPx * 0.4);
+    }
+  }
+
   const layerApi = {
     spriteKey,
     getSpriteSlice,
     drawBattleWarpArcs,
     drawBattleObjects,
     drawBattleTacticalOverlays,
-    drawMinimapUnits
+    drawMinimapUnits,
+    drawMapObjects
   };
   globalThis.objectLayerApi = layerApi;
 })();

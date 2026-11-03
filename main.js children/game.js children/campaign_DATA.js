@@ -19,7 +19,11 @@ const campaignDataPayload = (() => ({
       wallet: 25000,
       startFleet: ["Flagship Battlecruiser", "Fighter", "Fighter", "Attack Frigate", "Probe"],
       battle: { cornerCapacity: 4 },
-      cargo: { goods: 0, fuel: 20, crew: 0, parts: 5 },
+      // M3 balance: fuel is consumed at ships × distance units (x3 in
+      // hyperspace), so the M1-era 20-unit canister could not cross one
+      // inter-system gap (one jump for the 5-ship start fleet ≈ 145 units).
+      // 500 units ≈ 3–4 jumps; a full tank is 2,500 ⒸB of the 25,000 wallet.
+      cargo: { goods: 0, fuel: 500, crew: 0, parts: 5 },
       clock: { month: 1, year: 2401 },
       map: { locationId: "sol-gate" }
     },

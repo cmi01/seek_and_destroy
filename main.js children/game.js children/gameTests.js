@@ -731,6 +731,96 @@ const runGameTests = function (bridge, testName) {  const suite = {
       };
     },
 
+
+    // M3 (Q5): a hyperspace jump transit costs the x3 multiplier over the
+    // edge-to-edge jump distance, departs the origin system's edge and lands
+    // on the destination well's edge (gravity wells are destinations only).
+    testMapJumpTransit() {
+      const m = bridge.mapFromTable();
+      const pf = m.fleets.find(f => f.faction === "player");
+      const before = JSON.stringify(m.fleets.find(f => f.id === "player"));
+      const res = bridge.mapJump(m, "player", "aurora-prime");
+      const ev = res.events[0] || {};
+      const landed = res.mapState.fleets.find(f => f.id === "player");
+      const sol = m.locations.find(l => l.id === "sol-gate");
+      const aur = m.locations.find(l => l.id === "aurora-prime");
+      const fromEdgeOk = ev.from && Math.abs(Math.hypot(ev.from.x - sol.x, ev.from.y - sol.y) - sol.well) < 1e-9;
+      const toEdgeOk = ev.to && Math.abs(Math.hypot(ev.to.x - aur.x, ev.to.y - aur.y) - aur.well) < 1e-9;
+      const costOk = ev.cost === pf.ships.length * ev.distance * 3;
+      const pass = ev.kind === "fleetJumped" && ev.space === "hyperspace" && costOk &&
+        fromEdgeOk && toEdgeOk && landed.x === ev.to.x && landed.y === ev.to.y &&
+        landed.fuel === pf.fuel - ev.cost && res.mapState.locationId === "aurora-prime" &&
+        res.mapState.turn === m.turn + 1 && before !== JSON.stringify(landed);
+      return {
+        name: "M3 HYPERSPACE JUMP (Q5: edge-to-edge, x3 fuel)",
+        pass,
+        detail: pass
+          ? ("jump " + ev.from.system + " -> " + ev.to.system + " d=" + ev.distance.toFixed(2) + " cost=" + ev.cost.toFixed(2))
+          : ("ev=" + ev.kind + " costOk=" + costOk + " edges=" + fromEdgeOk + "/" + toEdgeOk + " loc=" + res.mapState.locationId)
+      };
+    },
+
+    // M3 (Q5): jump points are at system edges and gravity wells are the
+    // only destinations — deep space cannot jump and cannot be jumped to.
+    testMapJumpPointRules() {
+      const m = bridge.mapFromTable();
+      const open = JSON.parse(JSON.stringify(m));
+      const pf = open.fleets.find(f => f.faction === "player");
+      open.fleets = open.fleets.map(f => f.id === pf.id ? { ...f, x: 20, y: 30 } : f);
+      const fromOpen = bridge.mapJump(open, "player", "aurora-prime");
+      const toOpen = bridge.mapJump(m, "player", "deep-space");
+      const same = bridge.mapJump(m, "player", "sol-gate");
+      const pass = fromOpen.events[0].reason === "no-jump-point" &&
+        toOpen.events[0].reason === "unknown-target" &&
+        same.events[0].reason === "already-there";
+      return {
+        name: "M3 JUMP POINTS AT EDGES, WELLS ONLY (Q5)",
+        pass,
+        detail: pass
+          ? "deep space refused at both ends; same-well refused"
+          : ("r1=" + fromOpen.events[0].reason + " r2=" + toOpen.events[0].reason + " r3=" + same.events[0].reason)
+      };
+    },
+
+    // M3: an unfuelled jump is rejected with the merchant event + offer.
+    testMapJumpUnfuelled() {
+      const m = bridge.mapFromTable();
+      const pf = m.fleets.find(f => f.faction === "player");
+      const dry = { ...m, fleets: m.fleets.map(f => f.id === pf.id ? { ...f, fuel: 0 } : f) };
+      const res = bridge.mapJump(dry, "player", "aurora-prime");
+      const ev = res.events[0] || {};
+      const pass = ev.kind === "merchantFleetEvent" && ev.reason === "no-fuel" &&
+        ev.offer && ev.offer.kind === "merchant" && res.mapState === dry;
+      return {
+        name: "M3 UNFUELLED JUMP REJECTED + MERCHANT EVENT",
+        pass,
+        detail: pass ? "jump refused (fuel 0), offer attached" : ("ev=" + ev.kind + ":" + ev.reason)
+      };
+    },
+
+    // M3 AC (render contract): the map DTO is plain data for the map scene —
+    // kind "map", the view window, and hyperspace true only when the player
+    // fleet is outside every gravity well.
+    testMapFrameDto() {
+      const m = bridge.mapFromTable();
+      const v = bridge.mapView(m, { x: 0, y: 0, span: 64 });
+      const pf = m.fleets.find(f => f.faction === "player");
+      const open = JSON.parse(JSON.stringify(m));
+      open.fleets = open.fleets.map(f => f.id === pf.id ? { ...f, x: 20, y: 30 } : f);
+      const v2 = bridge.mapView(open, null);
+      const pass = v.kind === "map" && v.span === 64 && v.hyperspace === false &&
+        v2.hyperspace === true && Array.isArray(v.locations) && v.locations.length === 12 &&
+        Array.isArray(v.fleets) && v.fleets.some(f => f.isPlayer) &&
+        v.screen === "map" && typeof v.turn === "number";
+      return {
+        name: "M3 MAP DTO (kind/view/hyperspace flag)",
+        pass,
+        detail: pass
+          ? "in-well hyperspace=false, deep-space hyperspace=true, 12 locations"
+          : ("kind=" + v.kind + " hs=" + v.hyperspace + "/" + v2.hyperspace + " locs=" + (v.locations || []).length)
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -746,7 +836,9 @@ const runGameTests = function (bridge, testName) {  const suite = {
         this.testShieldReraiseRule(),
         this.testMapFuelFormula(), this.testMapUnfuelledMoveRejected(),
         this.testMapFlagshipCrewGate(), this.testMapSlowestShipCapsMove(),
-        this.testMapFrozenDuringBattle(), this.testMapSaveRoundTripAndMigration()
+        this.testMapFrozenDuringBattle(), this.testMapSaveRoundTripAndMigration(),
+        this.testMapJumpTransit(), this.testMapJumpPointRules(),
+        this.testMapJumpUnfuelled(), this.testMapFrameDto()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;
