@@ -36,9 +36,13 @@ const Inputs = (() => {
 
     function getNormCoords(e) {
       const rect = canvas.getBoundingClientRect();
+      const bl = canvas.clientLeft || 0;
+      const bt = canvas.clientTop || 0;
+      const cw = canvas.clientWidth || rect.width;
+      const ch = canvas.clientHeight || rect.height;
       return {
-        u: (e.clientX - rect.left) / Math.max(1, rect.width),
-        v: (e.clientY - rect.top) / Math.max(1, rect.height)
+        u: (e.clientX - rect.left - bl) / Math.max(1, cw),
+        v: (e.clientY - rect.top - bt) / Math.max(1, ch)
       };
     }
 

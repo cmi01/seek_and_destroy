@@ -12,23 +12,24 @@
 const buildBridgeShopButtons = function (input, bridgeModal) {
   const DS = input.metrics.displaySize;
   const US = input.metrics.uiScale;
-  const pad = Math.max(12, Math.round(18 * US));
+  const ui = input.metrics.ui || null;
+  const px = function (design) { return Math.round(design * US); };
+  const pad = (ui && ui.padMd) || px(18);
   const mx = pad, my = pad;
   const mw = DS - pad * 2, mh = DS - pad * 2;
-  const hdrH = Math.round(74 * US);
-  const uiTextPx = Math.max(8, Math.round(15 * US));
-  const closeW = Math.max(88, Math.round(106 * US), Math.round(12 * 0.64 * uiTextPx) + Math.round(20 * US));
-  const closeH = Math.max(22, Math.round(26 * US));
-  const closeX = mx + mw - closeW - Math.round(10 * US);
-  const closeY = my + Math.round(11 * US);
+  const hdrH = (ui && ui.headerBridge) || px(74);
+  const closeW = Math.min((ui && ui.closeBridgeW) || px(106), Math.max(px(40), mw - px(24)));
+  const closeH = (ui && ui.buttonHSm) || px(26);
+  const closeX = mx + mw - closeW - px(10);
+  const closeY = my + px(11);
   const buttons = [
     { id: "CLOSE_MODAL", label: "RESUME [SPC]", x: closeX, y: closeY, w: closeW, h: closeH, enabled: true, active: false }
   ];
   const cards = Array.isArray(bridgeModal.cards) ? bridgeModal.cards : [];
   const cols = 3;
   const rows = Math.ceil(Math.max(1, cards.length) / cols);
-  const gridPad = Math.round(10 * US);
-  const gap = Math.round(7 * US);
+  const gridPad = px(10);
+  const gap = px(7);
   const gridX = mx + gridPad;
   const gridY = my + hdrH + gridPad;
   const gridW = mw - gridPad * 2;
@@ -50,5 +51,8 @@ const buildBridgeShopButtons = function (input, bridgeModal) {
       active: false
     });
   }
-  return buttons;
+  return {
+    buttons: buttons,
+    layout: { mx: mx, my: my, mw: mw, mh: mh, hdrH: hdrH, pad: pad, closeBtn: buttons[0] }
+  };
 };

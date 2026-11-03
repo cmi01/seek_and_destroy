@@ -27,7 +27,8 @@ const buildBoardSlice = function (p, deps){
     uiScale: m.uiScale,
     minimapSize: m.minimapSize,
     minimapCanvasSize: m.minimapCanvasSize,
-    minimapDevicePx: m.minimapDevicePx
+    minimapDevicePx: m.minimapDevicePx,
+    ui: m.ui || null
   } : null;
 
   // Render extents: the plain view span widened to cover an in-flight zoom

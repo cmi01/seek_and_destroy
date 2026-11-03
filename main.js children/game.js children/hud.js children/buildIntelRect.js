@@ -20,6 +20,6 @@ const buildIntelRect = function (input, view, topBarRect) {
   const linesCount = Math.max(1, Array.isArray(view.intelOverlay.lines) ? view.intelOverlay.lines.length * 2 : 2);
   const ih = (view.panelRects.intelOverlay && view.panelRects.intelOverlay.h)
     ? view.panelRects.intelOverlay.h
-    : (Math.round(38 * US) + linesCount * Math.max(11, Math.round(12 * US)));
+    : (Math.round(38 * US) + linesCount * ((input.metrics.ui && input.metrics.ui.lineSm) || Math.round(12 * US)));
   return { x: ix, y: iy, w: iw, h: ih };
 };

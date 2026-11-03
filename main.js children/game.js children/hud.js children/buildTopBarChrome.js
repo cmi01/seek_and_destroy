@@ -15,22 +15,21 @@ const buildTopBarChrome = function (input, menuOpen) {
   const US = input.metrics.uiScale;
   const isPlayerTurn = input.state.activeTeam === 1 && !input.state.gameOver;
 
-  const btnH = Math.round(30 * US);
-  const gap = Math.round(6 * US);
-  const padRight = Math.round(10 * US);
-  const topY = Math.round(10 * US);
-  const botY = DS - btnH - Math.round(10 * US);
+  const ui = input.metrics.ui || null;
+  const px = function (design) { return Math.round(design * US); };
+  const btnH = (ui && ui.buttonH) || px(30);
+  const gap = px(6);
+  const padRight = (ui && ui.padSm) || px(10);
+  const topY = px(10);
+  const botY = DS - btnH - px(10);
 
-  // The HUD is a set of fixed-size canvas objects in the 768 design grid,
-  // scaled uniformly with the canvas: two buttons top-right (reinforce +
-  // menu), one bottom-right (end turn), everything else in the dropdown.
   const topDefs = [
-    { id: "REINFORCEMENTS", label: "REINFORCEMENTS", w: Math.round(156 * US), enabled: isPlayerTurn, active: false },
-    { id: "MENU",           label: menuOpen ? "MENU ^" : "MENU v",          w: Math.round(80 * US), enabled: true,         active: menuOpen }
+    { id: "REINFORCEMENTS", label: "REINFORCEMENTS", w: (ui && ui.reinforceW) || px(156), enabled: isPlayerTurn, active: false },
+    { id: "MENU",           label: menuOpen ? "MENU ^" : "MENU v",          w: (ui && ui.menuW) || px(80), enabled: true,         active: menuOpen }
   ];
 
   const botDefs = [
-    { id: "END_TURN", label: "END TURN", w: Math.round(112 * US), enabled: isPlayerTurn, active: false }
+    { id: "END_TURN", label: "END TURN", w: (ui && ui.endTurnW) || px(112), enabled: isPlayerTurn, active: false }
   ];
 
   const topButtons = [];
@@ -54,9 +53,9 @@ const buildTopBarChrome = function (input, menuOpen) {
     botRight = x - gap;
   }
 
-  const pad = Math.round(10 * US);
+  const pad = (ui && ui.padSm) || Math.round(10 * US);
   const leftAvailW = Math.max(Math.round(160 * US), topButtonsLeftEdge - Math.round(18 * US));
-  const barW = Math.min(Math.round(340 * US), leftAvailW);
+  const barW = Math.min((ui && ui.topBarW) || Math.round(340 * US), leftAvailW);
   const barH = Math.round(46 * US);
 
   return {

@@ -100,6 +100,8 @@ PARENT_OF = {
     "main.js children/graphics.js": "main.js",
     "main.js children/inputs.js": "main.js",
     "main.js children/sounds.js": "main.js",
+    "main.js children/uiTokens_DATA.js": "main.js",
+    "main.js children/resolveUiMetrics.js": "main.js",
     "main.js children/game.js children/rules_DATA.js": "main.js children/game.js",
     "main.js children/game.js children/campaign_DATA.js": "main.js children/game.js",
     "main.js children/game.js children/beginningGameState_DATA.js": "main.js children/game.js",

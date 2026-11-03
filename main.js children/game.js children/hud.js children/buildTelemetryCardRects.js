@@ -15,9 +15,10 @@ const buildTelemetryCardRects = function (input, view, chrome, mmRect) {
   // ---- private height estimate (this file's one function only) ----------
   const estimateTelemetryCardHeight = function (model, inspectMode, US) {
     if (!model || model.kind === "none") return 0;
+    const ui = input && input.metrics && input.metrics.ui;
     const padY = Math.round(6 * US);
-    const headerH = Math.max(16, Math.round(18 * US));
-    const lineH = Math.max(15, Math.round(17 * US));
+    const headerH = (ui && ui.lineMd) ? Math.round(18 * US) : Math.round(18 * US);
+    const lineH = (ui && ui.lineMd) || Math.round(17 * US);
     // Compact card: header + HP row + stats row; flag details in inspect mode.
     let rows = 2;
     if (model.kind === "unit") {
@@ -25,13 +26,13 @@ const buildTelemetryCardRects = function (input, view, chrome, mmRect) {
     } else {
       rows += 1 + (Array.isArray(model.lines) ? model.lines.length : 0);
     }
-    return Math.max(Math.round(52 * US), padY * 2 + headerH + rows * lineH);
+    return padY * 2 + headerH + rows * lineH;
   };
 
   const DS = input.metrics.displaySize;
   const US = input.metrics.uiScale;
 
-  const cardW = Math.min(Math.round(308 * US), Math.max(Math.round(190 * US), DS - (mmRect.x + mmRect.w) - Math.round(24 * US)));
+  const cardW = Math.min((input.metrics.ui && input.metrics.ui.cardW) || Math.round(308 * US), Math.max(Math.round(190 * US), DS - (mmRect.x + mmRect.w) - Math.round(24 * US)));
   const cardX = DS - chrome.padRight - cardW;
   let nextCardBottom = chrome.botY - Math.round(7 * US);
   let selRect = null;

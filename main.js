@@ -14,7 +14,7 @@ const LayoutMetrics = {
   viewportWidth: 768,
   viewportHeight: 768,
   isWidescreen: false,
-  renderScale: 2,     // min(devicePixelRatio, 2)
+  renderScale: 1,     // devicePixelRatio, uncapped; offscreen caches have their own pixel budget
   // cellPx / fontScale are getters driven by Game.getViewSpan(). fontScale
   // scales with cell size by design: it sizes board-space labels (terrain
   // shapes, tactical glyphs, warp-arc text). The UI is a set of fixed-size
@@ -26,9 +26,10 @@ const LayoutMetrics = {
   get fontScale() { return this.cellPx / 24; },
   get textScale() { return Math.min(this.fontScale, 2); },
   get uiScale()   { return this.displaySize / 768; },
-  minimapSize: 120,          // frame outer size (CSS px, includes border)
+  minimapSize: 120,          // frame outer size (CSS px); replaced from metrics.ui on layout
   minimapCanvasSize: 118,    // canvas content size (CSS px) = minimapSize − 2
-  minimapDevicePx: 236       // canvas backing store = minimapCanvasSize × renderScale
+  minimapDevicePx: 118,      // canvas backing store = minimapCanvasSize × renderScale
+  ui: null                   // resolved design-unit tokens (CSS px); set on layout
 };
 
 // ============================================================
@@ -155,14 +156,19 @@ function computeLayoutMetrics() {
   const canvas = document.getElementById("battle-canvas");
   if (!canvas) return;
 
-  const availW = Math.max(200, (window.innerWidth || 768) - 8);
-  const availH = Math.max(200, (window.innerHeight || 768) - 8);
+  // 1px CSS border is outside the content box (content-box). Reserve it so
+  // the bordered element stays inside the viewport. The 200px floor is the
+  // engine minimum canvas, applied once here — not a per-widget floor.
+  const borderOutset = 2;
+  const availW = Math.max(200, (window.innerWidth || 768) - 8 - borderOutset);
+  const availH = Math.max(200, (window.innerHeight || 768) - 8 - borderOutset);
   const size   = Math.max(200, Math.floor(Math.min(availW, availH)));
 
+  canvas.style.boxSizing = "content-box";
   canvas.style.width  = size + "px";
   canvas.style.height = size + "px";
 
-  const renderScale = Math.min(window.devicePixelRatio || 1, 2);
+  const renderScale = window.devicePixelRatio || 1;
   const devicePx    = Math.round(size * renderScale);
 
   LayoutMetrics.displaySize    = size;
@@ -171,13 +177,20 @@ function computeLayoutMetrics() {
   LayoutMetrics.isWidescreen   = availW > availH * 1.15;
   LayoutMetrics.renderScale    = renderScale;
   LayoutMetrics.devicePx       = devicePx;
+  if (typeof resolveUiMetrics === "function" && typeof uiTokensTable !== "undefined") {
+    LayoutMetrics.ui = resolveUiMetrics(uiTokensTable, {
+      displaySize: size,
+      uiScale: size / 768,
+      renderScale: renderScale
+    });
+  }
 
   if (canvas.width !== devicePx || canvas.height !== devicePx) {
     canvas.width  = devicePx;
     canvas.height = devicePx;
   }
 
-  const minimapSize       = Math.round(120 * size / 768); // fixed design-grid size (120), scaled with the canvas
+  const minimapSize       = (LayoutMetrics.ui && LayoutMetrics.ui.minimap) || Math.round(120 * size / 768);
   const minimapCanvasSize = minimapSize - 2;
   const minimapDevicePx   = Math.round(minimapCanvasSize * renderScale);
 
@@ -212,9 +225,30 @@ function assertCanvasSetup() {
   }
 }
 
+let _dprQuery = null;
+function onDprChange() {
+  armDprWatch();
+  HostBridge.handleResize();
+}
+function armDprWatch() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+  if (_dprQuery && typeof _dprQuery.removeEventListener === "function") {
+    _dprQuery.removeEventListener("change", onDprChange);
+  }
+  const dpr = window.devicePixelRatio || 1;
+  _dprQuery = window.matchMedia("(resolution: " + dpr + "dppx)");
+  if (_dprQuery && typeof _dprQuery.addEventListener === "function") {
+    _dprQuery.addEventListener("change", onDprChange);
+  }
+}
+
 function bootGame() {
+  // Size the canvas before the first paint so the opening frame is not a
+  // 768 default that the next resize then clears (a flash).
+  computeLayoutMetrics();
   exposeDebugHandle();
   Inputs.bind();
+  armDprWatch();
   initLayout();
   assertCanvasSetup();
   Game.startSector(101);
@@ -296,6 +330,10 @@ const AI_TREE_SCRIPTS = [
   "main.js children/game.js children/ai.js children/aiTurnWorkflow.js"
 ];
 
+const SCALE_SCRIPTS = [
+  "main.js children/uiTokens_DATA.js",
+  "main.js children/resolveUiMetrics.js"
+];
 const PROCESS_SCRIPTS = [
   "main.js children/game.js",
   "main.js children/graphics.js",
@@ -432,6 +470,13 @@ const GAME_LEAF_SCRIPTS = [
 
 async function startGame(){
   try {
+    await _loadScripts(SCALE_SCRIPTS);
+    _verifyLoaded([
+      ["main.js children/uiTokens_DATA.js", () => typeof uiTokensTable === "object" && uiTokensTable !== null],
+      ["main.js children/resolveUiMetrics.js", () => typeof resolveUiMetrics === "function"]
+    ]);
+    if (typeof uiTokensTable !== "undefined") _freezeTree(uiTokensTable);
+
     await _loadScripts(INTERFACE_SCRIPTS);
     _verifyLoaded([
       ["main.js children/inputInterface.js",    () => typeof createInputInterface === "function"],

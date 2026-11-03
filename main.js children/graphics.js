@@ -189,14 +189,20 @@ const Graphics = (() => {
   }
 
   function _uiFonts(us) {
-    const cacheKey = String(us);
+    const ui = (_graphicsBridge && _graphicsBridge.metrics && _graphicsBridge.metrics.ui) || null;
+    const size = (ui && ui.textPx) ? ui.textPx : Math.round(UI_TEXT_PX * us);
+    const family = (ui && ui.fontFamily) ? ui.fontFamily : "monospace";
+    const cacheKey = size + "|" + family;
     let out = _uiFontCache[cacheKey];
     if (!out) {
       out = {};
-      const size = Math.max(8, Math.round(UI_TEXT_PX * us));
+      const bold = "bold " + size + "px " + family;
+      const regular = size + "px " + family;
+      out.bold = bold;
+      out.regular = regular;
       for (let i = 0; i < UI_FONT_SPECS.length; i++) {
-        const [k, weight] = UI_FONT_SPECS[i];
-        out[k] = (weight ? weight + " " : "") + size + "px monospace";
+        const spec = UI_FONT_SPECS[i];
+        out[spec[0]] = spec[1] ? bold : regular;
       }
       _uiFontCache[cacheKey] = out;
     }
@@ -243,7 +249,7 @@ const Graphics = (() => {
       "body[data-theme='alien']{--bg-void:#070312;--t1-cyan:#2dd4bf;--warp-violet:#e879f9;}",
       "*{box-sizing:border-box;margin:0;padding:0;user-select:none;}",
       "body{background-color:#030407;color:#e2e8f0;font-family:var(--font-mono);display:flex;align-items:center;justify-content:center;width:100vw;height:100vh;overflow:hidden;padding:0;}",
-      "#battle-canvas{display:block;border:1px solid rgba(56,189,248,0.35);background:var(--bg-void);box-shadow:0 0 24px rgba(0,0,0,0.9);cursor:crosshair;}"
+      "#battle-canvas{display:block;box-sizing:content-box;border:1px solid rgba(56,189,248,0.35);background:var(--bg-void);box-shadow:0 0 24px rgba(0,0,0,0.9);cursor:crosshair;}"
     ].join("\n");
     document.head.appendChild(styleEl);
   }
@@ -568,8 +574,15 @@ const Graphics = (() => {
   }
 
   // ---- Terrain cache: core-owned canvas, key & invalidation ----------------
-  function _terrainKey(state, themeKey, gridSize, CP, FS) {
-    return `${state.levelId}|${themeKey}|${gridSize}|${CP.toFixed(2)}|${FS.toFixed(3)}`;
+  function _terrainDensity(gridSize, CP, renderScale) {
+    const cssSide = Math.max(1, gridSize * CP);
+    const budget = 4096;
+    const rs = renderScale > 0 ? renderScale : 1;
+    return Math.min(rs, budget / cssSide);
+  }
+
+  function _terrainKey(state, themeKey, gridSize, CP, FS, density) {
+    return `${state.levelId}|${themeKey}|${gridSize}|${CP.toFixed(2)}|${FS.toFixed(3)}|${Number(density).toFixed(4)}`;
   }
 
   // Deterministic asteroid geometry from the single RNG source (the core's
@@ -614,22 +627,27 @@ const Graphics = (() => {
   // Returns the cached terrain canvas for this key, or repaints it via the
   // background layer (which only receives a validated canvas to paint into).
   function _ensureTerrainCanvas(state, themeKey, bp, gridSize, CP, FS) {
-    const key = _terrainKey(state, themeKey, gridSize, CP, FS);
+    const RS = (_graphicsBridge && _graphicsBridge.metrics && _graphicsBridge.metrics.renderScale) || 1;
+    const density = _terrainDensity(gridSize, CP, RS);
+    const key = _terrainKey(state, themeKey, gridSize, CP, FS, density);
     const cache = _terrainCache;
     if (cache.canvas && cache.key === key && cache.ref === state.terrain) return cache.canvas;
-    const totalPx = Math.max(64, Math.ceil(gridSize * CP));
+    const paintCP = CP * density;
+    const paintFS = FS * density;
+    const totalPx = Math.max(64, Math.ceil(gridSize * paintCP));
     if (!cache.canvas) cache.canvas = _createCanvas(totalPx, totalPx);
     if (cache.canvas.width !== totalPx || cache.canvas.height !== totalPx) {
       cache.canvas.width = totalPx;
       cache.canvas.height = totalPx;
     }
     _layers.background.paintTerrain({
-      canvas: cache.canvas, state, bp, gridSize, CP, FS,
-      shapes: _terrainShapes(state, gridSize, FS),
+      canvas: cache.canvas, state, bp, gridSize, CP: paintCP, FS: paintFS,
+      shapes: _terrainShapes(state, gridSize, paintFS),
       TC: _themeColor
     });
     cache.key = key;
     cache.ref = state.terrain;
+    cache.density = density;
     return cache.canvas;
   }
 
@@ -777,7 +795,8 @@ const Graphics = (() => {
       _layers.background.drawBattleGridAndTerrain({
         ctx, visMatrix, state, bp, gridSize,
         CP, FS, DX0, DX1, DY0, DY1,
-        terrainCanvas: _ensureTerrainCanvas(state, _activeTheme, bp, gridSize, CP, FS)
+        terrainCanvas: _ensureTerrainCanvas(state, _activeTheme, bp, gridSize, CP, FS),
+        terrainDensity: (_terrainCache && _terrainCache.density) || 1
       });
 
       // 2. Warp perimeter arcs
@@ -889,6 +908,7 @@ const Graphics = (() => {
 
       _layers.ui.drawMinimapUi({
         ctx, state, bp, cellPx, now,
+        metrics: metrics,
         colors: _uiColors()
       });
     }

@@ -800,7 +800,8 @@ function _hudInput(){
       displaySize: DS,
       uiScale: (m && m.uiScale) ? m.uiScale : 1,
       minimapSize: (m && m.minimapSize) ? m.minimapSize : 120,
-      cellPx: (m && m.cellPx) ? m.cellPx : (DS / viewSpan)
+      cellPx: (m && m.cellPx) ? m.cellPx : (DS / viewSpan),
+      ui: (m && m.ui) ? m.ui : null
     },
     units: Array.isArray(State.units) ? State.units.filter(u => u.hp > 0).map(_unitDTO) : [],
     selectedUnit: _unitDTO(Selection.getUnit()),

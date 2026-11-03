@@ -11,8 +11,8 @@
 function buildMinimapModel(input) {
   const DS = input.metrics.displaySize;
   const US = input.metrics.uiScale;
-  const mmSize = input.metrics.minimapSize;
-  const mmPad = Math.round(10 * US);
+  const mmSize = (input.metrics.ui && input.metrics.ui.minimap) || input.metrics.minimapSize;
+  const mmPad = (input.metrics.ui && input.metrics.ui.padSm) || Math.round(10 * US);
   return {
     rect: { x: mmPad, y: DS - mmSize - mmPad, w: mmSize, h: mmSize }
   };

@@ -149,9 +149,10 @@ const createHud = function (deps) {
     const DS = input.metrics.displaySize;
 
     if (w.activeModal === "bridge") {
-      const buttons = buildBridgeShopButtons(input, w.bridgeModal);
+      const shop = buildBridgeShopButtons(input, w.bridgeModal);
+      w.bridgeModal.layout = shop.layout;
       w.panelRects = { topBar: null, minimap: null, selectedCard: null, hoveredCard: null, intelOverlay: null, menu: null };
-      return { view: w, buttons };
+      return { view: w, buttons: shop.buttons };
     }
 
     if (w.activeModal === "campaign") {
@@ -182,9 +183,12 @@ const createHud = function (deps) {
     const mmRect = mm.rect;
 
     if (w.activeModal === "endgame") {
-      const buttons = buildEndgameButtons(input, w.endgameModal);
+      const built = buildEndgameButtons(input, w.endgameModal);
+      w.endgameModal.panel = built.panel;
+      w.endgameModal.lines = built.lines;
+      w.endgameModal.lineH = built.lineH;
       w.panelRects = { topBar: null, minimap: mmRect, selectedCard: null, hoveredCard: null, intelOverlay: null };
-      return { view: w, buttons };
+      return { view: w, buttons: built.buttons };
     }
 
     // Main HUD chrome: edge buttons + top bar, the dropdown menu, the

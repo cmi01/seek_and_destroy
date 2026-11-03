@@ -16,7 +16,7 @@
     const { canvas, state, bp, gridSize, CP, FS, shapes, TC: rawTC } = cmd;
     const TC = typeof rawTC === "function" ? rawTC : (c => c);
     if (!canvas) return;
-    const totalPx = Math.max(64, Math.ceil(gridSize * CP));
+    const totalPx = canvas.width || Math.max(64, Math.ceil(gridSize * CP));
     const tctx = canvas.getContext("2d");
     tctx.clearRect(0, 0, totalPx, totalPx);
 
@@ -122,6 +122,7 @@
     // 3. Cached procedural terrain (active visibility at 1.0 alpha, explored memory at 0.45 alpha) (ISS-030, ISS-069)
     const cacheCanvas = terrainCanvas || null;
     const explored = state.exploredCells;
+    const d = (typeof cmd.terrainDensity === "number" && cmd.terrainDensity > 0) ? cmd.terrainDensity : 1;
     if (cacheCanvas) {
       ctx.save();
       for (let gx = DX0; gx < DX1; gx++) {
@@ -134,8 +135,8 @@
           const isExp = Boolean(explored && explored[gx] && explored[gx][gy]);
           if (!isVis && !isExp) continue;
           ctx.globalAlpha = isVis ? 1.0 : 0.45;
-          const sx = gx * CP, sy = gy * CP;
-          ctx.drawImage(cacheCanvas, sx, sy, CP, CP, sx, sy, CP, CP);
+          const sx = gx * CP * d, sy = gy * CP * d, sw = CP * d;
+          ctx.drawImage(cacheCanvas, sx, sy, sw, sw, gx * CP, gy * CP, CP, CP);
         }
       }
       ctx.restore();

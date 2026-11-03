@@ -5,6 +5,12 @@
 // Owner: graphics.js. Holds no state unless it is a core.
 // ============================================================
 (() => {
+  let _ui = null;
+  let _stroke = { hairline: 1, thin: 1.2, mid: 1.4, regular: 1.5, heavy: 2, focus: 2.2 };
+  function _armUi(metrics) {
+    _ui = (metrics && metrics.ui) || null;
+    if (_ui && _ui.stroke) _stroke = _ui.stroke;
+  }
   const _hasFlag = (u, f) => Boolean(u && u.flags && (typeof u.flags.has === "function" ? u.flags.has(f) : Array.isArray(u.flags) && u.flags.includes(f)));
 
   // ---- Pure plain-data helpers (local re-implementations over frame data) ----
@@ -64,42 +70,42 @@
   function _drawButtonWidget(ctx, b, hoveredId, pressedId, bp, US, F, C) {
     const isHovered = (hoveredId === b.id);
     const isPressed = (pressedId === b.id);
-    const cut = Math.max(3, Math.round(5 * US));
+    const cut = Math.round(5 * US);
 
     ctx.save();
-    ctx.font = F["bold:7"];
+    ctx.font = F["bold"];
     ctx.textBaseline = "middle";
     _drawChamferedRect(ctx, b.x, b.y, b.w, b.h, cut);
 
     if (!b.enabled) {
       ctx.fillStyle = C["rgba(6, 8, 14, 0.72)"];
       ctx.strokeStyle = C["rgba(148, 163, 184, 0.25)"];
-      ctx.lineWidth = 1;
+      ctx.lineWidth = _stroke.hairline;
     } else if (isPressed) {
       ctx.fillStyle = bp.gold;
       ctx.strokeStyle = C["#ffffff"];
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = _stroke.regular;
     } else if (isHovered) {
       ctx.fillStyle = bp.accent;
       ctx.strokeStyle = bp.gold;
       ctx.shadowColor = bp.accent;
       ctx.shadowBlur = 8;
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = _stroke.regular;
     } else if (b.active) {
       ctx.fillStyle = C["rgba(15, 23, 42, 0.90)"];
       ctx.strokeStyle = bp.gold;
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = _stroke.thin;
     } else {
       ctx.fillStyle = C["rgba(6, 8, 14, 0.88)"];
       ctx.strokeStyle = bp.accent;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = _stroke.hairline;
     }
 
     ctx.fill();
     ctx.stroke();
     ctx.clip();
 
-    const pipSize = Math.max(3, Math.round(4 * US));
+    const pipSize = Math.round(4 * US);
     ctx.fillStyle = !b.enabled
       ? C["rgba(148, 163, 184, 0.35)"]
       : ((isHovered || isPressed) ? C["#06080e"] : (b.active ? bp.gold : bp.accent));
@@ -125,7 +131,7 @@
     _drawChamferedRect(ctx, pad, pad, barW, barH, cut);
     ctx.fillStyle = C["rgba(6, 8, 14, 0.88)"];
     ctx.strokeStyle = isAI ? bp.hostile : bp.accent;
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = _stroke.thin;
     ctx.fill();
     ctx.stroke();
     ctx.clip();
@@ -139,7 +145,7 @@
     ctx.textBaseline = "top";
 
     // Row 1: level tag
-    ctx.font = F["bold:7"];
+    ctx.font = F["bold"];
     ctx.fillStyle = C["#c084fc"];
     const lvlTag = (uiHud && uiHud.levelTag) ? uiHud.levelTag : `SECTOR ${state.levelId}`;
     ctx.fillText(_fitTextToWidth(ctx, lvlTag, maxW), textX, pad + Math.round(6 * US));
@@ -160,15 +166,16 @@
 
   function _drawMinimapOnBattleCanvas(ctx, minimapCanvas, metrics, uiHud, bp, DS, US, F, C) {
     if (!minimapCanvas || !metrics) return null;
-    const pad = Math.max(8, Math.round(10 * US));
-    const mmSize = metrics.minimapSize || 120;
+    const hudMm = (uiHud && uiHud.panelRects) ? uiHud.panelRects.minimap : null;
+    const pad = (_ui && _ui.padSm) || Math.round(10 * US);
+    const mmSize = (hudMm && hudMm.w) || (metrics.minimapSize || ((_ui && _ui.minimap) || Math.round(120 * US)));
     const x = pad;
     const y = DS - mmSize - pad;
 
     ctx.save();
     ctx.fillStyle = C["rgba(6, 8, 14, 0.92)"];
     ctx.strokeStyle = bp.accent;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = _stroke.hairline;
     ctx.fillRect(x, y, mmSize, mmSize);
     ctx.drawImage(minimapCanvas, x + 1, y + 1, mmSize - 2, mmSize - 2);
     ctx.strokeRect(x + 0.5, y + 0.5, mmSize - 1, mmSize - 1);
@@ -188,8 +195,8 @@
     const padX = Math.round(8 * US);
     const padY = Math.round(6 * US);
     const innerW = w - padX * 2;
-    const lineH = Math.max(15, Math.round(17 * US));
-    const headerH = Math.max(16, Math.round(18 * US));
+    const lineH = (_ui && _ui.lineMd) || Math.round(17 * US);
+    const headerH = Math.round(18 * US);
 
     const rows = [];
     if (model.kind === "unit") {
@@ -211,14 +218,14 @@
       }
     }
 
-    const h = Math.max(Math.round(52 * US), padY * 2 + headerH + rows.length * lineH);
+    const h = padY * 2 + headerH + rows.length * lineH;
     const y = Math.max(Math.round(8 * US), bottomY - h);
 
     ctx.save();
     _drawChamferedRect(ctx, x, y, w, h, cut);
     ctx.fillStyle = C["rgba(6, 8, 14, 0.90)"];
     ctx.strokeStyle = borderCol;
-    ctx.lineWidth = 1.1;
+    ctx.lineWidth = _stroke.thin;
     ctx.fill();
     ctx.stroke();
     ctx.clip();
@@ -230,14 +237,14 @@
     let cy = y + padY;
     ctx.textBaseline = "top";
 
-    ctx.font = F["bold:7"];
+    ctx.font = F["bold"];
     ctx.fillStyle = borderCol;
     ctx.fillText(_fitTextToWidth(ctx, `${labelPrefix}: ${model.title || ""}`, innerW), tx, cy);
     cy += headerH;
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
-      ctx.font = F["regular:6"];
+      ctx.font = F["regular"];
       ctx.fillStyle = row.color;
       ctx.fillText(_fitTextToWidth(ctx, row.text, innerW), tx, cy);
       cy += lineH;
@@ -250,13 +257,13 @@
   function _drawIntelOverlay(ctx, uiHud, topBarRect, bp, DS, US, F, C) {
     if (!uiHud || !uiHud.intelOverlay || !uiHud.intelOverlay.visible) return null;
     const intel = uiHud.intelOverlay;
-    const pad = Math.max(8, Math.round(10 * US));
+    const pad = (_ui && _ui.padSm) || Math.round(10 * US);
     const x = pad;
     const y = (topBarRect ? (topBarRect.y + topBarRect.h) : pad) + Math.round(8 * US);
     const w = Math.min(DS - pad * 2, Math.round(410 * US));
 
     ctx.save();
-    ctx.font = F["regular:6"];
+    ctx.font = F["regular"];
     const wrappedBullets = [];
     const rawLines = Array.isArray(intel.lines) ? intel.lines : [];
     for (let i = 0; i < rawLines.length; i++) {
@@ -264,36 +271,36 @@
       for (let j = 0; j < sub.length; j++) wrappedBullets.push(sub[j]);
     }
 
-    const lineH = Math.max(11, Math.round(12 * US));
+    const lineH = (_ui && _ui.lineSm) || Math.round(12 * US);
     const h = Math.round(38 * US) + wrappedBullets.length * lineH;
 
     _drawChamferedRect(ctx, x, y, w, h, Math.round(6 * US));
     ctx.fillStyle = C["rgba(6, 8, 14, 0.93)"];
     ctx.strokeStyle = bp.accent;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = _stroke.hairline;
     ctx.fill();
     ctx.stroke();
     ctx.clip();
 
     ctx.fillStyle = bp.gold;
-    ctx.fillRect(x, y, Math.max(3, Math.round(3 * US)), h);
+    ctx.fillRect(x, y, Math.round(3 * US), h);
 
     const tx = x + Math.round(10 * US);
     let cy = y + Math.round(6 * US);
     ctx.textBaseline = "top";
-    ctx.font = F["bold:7"];
+    ctx.font = F["bold"];
     ctx.fillStyle = bp.gold;
     ctx.fillText(_fitTextToWidth(ctx, intel.title || "OPERATIONAL TURN REPORT", w - Math.round(18 * US)), tx, cy);
     cy += Math.round(15 * US);
 
-    ctx.font = F["regular:6"];
+    ctx.font = F["regular"];
     ctx.fillStyle = C["#e2e8f0"];
     for (let i = 0; i < wrappedBullets.length; i++) {
       ctx.fillText(wrappedBullets[i], tx, cy);
       cy += lineH;
     }
 
-    ctx.font = F["bold:6"];
+    ctx.font = F["bold"];
     ctx.fillStyle = bp.accent;
     ctx.fillText("[CLICK REPORT TO ACKNOWLEDGE // DISMISS]", tx, y + h - Math.round(14 * US));
     ctx.restore();
@@ -313,7 +320,7 @@
     _drawChamferedRect(ctx, r.x, r.y, r.w, r.h, Math.round(10 * US));
     ctx.fillStyle = C["#060911"];
     ctx.strokeStyle = bp.accent;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = _stroke.regular;
     ctx.fill();
     ctx.stroke();
     ctx.clip();
@@ -322,7 +329,7 @@
     let cy = r.y + Math.round(16 * US);
     const maxW = r.w - Math.round(36 * US);
 
-    ctx.font = F["bold:8.5"];
+    ctx.font = F["bold"];
     ctx.fillStyle = bp.accent;
     ctx.fillText(_fitTextToWidth(ctx, help.title || "HELP", maxW), r.x + Math.round(18 * US), cy);
     cy += Math.round(30 * US);
@@ -334,7 +341,7 @@
       }) : []);
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
-      ctx.font = row.head ? F["bold:7"] : F["regular:6"];
+      ctx.font = row.head ? F["bold"] : F["regular"];
       ctx.fillStyle = row.head ? bp.gold : C["#cbd5e1"];
       ctx.fillText(_fitTextToWidth(ctx, String(row.text || ""), maxW), r.x + Math.round(18 * US), cy);
       cy += Math.round(24 * US);
@@ -348,11 +355,11 @@
   }
 
   function _drawBridgeModal(ctx, state, uiHud, bp, DS, US, iconSprites, F, C) {
-    const pad = Math.max(12, Math.round(18 * US));
-    const mx = pad, my = pad;
-    const mw = DS - pad * 2, mh = DS - pad * 2;
     const modal = (uiHud && uiHud.bridgeModal) ? uiHud.bridgeModal : { locusText: "", locusOk: false, credits: 0, cards: [] };
-
+    const lay = modal.layout || null;
+    const pad = (lay && lay.pad) || ((_ui && _ui.padMd) || Math.round(18 * US));
+    const mx = (lay && lay.mx) || pad, my = (lay && lay.my) || pad;
+    const mw = (lay && lay.mw) || (DS - pad * 2), mh = (lay && lay.mh) || (DS - pad * 2);
     ctx.save();
     // Backdrop
     ctx.fillStyle = C["rgba(3, 5, 10, 0.88)"];
@@ -362,12 +369,12 @@
     _drawChamferedRect(ctx, mx, my, mw, mh, Math.round(10 * US));
     ctx.fillStyle = C["#060911"];
     ctx.strokeStyle = bp.accent;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = _stroke.regular;
     ctx.fill();
     ctx.stroke();
 
     // Header
-    const hdrH = Math.round(74 * US);
+    const hdrH = (lay && lay.hdrH) || ((_ui && _ui.headerBridge) || Math.round(74 * US));
     ctx.fillStyle = C["rgba(10, 15, 26, 0.95)"];
     ctx.fillRect(mx + 1, my + 1, mw - 2, hdrH);
     ctx.strokeStyle = C["rgba(56, 189, 248, 0.3)"];
@@ -376,16 +383,17 @@
     ctx.lineTo(mx + mw, my + hdrH);
     ctx.stroke();
 
-    // Close button & credits in header right
-    const uiTextPx = Math.max(8, Math.round(15 * US));
-    const closeW = Math.max(88, Math.round(106 * US), Math.round(12 * 0.64 * uiTextPx) + Math.round(20 * US));
-    const closeH = Math.max(22, Math.round(26 * US));
-    const closeX = mx + mw - closeW - Math.round(10 * US);
-    const closeY = my + Math.round(11 * US);
-    const closeBtn = { id: "CLOSE_MODAL", label: "RESUME [SPC]", x: closeX, y: closeY, w: closeW, h: closeH, enabled: true, active: false };
-    _drawButtonWidget(ctx, closeBtn, state.buttonHovered, state.buttonPressed, bp, US, F, C);
+    const btns = Array.isArray(state.canvasButtons) ? state.canvasButtons : [];
+    let closeBtn = (lay && lay.closeBtn) || null;
+    if (!closeBtn) {
+      for (let bi = 0; bi < btns.length; bi++) {
+        if (btns[bi] && btns[bi].id === "CLOSE_MODAL") { closeBtn = btns[bi]; break; }
+      }
+    }
+    const closeX = closeBtn ? closeBtn.x : (mx + mw - Math.round(106 * US));
+    if (closeBtn) _drawButtonWidget(ctx, closeBtn, state.buttonHovered, state.buttonPressed, bp, US, F, C);
 
-    ctx.font = F["bold:8.5"];
+    ctx.font = F["bold"];
     ctx.fillStyle = bp.gold;
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
@@ -406,20 +414,20 @@
     const hdrPitch = Math.round(13 * US);
     let hdrY = my + Math.round((hdrH - (hdrPitch * (hdrRows - 1) + Math.round(15 * US))) * 0.5);
     ctx.textBaseline = "top";
-    ctx.font = F["bold:8"];
+    ctx.font = F["bold"];
     ctx.fillStyle = bp.accent;
     for (let hl = 0; hl < titleLines.length; hl++) {
       ctx.fillText(_fitTextToWidth(ctx, titleLines[hl], headerLeftMaxW), mx + Math.round(12 * US), hdrY);
       hdrY += hdrPitch;
     }
-    ctx.font = F["bold:6.2"];
+    ctx.font = F["bold"];
     ctx.fillStyle = modal.locusOk ? C["#34d399"] : bp.hostile;
     for (let hl = 0; hl < locusLines.length; hl++) {
       ctx.fillText(_fitTextToWidth(ctx, locusLines[hl], headerLeftMaxW), mx + Math.round(12 * US), hdrY);
       hdrY += hdrPitch;
     }
     if (protoLines.length) {
-      ctx.font = F["regular:5.8"];
+      ctx.font = F["regular"];
       ctx.fillStyle = C["#94a3b8"];
       for (let hl = 0; hl < protoLines.length; hl++) {
         ctx.fillText(_fitTextToWidth(ctx, protoLines[hl], headerLeftMaxW), mx + Math.round(12 * US), hdrY);
@@ -455,19 +463,19 @@
       if (!c.affordable) {
         ctx.fillStyle = C["rgba(10, 15, 26, 0.45)"];
         ctx.strokeStyle = C["rgba(244, 63, 94, 0.35)"];
-        ctx.lineWidth = 1;
+        ctx.lineWidth = _stroke.hairline;
       } else if (isPrs) {
         ctx.fillStyle = C["rgba(250, 204, 21, 0.25)"];
         ctx.strokeStyle = C["#ffffff"];
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = _stroke.regular;
       } else if (isHov) {
         ctx.fillStyle = C["rgba(2, 132, 199, 0.28)"];
         ctx.strokeStyle = bp.gold;
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = _stroke.regular;
       } else {
         ctx.fillStyle = C["rgba(10, 15, 26, 0.88)"];
         ctx.strokeStyle = C["rgba(56, 189, 248, 0.4)"];
-        ctx.lineWidth = 1;
+        ctx.lineWidth = _stroke.hairline;
       }
       ctx.fill();
       ctx.stroke();
@@ -496,7 +504,7 @@
       ctx.textBaseline = "top";
 
       // Cost badge (right-aligned) — colored by credit sufficiency (c.priceOk) (ISS-039)
-      ctx.font = F["bold:7"];
+      ctx.font = F["bold"];
       const costStr = `${c.cost}ⒸB`;
       const costW = ctx.measureText(costStr).width;
       const priceOk = (c.priceOk !== undefined) ? c.priceOk : c.affordable;
@@ -530,7 +538,7 @@
       const nameRows = Math.min(2, nameLines.length);
 
       // Flags (wrapped up to 2 lines so multi-flag warships are legible)
-      ctx.font = F["regular:5.8"];
+      ctx.font = F["regular"];
       ctx.fillStyle = c.affordable ? bp.accent : C["#475569"];
       const flagLines = _wrapTextLines(ctx, c.flagsText || "STANDARD", textAvailW);
       const maxFlagLines = cardH >= Math.round(72 * US) ? 2 : 1;
@@ -540,7 +548,7 @@
 
       // Stats anchored near bottom of card — two lines so every field
       // (incl. S:<scan>) is readable at the single-size UI font.
-      ctx.font = F["regular:6"];
+      ctx.font = F["regular"];
       ctx.fillStyle = C["#94a3b8"];
       const statsLine1 = `HP:${c.hp} M:${c.move} FP:${c.fp}`;
       const statsLine2 = `R:${c.range} S:${c.scan}`;
@@ -572,7 +580,7 @@
     const nodes = Array.isArray(modal.nodes) ? modal.nodes : [];
     const layout = modal.layout || null;
 
-    const pad = Math.max(12, Math.round(20 * US));
+    const pad = (_ui && _ui.padLg) || Math.round(20 * US);
     const mx = layout ? layout.mx : pad;
     const my = layout ? layout.my : pad;
     const mw = layout ? layout.mw : (DS - pad * 2);
@@ -587,7 +595,7 @@
     _drawChamferedRect(ctx, mx, my, mw, mh, Math.round(10 * US));
     ctx.fillStyle = C["#060911"];
     ctx.strokeStyle = bp.accent;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = _stroke.regular;
     ctx.fill();
     ctx.stroke();
 
@@ -618,26 +626,38 @@
     ctx.stroke();
 
     // Close button (geometry shared with hit-test via layout.closeBtn)
-    const closeBtn = (layout && layout.closeBtn)
-      ? layout.closeBtn
-      : { id: "CLOSE_MODAL", label: "CLOSE [ESC]", x: mx + mw - Math.round(108 * US), y: my + Math.round(11 * US), w: Math.max(82, Math.round(98 * US)), h: Math.max(22, Math.round(26 * US)), enabled: true, active: false };
-    _drawButtonWidget(ctx, closeBtn, state.buttonHovered, state.buttonPressed, bp, US, F, C);
+    const closeBtn = (layout && layout.closeBtn) || null;
+    if (closeBtn) _drawButtonWidget(ctx, closeBtn, state.buttonHovered, state.buttonPressed, bp, US, F, C);
 
-    const hdrTextW = closeBtn.x - (mx + Math.round(20 * US));
+    const hdrTextW = (closeBtn ? closeBtn.x : (mx + mw)) - (mx + Math.round(20 * US));
+    const titleLines = (layout && Array.isArray(layout.titleLines) && layout.titleLines.length)
+      ? layout.titleLines
+      : ["CAMPAIGN STARMAP // SECTOR NAVIGATION"];
+    const subtitleLines = (layout && Array.isArray(layout.subtitleLines) && layout.subtitleLines.length)
+      ? layout.subtitleLines
+      : ["Select a sector node to deploy. Eliminate all Syndicate !flagship vessels to secure it."];
+    const lineH = (layout && layout.lineH) || ((_ui && _ui.lineMd) || Math.round(17 * US));
     ctx.textBaseline = "top";
     ctx.textAlign = "left";
-    ctx.font = F["bold:8.5"];
+    let hy = my + Math.round(8 * US);
+    ctx.font = F["bold"];
     ctx.fillStyle = bp.accent;
-    ctx.fillText(_fitTextToWidth(ctx, "CAMPAIGN STARMAP // SECTOR NAVIGATION", hdrTextW), mx + Math.round(12 * US), my + Math.round(8 * US));
-    ctx.font = F["regular:6.5"];
+    for (let ti = 0; ti < titleLines.length; ti++) {
+      ctx.fillText(_fitTextToWidth(ctx, titleLines[ti], hdrTextW), mx + Math.round(12 * US), hy);
+      hy += lineH;
+    }
+    ctx.font = F["regular"];
     ctx.fillStyle = C["#94a3b8"];
-    ctx.fillText(_fitTextToWidth(ctx, "Select a sector node to deploy. Eliminate all Syndicate !flagship vessels to secure it.", hdrTextW), mx + Math.round(12 * US), my + Math.round(27 * US));
+    for (let si = 0; si < subtitleLines.length; si++) {
+      ctx.fillText(_fitTextToWidth(ctx, subtitleLines[si], hdrTextW), mx + Math.round(12 * US), hy);
+      hy += lineH;
+    }
 
     // Route lines between consecutive sectors (campaign order)
     if (nodes.length > 1) {
       ctx.save();
       ctx.setLineDash([Math.round(5 * US), Math.round(5 * US)]);
-      ctx.lineWidth = 1.4;
+      ctx.lineWidth = _stroke.mid;
       for (let i = 0; i < nodes.length - 1; i++) {
         const a = nodes[i], b = nodes[i + 1];
         const aDone = cards[i] && cards[i].isDone;
@@ -668,7 +688,7 @@
       if (isNext && !isDone) {
         const pulse = 1 + Math.sin(now * 0.005) * 0.08;
         ctx.strokeStyle = C["rgba(250, 204, 21, 0.45)"];
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = _stroke.thin;
         ctx.beginPath();
         ctx.arc(node.cx, node.cy, node.r * 1.25 * pulse, 0, Math.PI * 2);
         ctx.stroke();
@@ -688,7 +708,7 @@
         : (isHov ? C["rgba(2, 132, 199, 0.35)"]
           : (isDone ? C["rgba(16, 95, 72, 0.50)"] : C["rgba(10, 15, 26, 0.92)"]));
       ctx.fill();
-      ctx.lineWidth = (isHov || isNext) ? 2.2 : 1.4;
+      ctx.lineWidth = (isHov || isNext) ? _stroke.focus : _stroke.mid;
       ctx.strokeStyle = isHov ? bp.gold : ringCol;
       ctx.stroke();
       ctx.shadowBlur = 0;
@@ -697,7 +717,7 @@
       ctx.beginPath();
       ctx.arc(node.cx, node.cy, node.r * 0.62, 0, Math.PI * 2);
       ctx.strokeStyle = isDone ? C["rgba(52, 211, 153, 0.6)"] : C["rgba(148, 163, 184, 0.35)"];
-      ctx.lineWidth = 1;
+      ctx.lineWidth = _stroke.hairline;
       ctx.stroke();
 
       // Center glyph: ✓ when secured, otherwise sector ordinal
@@ -705,11 +725,11 @@
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       if (isDone) {
-        ctx.font = F["bold:12"];
+        ctx.font = F["bold"];
         ctx.fillStyle = C["#34d399"];
         ctx.fillText("✓", node.cx, node.cy + Math.round(1 * US));
       } else {
-        ctx.font = F["bold:11"];
+        ctx.font = F["bold"];
         ctx.fillStyle = isNext ? bp.gold : C["#e2e8f0"];
         ctx.fillText(String(i + 1), node.cx, node.cy + Math.round(1 * US));
       }
@@ -723,10 +743,10 @@
       const labelMaxW = Math.max(node.hitW, Math.round(150 * US));
       const tagRaw = String(c.tag || ("SECTOR " + node.id));
       const code = tagRaw.split("//")[0].trim() || tagRaw;
-      ctx.font = F["bold:6.6"];
+      ctx.font = F["bold"];
       ctx.fillStyle = isDone ? C["#34d399"] : (isNext ? bp.gold : C["#c084fc"]);
       ctx.fillText(_fitTextToWidth(ctx, code, labelMaxW), node.cx, labelY);
-      ctx.font = F["regular:5.8"];
+      ctx.font = F["regular"];
       ctx.fillStyle = C["#94a3b8"];
       const status = isDone ? "SECURED" : (isNext ? "NEXT OBJECTIVE" : "AVAILABLE");
       ctx.fillText(status, node.cx, labelY + Math.round(11 * US));
@@ -744,10 +764,10 @@
         ctx.textBaseline = "top";
         const stripY = my + mh - Math.round(34 * US);
         const stripW = mw - Math.round(40 * US);
-        ctx.font = F["bold:7.4"];
+        ctx.font = F["bold"];
         ctx.fillStyle = bp.gold;
         ctx.fillText(_fitTextToWidth(ctx, hc.title, stripW), mx + mw * 0.5, stripY);
-        ctx.font = F["regular:6"];
+        ctx.font = F["regular"];
         ctx.fillStyle = C["#94a3b8"];
         ctx.fillText(_fitTextToWidth(ctx, hc.creditsText || "", stripW), mx + mw * 0.5, stripY + Math.round(13 * US));
         ctx.restore();
@@ -760,10 +780,11 @@
 
   function _drawEndgameModal(ctx, state, uiHud, bp, DS, US, F, C) {
     const modal = (uiHud && uiHud.endgameModal) ? uiHud.endgameModal : { isVictory: true, title: "SECTOR SECURED", body: "" };
-    const mw = Math.min(DS - Math.round(36 * US), Math.round(430 * US));
-    const mh = Math.round(172 * US);
-    const mx = Math.round((DS - mw) * 0.5);
-    const my = Math.round((DS - mh) * 0.5);
+    const panel = modal.panel || null;
+    const mw = panel ? panel.w : Math.min(DS - Math.round(36 * US), Math.round(430 * US));
+    const mh = panel ? panel.h : Math.round(172 * US);
+    const mx = panel ? panel.x : Math.round((DS - mw) * 0.5);
+    const my = panel ? panel.y : Math.round((DS - mh) * 0.5);
     const accentCol = modal.isVictory ? bp.gold : bp.hostile;
 
     ctx.save();
@@ -773,37 +794,31 @@
     _drawChamferedRect(ctx, mx, my, mw, mh, Math.round(10 * US));
     ctx.fillStyle = C["#060911"];
     ctx.strokeStyle = accentCol;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = _stroke.heavy;
     ctx.fill();
     ctx.stroke();
 
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.font = F["bold:9.5"];
+    ctx.font = F["bold"];
     ctx.fillStyle = accentCol;
-    ctx.fillText(modal.title, mx + mw * 0.5, my + Math.round(18 * US));
+    ctx.fillText(_fitTextToWidth(ctx, modal.title || "", mw - Math.round(24 * US)), mx + mw * 0.5, my + Math.round(18 * US));
 
-    ctx.font = F["regular:6.8"];
+    ctx.font = F["regular"];
     ctx.fillStyle = C["#cbd5e1"];
-    const lines = _wrapTextLines(ctx, modal.body, mw - Math.round(32 * US));
-    for (let i = 0; i < Math.min(3, lines.length); i++) {
-      ctx.fillText(lines[i], mx + mw * 0.5, my + Math.round((46 + i * 14) * US));
+    const lineH = modal.lineH || Math.round(14 * US);
+    const lines = Array.isArray(modal.lines) ? modal.lines : _wrapTextLines(ctx, modal.body, mw - Math.round(32 * US));
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], mx + mw * 0.5, my + Math.round(46 * US) + i * lineH);
     }
     ctx.textAlign = "left";
 
-    const btnW = Math.round(156 * US);
-    const btnH = Math.max(24, Math.round(28 * US));
-    const gap = Math.round(12 * US);
-    const b1X = Math.round(mx + (mw - (btnW * 2 + gap)) * 0.5);
-    const b2X = b1X + btnW + gap;
-    const btnY = my + mh - btnH - Math.round(16 * US);
-
-    // Highlight SECTOR MAP on victory and REDEPLOY SECTOR on defeat (ISS-071)
-    const retryBtn = { id: "ENDGAME_RETRY", label: "REDEPLOY SECTOR", x: b1X, y: btnY, w: btnW, h: btnH, enabled: true, active: !modal.isVictory };
-    const mapBtn   = { id: "ENDGAME_MAP",   label: "SECTOR MAP",      x: b2X, y: btnY, w: btnW, h: btnH, enabled: true, active: Boolean(modal.isVictory) };
-
-    _drawButtonWidget(ctx, retryBtn, state.buttonHovered, state.buttonPressed, bp, US, F, C);
-    _drawButtonWidget(ctx, mapBtn, state.buttonHovered, state.buttonPressed, bp, US, F, C);
+    const btns = Array.isArray(state.canvasButtons) ? state.canvasButtons : [];
+    for (let i = 0; i < btns.length; i++) {
+      const b = btns[i];
+      if (!b || (b.id !== "ENDGAME_RETRY" && b.id !== "ENDGAME_MAP")) continue;
+      _drawButtonWidget(ctx, b, state.buttonHovered, state.buttonPressed, bp, US, F, C);
+    }
 
     ctx.restore();
   }
@@ -828,7 +843,7 @@
       ctx.strokeStyle = C["#ffffff"];
       ctx.shadowColor = bp.accent;
       ctx.shadowBlur = 6;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2 * FS;
       ctx.beginPath();
       ctx.moveTo(x0, y0 + arm); ctx.lineTo(x0, y0); ctx.lineTo(x0 + arm, y0);
       ctx.moveTo(x1 - arm, y0); ctx.lineTo(x1, y0); ctx.lineTo(x1, y0 + arm);
@@ -837,7 +852,7 @@
       ctx.stroke();
       ctx.restore();
 
-      ctx.font = F["bold:7"];
+      ctx.font = F["bold"];
       ctx.fillStyle = bp.accent;
       ctx.fillText("SEL", rx + 2 * FS, ry + 22 * FS);
     }
@@ -850,7 +865,7 @@
       if (detUnit) {
         const isHostile = detUnit.team === 2;
         ctx.strokeStyle = isHostile ? bp.hostile : bp.gold;
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.5 * FS;
         ctx.strokeRect(hx + 1 * FS, hy + 1 * FS, 22 * FS, 22 * FS);
 
         const hc = _cellCenter(detUnit.x, detUnit.y, CP);
@@ -860,7 +875,7 @@
         if (detUnit.move > 0) {
           ctx.setLineDash([4, 4]);
           ctx.strokeStyle = isHostile ? C["rgba(250, 204, 21, 0.22)"] : C["rgba(56, 189, 248, 0.22)"];
-          ctx.lineWidth = 1;
+          ctx.lineWidth = 1 * FS;
           ctx.beginPath();
           ctx.arc(hc.x, hc.y, detUnit.move * CP, 0, Math.PI * 2);
           ctx.stroke();
@@ -870,7 +885,7 @@
         if (detUnit.range > 0) {
           ctx.setLineDash([3, 3]);
           ctx.strokeStyle = isHostile ? C["rgba(244, 63, 94, 0.34)"] : C["rgba(254, 72, 26, 0.28)"];
-          ctx.lineWidth = 1.1;
+          ctx.lineWidth = 1.1 * FS;
           ctx.beginPath();
           ctx.arc(hc.x, hc.y, detUnit.range * CP, 0, Math.PI * 2);
           ctx.stroke();
@@ -881,7 +896,7 @@
         if (effScan > 0 && (isHostile || state.inspectMode)) {
           ctx.setLineDash([2, 4]);
           ctx.strokeStyle = isHostile ? C["rgba(192, 132, 252, 0.26)"] : C["rgba(56, 189, 248, 0.30)"];
-          ctx.lineWidth = 1;
+          ctx.lineWidth = 1 * FS;
           ctx.beginPath();
           ctx.arc(hc.x, hc.y, effScan * CP, 0, Math.PI * 2);
           ctx.stroke();
@@ -890,7 +905,7 @@
         ctx.restore();
       } else {
         ctx.strokeStyle = C["rgba(148, 163, 184, 0.28)"];
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1 * FS;
         ctx.strokeRect(hx + 0.5 * FS, hy + 0.5 * FS, 23 * FS, 23 * FS);
       }
     }
@@ -902,6 +917,7 @@
       iconSprites, fonts: F, colors: C
     } = cmd;
     if (!state || !DS) return;
+    _armUi(metrics);
     const US = rawUS || (metrics && metrics.uiScale) || 1;
 
     // 1. If a full-screen modal is open, render modal overlay and set modal-only canvasButtons
@@ -941,7 +957,7 @@
       _drawChamferedRect(ctx, menuRect.x, menuRect.y, menuRect.w, menuRect.h, Math.round(5 * US));
       ctx.fillStyle = C["rgba(6, 8, 14, 0.94)"];
       ctx.strokeStyle = bp.accent;
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = _stroke.thin;
       ctx.fill();
       ctx.stroke();
     }
@@ -958,13 +974,13 @@
     }
 
     // 4. Top-Left HUD Status Bar
-    const leftAvailW = Math.max(160, topButtonsLeftEdge - Math.round(18 * US));
+    const leftAvailW = topButtonsLeftEdge - Math.round(18 * US);
     const topBarRect = _drawTopLeftHudBar(ctx, state, uiHud, bp, DS, US, leftAvailW, F, C);
 
     // 5. Bottom Telemetry Cards (Selected Locus & Hovered Contact)
     let selRect = null;
     if (uiHud) {
-      const cardW = Math.min(Math.round(308 * US), Math.max(190, DS - (mmRect ? (mmRect.x + mmRect.w) : 0) - Math.round(24 * US)));
+      const cardW = Math.min((_ui && _ui.cardW) || Math.round(308 * US), Math.max(Math.round(190 * US), DS - (mmRect ? (mmRect.x + mmRect.w) : 0) - Math.round(24 * US)));
       const cardX = DS - padRight - cardW;
       let nextCardBottom = botY - Math.round(7 * US);
 
@@ -989,7 +1005,8 @@
   }
 
   function drawMinimapUi(cmd) {
-    const { ctx, state, bp, cellPx, now, colors: C } = cmd;
+    const { ctx, state, bp, cellPx, now, metrics, colors: C } = cmd;
+    _armUi(metrics);
 
     let vx = state.viewX;
     let vy = state.viewY;
@@ -1004,7 +1021,7 @@
     }
 
     ctx.strokeStyle = bp.gold;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = _stroke.regular;
     ctx.strokeRect(
       vx * cellPx + 0.5,
       vy * cellPx + 0.5,
@@ -1016,7 +1033,7 @@
       const spx = state.selectedCell.x * cellPx;
       const spy = state.selectedCell.y * cellPx;
       ctx.strokeStyle = C["#ffffff"];
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = _stroke.regular;
       ctx.strokeRect(spx + 1, spy + 1, cellPx - 2, cellPx - 2);
     }
 
@@ -1024,7 +1041,7 @@
       const hpx = state.hoveredCell.x * cellPx;
       const hpy = state.hoveredCell.y * cellPx;
       ctx.strokeStyle = C["rgba(250, 204, 21, 0.6)"];
-      ctx.lineWidth = 1;
+      ctx.lineWidth = _stroke.hairline;
       ctx.strokeRect(hpx + 0.5, hpy + 0.5, cellPx - 1, cellPx - 1);
     }
   }
