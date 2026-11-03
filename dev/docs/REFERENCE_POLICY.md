@@ -110,6 +110,14 @@ These are written into the checker, not left to reviewer judgement:
    (`module.exports = { … }`, `module.exports = fn`, `exports.x =`) generate
    binding patterns. Non-module files keep the full top-level
    factory-global surface.
+10. **Scoped npm specifiers are bare package specifiers.** An ES import of
+    `@scope/name` — or a subpath of it, `@scope/name/…` — is an external
+    package reference, exactly like an unscoped bare specifier, and is
+    allowlisted as unresolved in the reference-graph analyzer. The analyzer's
+    bare-specifier test used to require no `/` in the specifier, so the
+    Playwright harness's `import '@playwright/test'` (v123–v127) reported 15
+    false-unresolved refs and reddened the `--fail-on-unresolved` gate. Only
+    relative (`./x`) and root-relative (`/x`) specifiers are repo paths.
 
 ## 5. Remedies (canonical, in preference order)
 

@@ -20,8 +20,8 @@ and docs.
 
 Unresolved references are reported as warnings unless they match the
 documented allowlist (external URLs, data URIs, node builtins, bare package
-or stdlib module specifiers, system #include, and patterns passed via
---allowlist).  Non-warning kinds (path-literal, manifest-entry,
+or stdlib module specifiers — scoped npm packages `@scope/name` included —
+system #include, and patterns passed via --allowlist).  Non-warning kinds (path-literal, manifest-entry,
 doc-mention) only record resolved hits and never warn.
 
 Usage:  python3 dev/scripts/reference_graph.py [options]
@@ -727,9 +727,14 @@ def looks_external(spec, kind):
         return True
     if kind in ("import", "dynamic-import", "require", "lua-require",
                 "python-import"):
-        if not spec.startswith(".") and "/" not in spec:
-            # Bare module specifier: node builtin, stdlib or external package.
-            return True
+        if not spec.startswith("."):
+            if "/" not in spec or spec.startswith("@"):
+                # Bare module specifier: node builtin, stdlib or external
+                # package — including scoped npm packages and their subpath
+                # imports (`@scope/name`, `@scope/name/…`; REFERENCE_POLICY.md
+                # §4.10). Only relative (`./x`) and root-relative (`/x`)
+                # specifiers are repo paths.
+                return True
         root_mod = spec.split("/")[0].replace(".py", "").split(".")[0]
         return kind == "python-import" and root_mod in PY_STDLIB
     return False

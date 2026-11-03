@@ -118,6 +118,62 @@ The whole UI (HUD, modals, buttons, minimap) is drawn on the single `#battle-can
 - **Input dispatch** — the input helpers send REAL browser events (Playwright mouse/keyboard) matching inputs.js's DOM listeners, never synthetic events; the game's input DTOs are produced by the game itself. Interaction helpers advance the virtual clock (`helpers/time.ts step()`) after each dispatch so frame-sliced work completes; the timer constants the advance helpers encode are grounded in game code (endgame modal 450 ms, AI beats 500 ms × 12 + 500 ms start + 460 ms handoff).
 - **Known UI semantics the suite encodes** — deployment auto-selects a unit; clicking the already-selected unit DESELECTS it (game.js POINTER_DOWN); clicking a cell under a HUD panel is swallowed by panel hit-testing; zoom anchoring (AC-1) is only exact away from viewport clamps. Specs assert around these by design, not by accident.
 
+## 8. CI — GitHub Actions and the every-10-versions release gate
+
+The CI workflow is `dev/ci/e2e.yml` (GitHub Actions, valid and ready to run).
+It has three jobs:
+
+1. **`suite` — every change.** On every push to `main` and every pull request:
+   `npm ci` → `npx playwright install --with-deps chromium` → `npm test`
+   (the full 26-test suite). ~3 minutes on a runner, cheap enough to run
+   unconditionally. The Playwright HTML report is uploaded as an artifact on
+   failure.
+2. **`version-gate` — computes the trigger below.** A seconds-cheap job that
+   runs on every workflow run and outputs `every_tenth`.
+3. **`release-verification` — every 10 versions.** Runs only when
+   `every_tenth` is true: the full suite **plus** the two dev gates
+   (`structure_audit.py`, `reference_policy_gate.py`) — the battery a release
+   milestone gets.
+
+### The every-10-versions rule (normative)
+
+**On a version tag `vNN`, `release-verification` runs iff the integer `N` is
+divisible by 10** — i.e. tags `v120`, `v130`, `v140`, … Version tags in this
+repo are plain `vNN` with an integer `N` and no dots (see the release runbook),
+so the gate is literally `N % 10 == 0`, computed in `version-gate` as
+`n="${GITHUB_REF_NAME#v}"` + modulo after a `^[0-9]+$` shape check. A `v*.0`
+tag glob does **not** express this rule (these tags contain no dot and would
+never match), which is why the gate computes the modulo instead of pattern
+matching. Non-tag runs (push/PR) never consult the gate — the suite always runs
+there. A tag push that is not a multiple of 10 (e.g. `v131`) leaves both gated
+jobs skipped, and the skipped workflow run in the Actions history is the
+record that the tag was seen and deliberately not verified.
+
+`dev/ci/release_gate.sh` implements the identical rule locally (modulo on the
+tag's `N`, same battery) so the cadence is enforced even before the workflow
+file lands: the release runbook runs `dev/ci/release_gate.sh vNN` at every
+release. `dev/ci/release_gate.sh v130` opens the gate; `v131` closes it with
+exit 0.
+
+### Why the workflow lives under `dev/ci/` (install step pending)
+
+The deploy credential is a GitHub App token **without** the `workflows`
+permission, so git rejects any ref containing a `.github/workflows/*.yml`
+commit ("refusing to allow a GitHub App to create or update workflow …
+without `workflows` permission" — verified 2026-11-03, same wall as
+`reference-policy.yml`). `dev/ci/e2e.yml` is therefore the canonical committed
+copy; a maintainer with workflows permission lands it with the two commands in
+its header (`cp dev/ci/e2e.yml .github/workflows/e2e.yml`, commit). GitHub
+Actions is enabled on the repository (the `pages build and deployment`
+workflow runs on pushes to `main`, green in the Actions history), so the jobs
+start executing as soon as the file exists under `.github/workflows/`.
+Evidence of the manual run that seeded this setup: the full-suite log from
+this release (26/26 green, `npm test`, exit 0) is attached to the CI task and
+recorded in its evidence artifacts.
+
 ## Follow-up (out of scope for this doc)
 
-- Wire `npx playwright test` into GitHub Actions once the repository-admin steps in `dev/docs/REFERENCE_POLICY_CI.md` land (the deploy credential cannot push workflows — audit §4).
+- A maintainer with `workflows` permission lands `dev/ci/e2e.yml` as
+  `.github/workflows/e2e.yml` (one `cp` + commit — commands in the file
+  header). Until then `dev/ci/release_gate.sh` enforces the same cadence from
+  the release runbook.

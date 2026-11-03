@@ -1,0 +1,130 @@
+# CI: full Playwright E2E suite — see dev/docs/TESTING.md section 8.
+#
+# INSTALL NOTE (why this file lives under dev/ci/): the deploy credential is a
+# GitHub App token WITHOUT the `workflows` permission, so any ref containing a
+# `.github/workflows/*.yml` commit is rejected at push time ("refusing to allow
+# a GitHub App to create or update workflow ... without `workflows`
+# permission" — verified 2026-11-03). This file is the canonical, valid,
+# ready-to-run workflow; a maintainer with workflows permission lands it with:
+#
+#     mkdir -p .github/workflows
+#     cp dev/ci/e2e.yml .github/workflows/e2e.yml
+#     git add .github/workflows/e2e.yml
+#     git commit -m "ci: land E2E suite workflow"
+#
+# Until then the identical gate runs locally via dev/ci/release_gate.sh (the
+# every-10-versions cadence is enforced by the release runbook).
+#
+# Every-10-versions rule (the documented trigger): on a version tag vNN the
+# release-verification job runs iff the integer N is divisible by 10
+# (v120, v130, v140, ...). Tags are plain vNN with no dots, so the gate is
+# literally N % 10 == 0 — a "v*.0" tag glob would NOT match these tags.
+name: E2E suite
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Version gate: computes the every-10-versions condition. Cheap (seconds) on
+  # every run; outputs every_tenth=true only for tag pushes vNN with N % 10 == 0.
+  # Non-tag events (push to main, pull requests) always run the suite job.
+  version-gate:
+    name: version-gate (every 10 versions)
+    runs-on: ubuntu-latest
+    outputs:
+      every_tenth: ${{ steps.gate.outputs.every_tenth }}
+    steps:
+      - id: gate
+        run: |
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            echo "every_tenth=false (not a tag push — suite job runs)"
+            echo "every_tenth=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          n="${GITHUB_REF_NAME#v}"
+          if printf '%s' "$n" | grep -Eq '^[0-9]+$' && [ $((n % 10)) -eq 0 ]; then
+            echo "every_tenth=true (v$n: $n is a multiple of 10)"
+            echo "every_tenth=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "every_tenth=false (v$n: $n is not a multiple of 10 — gate closed)"
+            echo "every_tenth=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Full suite on every change: each push to main and every pull request.
+  # ~3 minutes on a runner — cheap enough to run unconditionally.
+  suite:
+    name: e2e suite (every change)
+    if: github.ref_type != 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run full E2E suite
+        run: npm test
+
+      - name: Upload Playwright report on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+
+  # Release verification: runs only when a version tag vNN crosses a multiple
+  # of 10 (N % 10 == 0, computed by version-gate). The full battery a release
+  # milestone gets: the E2E suite plus the two dev gates.
+  release-verification:
+    name: release verification (vNN, N % 10 == 0)
+    needs: version-gate
+    if: needs.version-gate.outputs.every_tenth == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run full E2E suite
+        run: npm test
+
+      - name: Structure audit
+        run: python3 dev/scripts/structure_audit.py
+
+      - name: Reference-policy gate
+        run: python3 dev/scripts/reference_policy_gate.py
+
+      - name: Upload Playwright report on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-release
+          path: playwright-report/

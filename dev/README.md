@@ -128,7 +128,9 @@ path literals (this project's parent→child loads), HTML `src`/`href`, CSS
 `url()`/`@import`, C `#include`, Python imports, Lua `require` and GDScript
 `preload`/`load`. Unresolved references warn unless they match the built-in
 allowlist — external URLs and data URIs, node builtins, bare module
-specifiers, system `#include` — or a `--allowlist` pattern. Generic string
+specifiers (scoped npm packages `@scope/name` and their subpath imports
+included; REFERENCE_POLICY.md §4.10), system `#include` — or a
+`--allowlist` pattern. Generic string
 literals (`path-literal`, `manifest-entry`, `doc-mention`) only record
 resolved hits and never warn.
 

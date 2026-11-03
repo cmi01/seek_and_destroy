@@ -2,7 +2,7 @@
   "name": "seek-and-destroy",
   "version": "0.0.0",
   "private": true,
-  "description": "Seek & Destroy — tactical fleet strategy engine. No build step: the game scripts and assets are served as-is from the repo root (see the dev server script). This manifest exists only to hold the Playwright E2E test harness (the test-architecture doc is dev/docs/TESTING.md).",
+  "description": "Seek & Destroy — tactical fleet strategy engine. No build step: the game scripts and assets are served as-is from the repo root (see the dev server script). This manifest exists only to hold the Playwright E2E test harness (test-architecture docs live in the dev tree).",
   "scripts": {
     "test": "playwright test"
   },
