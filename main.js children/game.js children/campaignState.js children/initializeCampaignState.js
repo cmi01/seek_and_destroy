@@ -11,9 +11,12 @@
 // (compliance: children are stateless pure functions receiving data).
 // Fleet hull names expand to RosterEntry records with each hull's default
 // loadout and full HP/crew; reputation is keyed per faction pair, zeroed.
+// M3: the map-state builder arrives as a third injected argument (a sibling
+// transform — this file never names it); without one the map keeps its
+// pre-map anchor shape. The map builder's output is the whole map section.
 // ============================================================
 
-const initializeCampaignState = function (campaignData, shipSpecs){
+const initializeCampaignState = function (campaignData, shipSpecs, buildMapFn){
   const start = campaignData.start;
   const factions = campaignData.factions;
 
@@ -46,6 +49,8 @@ const initializeCampaignState = function (campaignData, shipSpecs){
     },
     reputation: reputation,
     clock: { month: start.clock.month, year: start.clock.year },
-    map: { locationId: start.map.locationId }
+    map: (typeof buildMapFn === "function")
+      ? buildMapFn(campaignData, shipSpecs, null)
+      : { locationId: start.map.locationId }
   };
 };

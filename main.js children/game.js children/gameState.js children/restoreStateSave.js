@@ -10,7 +10,12 @@
 // (version V58-1.0, no campaign key) has its credits and income scaled ×100
 // and receives a campaign section. A payload already at DATA.version is
 // copied unchanged, so a current save cannot be scaled twice.
-const restoreStateSave = function (DATA, stateBox, data){
+// M3 map migration: a campaign section whose map carries no location list is
+// pre-map (M2-era or earlier) — the map state is built by the injected
+// sibling builder and the saved anchor becomes the fleet's location. A
+// payload that already carries the map passes through untouched (the
+// round-trip contract is JSON identity).
+const restoreStateSave = function (DATA, stateBox, data, buildMapFn){
   const PRE_M1_VERSION = "V58-1.0";
   const allowedKeys = new Set(Object.keys(DATA.initialState));
 
@@ -58,5 +63,27 @@ const restoreStateSave = function (DATA, stateBox, data){
     if (st.income) st.income = scaleMoney(st.income);
   }
   if (!hadCampaign) stateBox.current.campaign = campaignSection();
+
+  // M3 map migration (see header): rebuild the map for pre-map payloads.
+  const st = stateBox.current;
+  const map = st.campaign && st.campaign.map;
+  if (map && !Array.isArray(map.locations) && typeof buildMapFn === "function") {
+    const built = buildMapFn();
+    const anchor = map.locationId;
+    if (anchor && built && Array.isArray(built.locations) && Array.isArray(built.fleets)) {
+      for (let i = 0; i < built.locations.length; i++) {
+        const L = built.locations[i];
+        if (L.id === anchor) {
+          const fleets = built.fleets.map(function (f) {
+            return f.faction === "player" ? Object.assign({}, f, { x: L.x, y: L.y }) : f;
+          });
+          built.fleets = fleets;
+          built.locationId = anchor;
+          break;
+        }
+      }
+    }
+    if (built) st.campaign.map = built;
+  }
   return stateBox.current;
 };

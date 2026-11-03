@@ -15,7 +15,7 @@
 
 const campaignState = function (){
   return {
-    InitializeCampaignState(campaignData, shipSpecs){ return initializeCampaignState(campaignData, shipSpecs); },
+    InitializeCampaignState(campaignData, shipSpecs, buildMapFn){ return initializeCampaignState(campaignData, shipSpecs, buildMapFn); },
     TryPatchCampaignState(state, patch){ return tryPatchCampaignState(state, patch); },
     RosterOf(section, filter){ return rosterOf(section, filter); },
     BeginBattle(section, encounter, deployFn){ return beginBattle(section, encounter, deployFn); },

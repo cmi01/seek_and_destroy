@@ -11,7 +11,7 @@
 // level credits/income and budgets below are the v99 battle values ×100.
 // ============================================================
 const campaignDataPayload = (() => ({
-  version: "M1-1.0",
+  version: "M3-1.0",
   schema: "seek-and-destroy.campaign-data",
   campaign: {
     factions: ["Syndicate", "Capital", "Freehold", "Armoury", "Fringe"],
@@ -22,6 +22,38 @@ const campaignDataPayload = (() => ({
       cargo: { goods: 0, fuel: 20, crew: 0, parts: 5 },
       clock: { month: 1, year: 2401 },
       map: { locationId: "sol-gate" }
+    },
+    // ---- map (M3): the systems/stations table the map state is built from.
+    // Money values are the ×100 economy scale (DESIGN §4.5): fuelUnitPrice is
+    // 5 ⒸB per fuel unit. Locations carry their gravity well (destination
+    // radius, Q5) and the battle-terrain flavor level for encounters there.
+    map: {
+      fuelUnitPrice: 5,
+      hyperspaceMultiplier: 3,
+      monthTurns: 30,
+      wellRadius: 6,
+      locations: [
+        { id: "sol-gate", kind: "station", name: "SOL GATE STATION", x: 8, y: 30, levelId: 101, defenders: [] },
+        { id: "wayfarer-drift", kind: "nebula", name: "WAYFARER DRIFT", x: 12, y: 12, levelId: 101, defenders: [] },
+        { id: "aurora-prime", kind: "planet", name: "AURORA PRIME", x: 26, y: 18, levelId: 1, defenders: ["Fighter", "Attack Frigate"] },
+        { id: "tarnished-belt", kind: "nebula", name: "TARNISHED BELT", x: 34, y: 8, levelId: 1, defenders: [] },
+        { id: "wolfpack-debris", kind: "planet", name: "WOLFPACK DEBRIS", x: 42, y: 24, levelId: 1, defenders: ["Attack Destroyer", "Boarding APC"] },
+        { id: "phantom-drift", kind: "nebula", name: "PHANTOM DRIFT", x: 46, y: 42, levelId: 2, defenders: [] },
+        { id: "khepri-station", kind: "station", name: "KHEPRI STATION", x: 24, y: 44, levelId: 2, defenders: [] },
+        { id: "helix-yards", kind: "station", name: "HELIX YARDS", x: 14, y: 54, levelId: 2, defenders: [] },
+        { id: "ember-reach", kind: "planet", name: "EMBER REACH", x: 54, y: 14, levelId: 3, defenders: ["Missile Frigate", "Probe"] },
+        { id: "citadel-singularity", kind: "planet", name: "CITADEL SINGULARITY", x: 58, y: 32, levelId: 3, defenders: ["Flagship Battlecruiser", "Battleship"] },
+        { id: "cold-anchor", kind: "station", name: "COLD ANCHOR", x: 56, y: 54, levelId: 3, defenders: [] },
+        { id: "freehold-concourse", kind: "planet", name: "FREEHOLD CONCOURSE", x: 32, y: 58, levelId: 3, defenders: [] }
+      ],
+      fleets: [
+        // The player entry takes its ships from start.startFleet and its fuel
+        // from start.cargo.fuel (the map builder expands both).
+        { id: "player", faction: "player", x: 8, y: 30 },
+        { id: "syndicate-picket", faction: "Syndicate", x: 42, y: 24, fuel: 120, ships: ["Fighter", "Fighter", "Attack Frigate"] },
+        { id: "syndicate-raiders", faction: "Syndicate", x: 46, y: 42, fuel: 120, ships: ["Attack Destroyer", "Missile Frigate", "Probe"] },
+        { id: "merchant-caravan", faction: "Freehold", x: 24, y: 44, fuel: 60, ships: ["Shuttle", "Shuttle"] }
+      ]
     }
   },
   levels: [
