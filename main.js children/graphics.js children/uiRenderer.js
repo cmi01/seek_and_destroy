@@ -1029,9 +1029,10 @@
     }
   }
 
-  Graphics._registerLayer("ui", {
+  const layerApi = {
     drawBattleWorldReticles,
     drawHud,
     drawMinimapUi
-  });
+  };
+  globalThis.uiLayerApi = layerApi;
 })();

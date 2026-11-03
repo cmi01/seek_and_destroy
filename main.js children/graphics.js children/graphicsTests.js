@@ -202,4 +202,3 @@ const runGraphicsTests = function (bridge, testName) {
   }
   return suite.runAll();
 };
-Graphics._registerLayer("tests", runGraphicsTests);

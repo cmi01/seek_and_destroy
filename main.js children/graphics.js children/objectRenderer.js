@@ -283,12 +283,13 @@
     });
   }
 
-  Graphics._registerLayer("object", {
+  const layerApi = {
     spriteKey,
     getSpriteSlice,
     drawBattleWarpArcs,
     drawBattleObjects,
     drawBattleTacticalOverlays,
     drawMinimapUnits
-  });
+  };
+  globalThis.objectLayerApi = layerApi;
 })();

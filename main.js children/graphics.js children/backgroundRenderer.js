@@ -237,10 +237,11 @@
     ctx.stroke();
   }
 
-  Graphics._registerLayer("background", {
+  const layerApi = {
     paintTerrain,
     drawBattleGridAndTerrain,
     drawBattleFog,
     drawMinimapBackground
-  });
+  };
+  globalThis.backgroundLayerApi = layerApi;
 })();

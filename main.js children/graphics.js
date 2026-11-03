@@ -956,10 +956,17 @@ const Graphics = (() => {
     if (_loadPromise) return _loadPromise;
     _loadPromise = (async () => {
       await _loadScripts(GRAPHICS_CHILDREN);
-      // The flattened child exposes one plain pure function at script scope
-      // (no registrar handshake): the loader captures the binding here, at
-      // load. A missing capture fails exactly where an unregistered module
-      // did — through the error list below.
+      // Parent captures each child at load. Renderer children publish a layer
+      // object onto a neutral global (they name no parent binding); the
+      // animation child is a script-scope function; the atlas pack still uses
+      // the load-time registrar because its container is not a scanned script.
+      // A missing capture fails exactly where an unregistered module did.
+      if (globalThis.backgroundLayerApi) _layers.background = globalThis.backgroundLayerApi;
+      if (globalThis.objectLayerApi) _layers.object = globalThis.objectLayerApi;
+      if (globalThis.uiLayerApi) _layers.ui = globalThis.uiLayerApi;
+      delete globalThis.backgroundLayerApi;
+      delete globalThis.objectLayerApi;
+      delete globalThis.uiLayerApi;
       _layers.vfx = typeof drawAnimation === "function" ? drawAnimation : null;
       _registrationOpen = false;
       delete api._registerLayer;
@@ -985,13 +992,9 @@ const Graphics = (() => {
   function loadTests() {
     if (_layers.tests) return Promise.resolve();
     if (!_testsPromise) {
-      _registrationOpen = true;
-      api._registerLayer = _registerLayer;
       _testsPromise = _loadScripts([GRAPHICS_TEST_CHILD]).then(() => {
+        _layers.tests = typeof runGraphicsTests === "function" ? runGraphicsTests : null;
         if (!_layers.tests) throw new Error(GRAPHICS_TEST_CHILD + " loaded but did not register its module.");
-      }).finally(() => {
-        _registrationOpen = false;
-        delete api._registerLayer;
       }).catch(err => {
         _testsPromise = null;
         throw err;

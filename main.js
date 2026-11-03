@@ -460,19 +460,13 @@ async function startGame(){
       ["main.js children/game.js children/hud.js children/hudBanner.js",             () => typeof buildPriorityBanner === "function"]
     ]);
 
-    // One AI member still publishes through the load channel: the priorities
-    // table, which follows the *_DATA.js convention. The shell opens that
-    // channel for the batch, then hands the frozen table on as a plain script
-    // binding, so no AI file sees a registrar after load and none is left
-    // behind. Everything else in the subtree is a plain script-scope binding.
-    const aiPublished = {};
-    window.getAIAction = { _register: function(name, mod){ aiPublished[name] = mod; } };
-    try {
-      await _loadScripts(AI_TREE_SCRIPTS);
-    } finally {
-      delete window.getAIAction;
-    }
-    window.aiPrioritiesData = _freezeTree(aiPublished.prioritiesData || {});
+    // The priorities table is a plain script-scope binding. The shell freezes
+    // it and republishes the frozen object under the name consumers already
+    // read, so no AI file names a parent binding and none is left behind.
+    await _loadScripts(AI_TREE_SCRIPTS);
+    window.aiPrioritiesData = _freezeTree(
+      (typeof aiPrioritiesTable !== "undefined" && aiPrioritiesTable) || {}
+    );
     _verifyLoaded([
       ["main.js children/game.js children/ai.js children/aiPriorities_DATA.js", () => typeof aiPrioritiesData === "object" && aiPrioritiesData !== null],
       ["main.js children/game.js children/ai.js children/aiTurnWorkflow.js children/computeUpdatedReservations.js", () => typeof computeUpdatedReservations === "function"],
