@@ -22,6 +22,16 @@
     }
   };
 
+  // M1 roster growth: the four hulls added by the campaign roster have no
+  // dedicated art rows yet. Until the atlas bake ships new art, they render
+  // from their base hull's rows (documented deviation in the M1 PR).
+  const SPRITE_ROW_ALIASES = {
+    "Dreadnought": "Battleship",
+    "Dreadnought Flagship": "Battleship",
+    "Attack Frigate Flagship": "Attack Frigate",
+    "Light Cruiser Flagship": "Light Cruiser"
+  };
+
   // ---- Plain-data helpers (local re-implementations over frame data) -------
   const _cellCenter = (gx, gy, CP) => ({ x: (gx + 0.5) * CP, y: (gy + 0.5) * CP });
   const _spottedBy = (u, team) => Boolean(u && (u.team === team || u.spottedByPlayer));
@@ -40,9 +50,10 @@
     const shipOrder = cfg.shipRows || DEFAULT_SPRITE_CONFIG.shipRows;
     const marineSentRow = cfg.marineSentRows || DEFAULT_SPRITE_CONFIG.marineSentRows;
     const sentMarines = _hasFlag(unit, "#space marines") && _hasFlag(unit, "-sent boarding party");
+    const spriteType = SPRITE_ROW_ALIASES[unit.type] || unit.type;
     const row = (sentMarines && marineSentRow[unit.type] !== undefined)
       ? marineSentRow[unit.type]
-      : shipOrder.indexOf(unit.type);
+      : shipOrder.indexOf(spriteType);
     if (row < 0) return null;
     const col = (unit.team === 2 ? 4 : 0)
               | (_hasFlag(unit, "-moved") ? 2 : 0)

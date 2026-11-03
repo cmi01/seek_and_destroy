@@ -427,7 +427,10 @@ const GAME_LEAF_SCRIPTS = [
   "main.js children/game.js children/selectionQueries.js children/getSelectedUnit.js",
   "main.js children/game.js children/selectionQueries.js children/cellForUnit.js",
   "main.js children/game.js children/sectorGenerator.js children/buildUnitRecord.js",
-  "main.js children/game.js children/sectorGenerator.js children/buildSectorData.js"
+  "main.js children/game.js children/sectorGenerator.js children/buildSectorData.js",
+  "main.js children/game.js children/campaignState.js children/initializeCampaignState.js",
+  "main.js children/game.js children/campaignState.js children/tryPatchCampaignState.js",
+  "main.js children/game.js children/campaignState.js children/rosterOf.js"
 ];
 
 async function startGame(){
@@ -562,7 +565,10 @@ async function startGame(){
       ["main.js children/game.js children/selectionQueries.js children/getSelectedUnit.js", () => typeof getSelectedUnit === "function"],
       ["main.js children/game.js children/selectionQueries.js children/cellForUnit.js",  () => typeof cellForUnit === "function"],
       ["main.js children/game.js children/sectorGenerator.js children/buildUnitRecord.js", () => typeof buildUnitRecord === "function"],
-      ["main.js children/game.js children/sectorGenerator.js children/buildSectorData.js", () => typeof buildSectorData === "function"]
+      ["main.js children/game.js children/sectorGenerator.js children/buildSectorData.js", () => typeof buildSectorData === "function"],
+      ["main.js children/game.js children/campaignState.js children/initializeCampaignState.js", () => typeof initializeCampaignState === "function"],
+      ["main.js children/game.js children/campaignState.js children/tryPatchCampaignState.js", () => typeof tryPatchCampaignState === "function"],
+      ["main.js children/game.js children/campaignState.js children/rosterOf.js", () => typeof rosterOf === "function"]
     ]);
 
     await Game.load();

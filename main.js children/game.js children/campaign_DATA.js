@@ -3,10 +3,26 @@
 // ============================================================
 // campaign_DATA.js — job: return the campaign and level table.
 // Owner: game.js. Holds no state unless it is a core.
+//
+// M1: adds the `campaign` section — the frozen starting package the
+// campaign state model is initialized from (fleet as hull names, wallet,
+// cargo, clock, map anchor; reputation is keyed per faction pair at
+// init). All money values are on the ×100 economy scale (DESIGN §4.5):
+// level credits/income and budgets below are the v99 battle values ×100.
 // ============================================================
 const campaignDataPayload = (() => ({
-  version: "V58-1.0",
+  version: "M1-1.0",
   schema: "seek-and-destroy.campaign-data",
+  campaign: {
+    factions: ["Syndicate", "Capital", "Freehold", "Armoury", "Fringe"],
+    start: {
+      wallet: 25000,
+      startFleet: ["Flagship Battlecruiser", "Fighter", "Fighter", "Attack Frigate", "Probe"],
+      cargo: { goods: 0, fuel: 20, crew: 0, parts: 5 },
+      clock: { month: 1, year: 2401 },
+      map: { locationId: "sol-gate" }
+    }
+  },
   levels: [
     {
       id:101, tag:"TUTORIAL 01 // CALIBRATION RANGE", title:"TUTORIAL 01: TACTICAL CALIBRATION RANGE",
@@ -14,7 +30,7 @@ const campaignDataPayload = (() => ({
       aiDoctrine:"DEFENSIVE_HOLD",
       asteroidClusters:{count:2,clusterSizeMin:3,clusterSizeMax:4},
       nebulaPatches:{count:2,patchSizeMin:3,patchSizeMax:5},
-      t1StartingCredits:35, t1Income:5, t2StartingCredits:0, t2Income:0,
+      t1StartingCredits:3500, t1Income:500, t2StartingCredits:0, t2Income:0,
       t1SpawnList:["Flagship Battlecruiser","Probe","Attack Frigate","Railgun Destroyer","Boarding APC"],
       t2SpawnList:["Flagship Battlecruiser","Probe","Shuttle","Light Cruiser","Heavy Cruiser"],
       t2CompositionBudget:0, t2ArchetypePool:["Shuttle"],
@@ -31,10 +47,10 @@ const campaignDataPayload = (() => ({
       aiDoctrine:"AGGRESSIVE_SWARM",
       asteroidClusters:{count:5,clusterSizeMin:3,clusterSizeMax:6},
       nebulaPatches:{count:4,patchSizeMin:4,patchSizeMax:7},
-      t1StartingCredits:50, t1Income:4, t2StartingCredits:65, t2Income:4,
+      t1StartingCredits:5000, t1Income:400, t2StartingCredits:6500, t2Income:400,
       t1SpawnList:["Flagship Battlecruiser","Probe","Attack Frigate","Attack Destroyer"],
       t2SpawnList:["Flagship Battlecruiser","Probe","Boarding APC"],
-      t2CompositionBudget:75, t2ArchetypePool:["Fighter","Bomber","Boarding APC","Attack Frigate","Attack Destroyer"],
+      t2CompositionBudget:7500, t2ArchetypePool:["Fighter","Bomber","Boarding APC","Attack Frigate","Attack Destroyer"],
       previewArchetypes:["Fighter","Bomber","Attack Destroyer","Flagship Battlecruiser"],
       initialIntel:[
         "SECTOR 01 TELEMETRY: Syndicate wolfpacks detected behind central asteroid clusters.",
@@ -47,10 +63,10 @@ const campaignDataPayload = (() => ({
       aiDoctrine:"ARTILLERY_SCREEN",
       asteroidClusters:{count:4,clusterSizeMin:3,clusterSizeMax:5},
       nebulaPatches:{count:6,patchSizeMin:5,patchSizeMax:9},
-      t1StartingCredits:50, t1Income:5, t2StartingCredits:140, t2Income:6,
+      t1StartingCredits:5000, t1Income:500, t2StartingCredits:14000, t2Income:600,
       t1SpawnList:["Flagship Battlecruiser","Probe","Missile Frigate","Light Cruiser"],
       t2SpawnList:["Flagship Battlecruiser","Flagship Battlecruiser","Probe","Probe","Missile Battleship"],
-      t2CompositionBudget:95, t2ArchetypePool:["Probe","Missile Frigate","Missile Destroyer","Missile Cruiser"],
+      t2CompositionBudget:9500, t2ArchetypePool:["Probe","Missile Frigate","Missile Destroyer","Missile Cruiser"],
       previewArchetypes:["Probe","Missile Destroyer","Missile Cruiser","Missile Battleship"],
       initialIntel:[
         "SECTOR 02 TELEMETRY: Two Syndicate Flagship Battlecruisers and an R:8 Missile Battleship screen detected.",
@@ -63,10 +79,10 @@ const campaignDataPayload = (() => ({
       aiDoctrine:"APEX_ARMADA",
       asteroidClusters:{count:6,clusterSizeMin:4,clusterSizeMax:7},
       nebulaPatches:{count:5,patchSizeMin:4,patchSizeMax:8},
-      t1StartingCredits:60, t1Income:5, t2StartingCredits:260, t2Income:8,
+      t1StartingCredits:6000, t1Income:500, t2StartingCredits:26000, t2Income:800,
       t1SpawnList:["Flagship Battlecruiser","Probe","Railgun Destroyer","Heavy Cruiser","Boarding APC"],
       t2SpawnList:["Flagship Battlecruiser","Flagship Battlecruiser","Flagship Battlecruiser","Battleship","Missile Battleship","Probe","Probe"],
-      t2CompositionBudget:130, t2ArchetypePool:["Railgun Cruiser","Heavy Cruiser","Battlecruiser","Boarding APC","Probe"],
+      t2CompositionBudget:13000, t2ArchetypePool:["Railgun Cruiser","Heavy Cruiser","Battlecruiser","Boarding APC","Probe"],
       previewArchetypes:["Railgun Cruiser","Missile Battleship","Battleship","Flagship Battlecruiser"],
       initialIntel:[
         "SECTOR 03 TELEMETRY: Three Syndicate Flagships and heavy #railgun dreadnoughts hold the Singularity Citadel.",
