@@ -18,6 +18,7 @@ const buildUnitRecord = function (shipSpecs, nextId, type, team, x, y, applySpaw
     id: nextId,
     type,
     team,
+    kind: "ship",
     x,
     y,
     hp: spec.hp,

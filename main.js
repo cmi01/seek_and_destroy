@@ -251,8 +251,8 @@ const HUD_WIDGET_SCRIPTS = [
   "main.js children/game.js children/hud.js children/buildTelemetryCardRects.js",
   "main.js children/game.js children/hud.js children/buildHelpLines.js",
   "main.js children/game.js children/hud.js children/buildHelpPanel.js",
-  "main.js children/game.js children/hud.js children/buildBridgeShopModel.js",
-  "main.js children/game.js children/hud.js children/buildBridgeShopButtons.js",
+  "main.js children/game.js children/hud.js children/buildReserveModel.js",
+  "main.js children/game.js children/hud.js children/buildReserveButtons.js",
   "main.js children/game.js children/hud.js children/buildCampaignCards.js",
   "main.js children/game.js children/hud.js children/buildCampaignLayout.js",
   "main.js children/game.js children/hud.js children/buildEndgameModel.js",
@@ -419,6 +419,9 @@ const GAME_LEAF_SCRIPTS = [
   "main.js children/game.js children/combatMath.js children/resolveCollisionOutcome.js",
   "main.js children/game.js children/combatMath.js children/isLethalShot.js",
   "main.js children/game.js children/combatMath.js children/isShootableFrom.js",
+  "main.js children/game.js children/combatMath.js children/computeCrewLost.js",
+  "main.js children/game.js children/reservePlacement.js children/listWarpCells.js",
+  "main.js children/game.js children/reservePlacement.js children/planDeployment.js",
   "main.js children/game.js children/cameraMath.js children/resolveZoomStep.js",
   "main.js children/game.js children/cameraMath.js children/clampViewportToBoard.js",
   "main.js children/game.js children/cameraMath.js children/computeRenderedViewport.js",
@@ -430,7 +433,9 @@ const GAME_LEAF_SCRIPTS = [
   "main.js children/game.js children/sectorGenerator.js children/buildSectorData.js",
   "main.js children/game.js children/campaignState.js children/initializeCampaignState.js",
   "main.js children/game.js children/campaignState.js children/tryPatchCampaignState.js",
-  "main.js children/game.js children/campaignState.js children/rosterOf.js"
+  "main.js children/game.js children/campaignState.js children/rosterOf.js",
+  "main.js children/game.js children/campaignState.js children/beginBattle.js",
+  "main.js children/game.js children/campaignState.js children/applyBattleResult.js"
 ];
 
 async function startGame(){
@@ -450,8 +455,8 @@ async function startGame(){
       ["main.js children/game.js children/hud.js children/buildTelemetryCardRects.js", () => typeof buildTelemetryCardRects === "function"],
       ["main.js children/game.js children/hud.js children/buildHelpLines.js",        () => typeof buildHelpLines === "function"],
       ["main.js children/game.js children/hud.js children/buildHelpPanel.js",        () => typeof buildHelpPanel === "function"],
-      ["main.js children/game.js children/hud.js children/buildBridgeShopModel.js",  () => typeof buildBridgeShopModel === "function"],
-      ["main.js children/game.js children/hud.js children/buildBridgeShopButtons.js", () => typeof buildBridgeShopButtons === "function"],
+      ["main.js children/game.js children/hud.js children/buildReserveModel.js",  () => typeof buildReserveModel === "function"],
+      ["main.js children/game.js children/hud.js children/buildReserveButtons.js", () => typeof buildReserveButtons === "function"],
       ["main.js children/game.js children/hud.js children/buildCampaignCards.js",    () => typeof buildCampaignCards === "function"],
       ["main.js children/game.js children/hud.js children/buildCampaignLayout.js",   () => typeof buildCampaignLayout === "function"],
       ["main.js children/game.js children/hud.js children/buildEndgameModel.js",     () => typeof buildEndgameModel === "function"],
@@ -557,6 +562,9 @@ async function startGame(){
       ["main.js children/game.js children/combatMath.js children/resolveCollisionOutcome.js", () => typeof resolveCollisionOutcome === "function"],
       ["main.js children/game.js children/combatMath.js children/isLethalShot.js",       () => typeof isLethalShot === "function"],
       ["main.js children/game.js children/combatMath.js children/isShootableFrom.js",    () => typeof isShootableFrom === "function"],
+      ["main.js children/game.js children/combatMath.js children/computeCrewLost.js",    () => typeof computeCrewLost === "function"],
+      ["main.js children/game.js children/reservePlacement.js children/listWarpCells.js", () => typeof listWarpCells === "function"],
+      ["main.js children/game.js children/reservePlacement.js children/planDeployment.js", () => typeof planDeployment === "function"],
       ["main.js children/game.js children/cameraMath.js children/resolveZoomStep.js",    () => typeof resolveZoomStep === "function"],
       ["main.js children/game.js children/cameraMath.js children/clampViewportToBoard.js", () => typeof clampViewportToBoard === "function"],
       ["main.js children/game.js children/cameraMath.js children/computeRenderedViewport.js", () => typeof computeRenderedViewport === "function"],
@@ -568,7 +576,9 @@ async function startGame(){
       ["main.js children/game.js children/sectorGenerator.js children/buildSectorData.js", () => typeof buildSectorData === "function"],
       ["main.js children/game.js children/campaignState.js children/initializeCampaignState.js", () => typeof initializeCampaignState === "function"],
       ["main.js children/game.js children/campaignState.js children/tryPatchCampaignState.js", () => typeof tryPatchCampaignState === "function"],
-      ["main.js children/game.js children/campaignState.js children/rosterOf.js", () => typeof rosterOf === "function"]
+      ["main.js children/game.js children/campaignState.js children/rosterOf.js", () => typeof rosterOf === "function"],
+      ["main.js children/game.js children/campaignState.js children/beginBattle.js", () => typeof beginBattle === "function"],
+      ["main.js children/game.js children/campaignState.js children/applyBattleResult.js", () => typeof applyBattleResult === "function"]
     ]);
 
     await Game.load();

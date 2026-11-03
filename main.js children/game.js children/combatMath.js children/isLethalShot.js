@@ -7,6 +7,7 @@
 
 const isLethalShot = function (D, u, target){
   if (!target || target.hp <= 0) return false;
+  if (target.kind === "mirage") return true;
   const shieldDmg = D.combatRules.shieldNonRailgunDamage || 1;
   const dmg = (target.flags.has("+shield") && !u.flags.has("#railgun")) ? shieldDmg : u.firepower;
   return (target.hp - dmg) <= 0;

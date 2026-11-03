@@ -6,6 +6,10 @@
 // ============================================================
 
 const resolveShootOutcome = function (D, unitA, target){
+  // A mirage has no HP: any hit destroys it (DESIGN §2.8).
+  if (target && target.kind === "mirage"){
+    return { damageDealt: Math.max(target.hp || 1, 1), shieldStripped: false };
+  }
   const shieldDmg = D.combatRules.shieldNonRailgunDamage || 1;
   if (target.flags.has("+shield")){
     // Any hit breaks the bubble; only #railgun fire keeps its full

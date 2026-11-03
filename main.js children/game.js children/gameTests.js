@@ -332,10 +332,108 @@ const runGameTests = function (bridge, testName) {  const suite = {
       };
     },
 
+    // M2 AC: summon costs exactly 1 AP and 0 credits (DESIGN §2.8).
+    testSummonCostsOneAp() {
+      this.clearBoard();
+      const st = bridge.state;
+      st.ap = 4;
+      st.credits = { 1: 9999, 2: 0 };
+      st.activeTeam = 1;
+      const flag = bridge.createUnit("Flagship Battlecruiser", 1, 16, 16, false);
+      st.battleReserve = [{ hull: "Fighter", loadout: [], hp: 2, maxHp: 2, crew: 1 }];
+      const ok = bridge.executeWarpIn(flag, "Fighter", false, 1, {});
+      const spawned = st.units.find(u => u.type === "Fighter");
+      const pass = Boolean(ok) && st.ap === 3 && st.credits[1] === 9999 && spawned && spawned.kind === "mirage";
+      return {
+        name: "M2 SUMMON 1 AP 0 CREDITS",
+        pass: pass,
+        detail: pass ? "AP 4→3, credits unchanged, mirage on board" : ("ok="+ok+" ap="+st.ap+" credits="+st.credits[1]+" kind="+(spawned && spawned.kind))
+      };
+    },
+
+    // M2 AC: any hit destroys a mirage.
+    testMirageAnyHitDestroys() {
+      this.clearBoard();
+      const st = bridge.state;
+      st.ap = 4;
+      st.activeTeam = 1;
+      const shooter = bridge.createUnit("Fighter", 1, 16, 16, false);
+      const mirage = bridge.createUnit("Probe", 2, 16, 17, false);
+      mirage.kind = "mirage";
+      bridge.executeShoot(shooter, mirage, false, 1);
+      const alive = st.units.some(u => u.id === mirage.id && u.hp > 0);
+      const pass = !alive;
+      return { name: "M2 MIRAGE ANY HIT DESTROYS", pass: pass, detail: pass ? "mirage removed after one hit" : "mirage still alive hp=" + mirage.hp };
+    },
+
+    // M2 AC: ram against a mirage destroys both ships.
+    testMirageRamDestroysBoth() {
+      this.clearBoard();
+      const st = bridge.state;
+      st.ap = 4;
+      st.activeTeam = 1;
+      const rammer = bridge.createUnit("Fighter", 1, 16, 16, false);
+      const mirage = bridge.createUnit("Probe", 2, 16, 17, false);
+      mirage.kind = "mirage";
+      const rammerId = rammer.id, mirageId = mirage.id;
+      bridge.executeMove(rammer, { x: 16, y: 17 }, false, 1);
+      const rammerAlive = st.units.some(u => u.id === rammerId && u.hp > 0);
+      const mirageAlive = st.units.some(u => u.id === mirageId && u.hp > 0);
+      const pass = !rammerAlive && !mirageAlive;
+      return { name: "M2 MIRAGE RAM DESTROYS BOTH", pass: pass, detail: pass ? "both hulls destroyed" : "rammerAlive="+rammerAlive+" mirageAlive="+mirageAlive };
+    },
+
+    // M2 AC: losing the flagship yields campaign-over endgame status.
+    testFlagshipLostCampaignOver() {
+      this.clearBoard();
+      const enemy = bridge.createUnit("Flagship Battlecruiser", 2, 16, 16, false);
+      const status = bridge.checkEndgameStatus(bridge.state.units);
+      const pass = status.over === true && status.reason === "flagship-lost" && status.t1Defeated === true;
+      return { name: "M2 FLAGSHIP-LOST CAMPAIGN OVER", pass: pass, detail: pass ? "over/flagship-lost" : JSON.stringify(status) + " enemy=" + enemy.type };
+    },
+
+    // M2 AC: seeded carry-over — payout formula, crew transfer, captured hull retained.
+    testBattleCarryOver() {
+      bridge.initializeCampaign();
+      const section = bridge.campaign;
+      const specs = bridge.shipSpecs;
+      const setup = bridge.openBattle(section, {
+        seed: 7,
+        capacity: 2,
+        opponent: [{ hull: "Attack Destroyer", loadout: ["Dual Light Cannons"], hp: 5, maxHp: 5, crew: 8 }]
+      });
+      const overflowOk = setup.overflow.length === 3 && setup.deployments[0].units.length === 2;
+      const flag = { hull: "Flagship Battlecruiser", loadout: specs["Flagship Battlecruiser"].defaultLoadout.slice(), hp: 6, maxHp: 12, crew: 88 };
+      const fighter = { hull: "Fighter", loadout: specs["Fighter"].defaultLoadout.slice(), hp: 2, maxHp: 2, crew: 5 };
+      const captured = { hull: "Probe", loadout: [], hp: 1, maxHp: 1, crew: 1 };
+      const folded = bridge.foldBattle(section, {
+        winner: "player",
+        survivors: [flag, fighter],
+        captured: [captured],
+        scrapped: [{ hull: "Attack Destroyer" }]
+      });
+      const next = folded.state;
+      const flagNext = next.fleet.find(e => e.hull === "Flagship Battlecruiser");
+      const hasProbe = next.fleet.some(e => e.hull === "Probe");
+      const expectParts = Math.floor(specs["Attack Destroyer"].capacity * 0.5);
+      const lost = bridge.crewKilled(6, 12, 88);
+      const expectFlagCrew = Math.min(specs["Flagship Battlecruiser"].crew, (88 - lost) + 5 + 1);
+      const partsOk = next.cargo.parts === (section.cargo.parts + expectParts);
+      const crewOk = flagNext && flagNext.crew === expectFlagCrew;
+      const pass = overflowOk && partsOk && crewOk && hasProbe;
+      return {
+        name: "M2 BATTLE CARRY-OVER",
+        pass: pass,
+        detail: pass ? ("parts +"+expectParts+", flagship crew "+expectFlagCrew+", Probe retained") : ("overflow="+setup.overflow.length+" parts="+next.cargo.parts+" crew="+(flagNext && flagNext.crew)+" probe="+hasProbe)
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
         this.testCampaignV99SaveMigration(),
+        this.testSummonCostsOneAp(), this.testMirageAnyHitDestroys(), this.testMirageRamDestroysBoth(),
+        this.testFlagshipLostCampaignOver(), this.testBattleCarryOver(),
         this.testKiting(), this.testFlagshipGuard(), this.testFocusFire(), this.testDoctrine(),
         this.testFlagshipShieldAlwaysUp(), this.testRailgunAvoidance(), this.testFleeWhenOutgunned(),
         this.testRecedingHorizon(), this.testBudgetAwarePlanning(),

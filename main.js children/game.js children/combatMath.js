@@ -9,6 +9,7 @@ const combatMath = function (D){
     computeShootOutcome(unitA, target){ return resolveShootOutcome(D, unitA, target); },
     computeCollisionOutcome(unitA, occupant){ return resolveCollisionOutcome(D, unitA, occupant); },
     isKillShot(u, target){ return isLethalShot(D, u, target); },
-    shootableFrom(u, dest, target, ev){ return isShootableFrom(u, dest, target, ev); }
+    shootableFrom(u, dest, target, ev){ return isShootableFrom(u, dest, target, ev); },
+    crewLostFromDamage(damage, maxHp, crew){ return computeCrewLost(damage, maxHp, crew); }
   };
 };

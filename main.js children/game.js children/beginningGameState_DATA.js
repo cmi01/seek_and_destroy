@@ -29,6 +29,7 @@ const beginningGameStateDataPayload = (() => ({
     exploredCells: [],
     asteroidSeeds: [],
     units: [],
+    battleReserve: [],
     nextUnitId: 1,
     aiDoctrine: "DEFENSIVE_HOLD",
     historicalVectors: [],

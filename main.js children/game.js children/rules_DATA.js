@@ -80,7 +80,7 @@ const rulesDataPayload = (() => ({
   },
   flagDescriptions: {
     "!flagship": "Command Locus: Losing all friendly !flagship units triggers immediate defeat. Immune to #space marines boarding capture.",
-    "#capital ship": "Mobile Warp Locus: Opens R:6 warp-ins via the REINFORCEMENTS button (or [Space]).",
+    "#capital ship": "Capital hull: no warp role. Only the !flagship anchors a 1 AP reserve summon (visible empty cell within 3).",
     "#railgun": "Hyper-Velocity Spinal Mount: Breaks enemy +shield bubbles and deals full firepower to hull HP.",
     "#space marines": "Boarding Contingent: Can capture adjacent (d <= 1) spotted non-flagship enemy vessels.",
     "#shield generator": "Deflector Array: Can spend 1 AP (S badge on self) to regenerate +shield if not -shielded this turn.",
