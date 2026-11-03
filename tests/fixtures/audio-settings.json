@@ -1,0 +1,4 @@
+{
+  "$comment": "localStorage payloads for sd.audio.settings.v2 (test-architecture doc §2). Pure data. TODO(10-persistence-audio.spec.ts): fill in the canonical payload shape once the persistence spec pins it against observed localStorage output; keys and value shapes here must mirror what sounds.js actually writes.",
+  "payloads": {}
+}

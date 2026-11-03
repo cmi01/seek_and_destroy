@@ -24,4 +24,8 @@ tmp/
 *.bkp.*
 dev/reference_graph.json
 
+# Playwright E2E harness output (TESTING.md)
+test-results/
+playwright-report/
+
 # Platform identity file is intentionally NOT ignored — keep it tracked.

@@ -204,7 +204,7 @@ def exposed_function_names(text):
 def list_js_files():
     out = []
     for root, dirs, names in os.walk(REPO_ROOT):
-        dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("dev", "snd-versions")]
+        dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("dev", "snd-versions", "node_modules", "test-results", "playwright-report")]
         for n in sorted(names):
             if n.endswith(".js"):
                 out.append(os.path.relpath(os.path.join(root, n), REPO_ROOT))

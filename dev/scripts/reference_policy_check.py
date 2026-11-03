@@ -81,7 +81,10 @@ GRAPH_SCHEMA = "reference-graph/1"
 
 TEXT_EXT = (".js", ".html", ".css", ".json", ".md", ".txt", ".sh", ".conf",
             ".yml", ".yaml", ".py")
-SKIP_DIRS = {".git", "__pycache__", "node_modules", "dist", "build"}
+SKIP_DIRS = {".git", "__pycache__", "node_modules", "dist", "build",
+             # untracked generated/vendored output (npm + Playwright E2E):
+             # never repository content, never referrers or referents.
+             "test-results", "playwright-report"}
 
 DEV_DIR = "dev"
 

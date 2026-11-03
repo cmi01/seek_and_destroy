@@ -1,0 +1,7 @@
+{
+  "$comment": "Canonical RNG seeds and their expected deterministic sector layouts (test-architecture doc §2, §7). Pure data. TODO(02-sector-generation.spec.ts): fill in canonical seeds (SD.setSeed(n) / mulberry32) and the expected unit layouts each seed generates; do not invent expected layouts until that spec is written against observed output.",
+  "seeds": {
+    "sectorDeterminism": 42
+  },
+  "expectedLayouts": {}
+}
