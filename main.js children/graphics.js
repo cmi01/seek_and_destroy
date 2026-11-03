@@ -5,6 +5,7 @@
 // ============================================================
 const Graphics = (() => {
   const GRAPHICS_CHILDREN = [
+    "main.js children/graphics.js children/terrainTileIndex.js",
     "main.js children/graphics.js children/backgroundRenderer.js",
     "main.js children/graphics.js children/objectRenderer.js",
     "main.js children/graphics.js children/vfx.js",
@@ -35,7 +36,8 @@ const Graphics = (() => {
   let _atlasesInitialized = false;
   let _missingChildrenReported = false;
   let _stylesInjected = false;
-  const _terrainCache = { canvas: null, key: "", ref: null };
+  const _terrainTiles = { worldKey: "", ref: null, map: new Map(), stamp: 0 };
+  let _indexTerrainTiles = null;
   const _atlasState = { images: {}, readyPromises: [] };
   let _themesData = null;
   const _colorCaches = {};
@@ -573,15 +575,8 @@ const Graphics = (() => {
     return out;
   }
 
-  // ---- Terrain cache: core-owned canvas, key & invalidation ----------------
-  function _terrainDensity(gridSize, CP, renderScale) {
-    const cssSide = Math.max(1, gridSize * CP);
-    const budget = 4096;
-    const rs = renderScale > 0 ? renderScale : 1;
-    return Math.min(rs, budget / cssSide);
-  }
-
-  function _terrainKey(state, themeKey, gridSize, CP, FS, density) {
+  // ---- Terrain cache: core-owned tile canvases, key & invalidation ---------
+  function _terrainWorldKey(state, themeKey, gridSize, CP, FS, density) {
     return `${state.levelId}|${themeKey}|${gridSize}|${CP.toFixed(2)}|${FS.toFixed(3)}|${Number(density).toFixed(4)}`;
   }
 
@@ -624,31 +619,98 @@ const Graphics = (() => {
     };
   }
 
-  // Returns the cached terrain canvas for this key, or repaints it via the
-  // background layer (which only receives a validated canvas to paint into).
-  function _ensureTerrainCanvas(state, themeKey, bp, gridSize, CP, FS) {
-    const RS = (_graphicsBridge && _graphicsBridge.metrics && _graphicsBridge.metrics.renderScale) || 1;
-    const density = _terrainDensity(gridSize, CP, RS);
-    const key = _terrainKey(state, themeKey, gridSize, CP, FS, density);
-    const cache = _terrainCache;
-    if (cache.canvas && cache.key === key && cache.ref === state.terrain) return cache.canvas;
+  // Bakes one tile (plus a 1-cell halo so asteroid overflow is not clipped).
+  function _bakeTerrainTile(spec, density, state, bp, gridSize, CP, FS, shapes) {
     const paintCP = CP * density;
     const paintFS = FS * density;
-    const totalPx = Math.max(64, Math.ceil(gridSize * paintCP));
-    if (!cache.canvas) cache.canvas = _createCanvas(totalPx, totalPx);
-    if (cache.canvas.width !== totalPx || cache.canvas.height !== totalPx) {
-      cache.canvas.width = totalPx;
-      cache.canvas.height = totalPx;
-    }
+    const pad = 1;
+    const originGx = Math.max(0, spec.gx0 - pad);
+    const originGy = Math.max(0, spec.gy0 - pad);
+    const endGx = Math.min(gridSize, spec.gx0 + spec.cellsX + pad);
+    const endGy = Math.min(gridSize, spec.gy0 + spec.cellsY + pad);
+    const pxW = Math.max(1, Math.ceil((endGx - originGx) * paintCP));
+    const pxH = Math.max(1, Math.ceil((endGy - originGy) * paintCP));
+    const canvas = _createCanvas(pxW, pxH);
     _layers.background.paintTerrain({
-      canvas: cache.canvas, state, bp, gridSize, CP: paintCP, FS: paintFS,
-      shapes: _terrainShapes(state, gridSize, paintFS),
-      TC: _themeColor
+      canvas, state, bp, gridSize, CP: paintCP, FS: paintFS,
+      shapes, TC: _themeColor,
+      originGx, originGy, gx0: originGx, gy0: originGy, gx1: endGx, gy1: endGy
     });
-    cache.key = key;
-    cache.ref = state.terrain;
-    cache.density = density;
-    return cache.canvas;
+    return {
+      canvas,
+      gx0: spec.gx0,
+      gy0: spec.gy0,
+      cellsX: spec.cellsX,
+      cellsY: spec.cellsY,
+      originGx,
+      originGy,
+      pxW,
+      pxH,
+      stamp: 0
+    };
+  }
+
+  function _evictTerrainTiles(budgetPx, liveStamp) {
+    const cache = _terrainTiles;
+    let used = 0;
+    const entries = [];
+    cache.map.forEach(function (tile, key) {
+      used += tile.pxW * tile.pxH;
+      entries.push([key, tile]);
+    });
+    if (used <= budgetPx) return;
+    entries.sort(function (a, b) { return a[1].stamp - b[1].stamp; });
+    for (let i = 0; i < entries.length; i++) {
+      if (used <= budgetPx) break;
+      const tile = entries[i][1];
+      if (tile.stamp === liveStamp) continue;
+      cache.map.delete(entries[i][0]);
+      used -= tile.pxW * tile.pxH;
+    }
+  }
+
+  // Returns the visible tile canvases for this viewport, baking at full
+  // renderScale. Each tile is at most 2048 device px per side; memory is
+  // bounded by an LRU (~64M device px) over tiles near the viewport.
+  function _ensureTerrainTiles(state, themeKey, bp, gridSize, CP, FS, DX0, DX1, DY0, DY1) {
+    if (!_indexTerrainTiles || !_layers.background) return { density: 1, tiles: [] };
+    const RS = (_graphicsBridge && _graphicsBridge.metrics && _graphicsBridge.metrics.renderScale) || 1;
+    const idx = _indexTerrainTiles({
+      gridSize, cellPx: CP, renderScale: RS,
+      maxTileSide: 2048, budgetPx: 67108864,
+      dx0: DX0, dx1: DX1, dy0: DY0, dy1: DY1
+    });
+    const worldKey = _terrainWorldKey(state, themeKey, gridSize, CP, FS, idx.density);
+    const cache = _terrainTiles;
+    if (cache.worldKey !== worldKey || cache.ref !== state.terrain) {
+      cache.map.clear();
+      cache.worldKey = worldKey;
+      cache.ref = state.terrain;
+    }
+    cache.stamp += 1;
+    const stamp = cache.stamp;
+    const shapes = _terrainShapes(state, gridSize, FS * idx.density);
+    const visible = [];
+    for (let i = 0; i < idx.visible.length; i++) {
+      const spec = idx.visible[i];
+      let tile = cache.map.get(spec.key);
+      if (!tile) {
+        tile = _bakeTerrainTile(spec, idx.density, state, bp, gridSize, CP, FS, shapes);
+        cache.map.set(spec.key, tile);
+      }
+      tile.stamp = stamp;
+      visible.push(tile);
+    }
+    for (let i = 0; i < idx.keep.length; i++) {
+      const spec = idx.keep[i];
+      const held = cache.map.get(spec.key);
+      if (held) held.stamp = stamp;
+    }
+    _evictTerrainTiles(idx.budgetPx, stamp);
+    cache.lastDensity = idx.density;
+    cache.lastTilePx = idx.tilePx;
+    cache.lastVisible = visible.length;
+    return { density: idx.density, tiles: visible };
   }
 
   function _areChildrenReady() {
@@ -664,7 +726,7 @@ const Graphics = (() => {
     if (!_areChildrenReady()) {
       if (!_missingChildrenReported) {
         _missingChildrenReported = true;
-        console.error("[S&D graphics] One or more child renderers (backgroundRenderer.js, objectRenderer.js, vfx.js, uiRenderer.js) are not loaded; the board cannot be drawn.");
+        console.error("[S&D graphics] One or more child renderers are not loaded; the board cannot be drawn.");
       }
       return;
     }
@@ -791,12 +853,13 @@ const Graphics = (() => {
 
       const visMatrix = visCache || Array.from({ length: gridSize }, () => Array(gridSize).fill(true));
 
-      // 1. Background grid & terrain (core-owned terrain cache canvas)
+      // 1. Background grid & terrain (core-owned terrain tile canvases)
+      const terrainPack = _ensureTerrainTiles(state, _activeTheme, bp, gridSize, CP, FS, DX0, DX1, DY0, DY1);
       _layers.background.drawBattleGridAndTerrain({
         ctx, visMatrix, state, bp, gridSize,
         CP, FS, DX0, DX1, DY0, DY1,
-        terrainCanvas: _ensureTerrainCanvas(state, _activeTheme, bp, gridSize, CP, FS),
-        terrainDensity: (_terrainCache && _terrainCache.density) || 1
+        terrainTiles: terrainPack.tiles,
+        terrainDensity: terrainPack.density
       });
 
       // 2. Warp perimeter arcs
@@ -984,13 +1047,16 @@ const Graphics = (() => {
       if (globalThis.backgroundLayerApi) _layers.background = globalThis.backgroundLayerApi;
       if (globalThis.objectLayerApi) _layers.object = globalThis.objectLayerApi;
       if (globalThis.uiLayerApi) _layers.ui = globalThis.uiLayerApi;
+      if (typeof globalThis.terrainTileIndex === "function") _indexTerrainTiles = globalThis.terrainTileIndex;
       delete globalThis.backgroundLayerApi;
       delete globalThis.objectLayerApi;
       delete globalThis.uiLayerApi;
+      delete globalThis.terrainTileIndex;
       _layers.vfx = typeof drawAnimation === "function" ? drawAnimation : null;
       _registrationOpen = false;
       delete api._registerLayer;
       const missing = [
+        ["main.js children/graphics.js children/terrainTileIndex.js",   _indexTerrainTiles],
         ["main.js children/graphics.js children/backgroundRenderer.js", _layers.background],
         ["main.js children/graphics.js children/objectRenderer.js",     _layers.object],
         ["main.js children/graphics.js children/vfx.js",                _layers.vfx],
@@ -1059,7 +1125,15 @@ const Graphics = (() => {
     blitSprite: (ctx, sprite, cx, cy, targetCellPx) => Renderer.blitSprite(ctx, sprite, cx, cy, targetCellPx),
     drawUnitStatic: (ctx, cx, cy, cellPx, unit) => Renderer.drawUnitStatic(ctx, cx, cy, cellPx, unit),
     drawUnitDynamic: (ctx, cx, cy, cellPx, unit, now) => Renderer.drawUnitDynamic(ctx, cx, cy, cellPx, unit, now),
-    drawUnitOnCanvas: (ctx, cx, cy, cellPx, unit, now) => Renderer.drawUnitOnCanvas(ctx, cx, cy, cellPx, unit, now)
+    drawUnitOnCanvas: (ctx, cx, cy, cellPx, unit, now) => Renderer.drawUnitOnCanvas(ctx, cx, cy, cellPx, unit, now),
+    terrainCacheInfo() {
+      return {
+        density: _terrainTiles.lastDensity || 0,
+        tilePx: _terrainTiles.lastTilePx || 0,
+        tiles: _terrainTiles.map.size,
+        visible: _terrainTiles.lastVisible || 0
+      };
+    }
   };
 
   return api;

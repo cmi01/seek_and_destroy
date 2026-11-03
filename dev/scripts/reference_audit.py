@@ -148,6 +148,7 @@ PARENT_OF = {
     "main.js children/sounds.js children/audio_DATA.js": "main.js children/sounds.js",
     "main.js children/sounds.js children/sfx.js": "main.js children/sounds.js",
     "main.js children/sounds.js children/music.js": "main.js children/sounds.js",
+    "main.js children/graphics.js children/terrainTileIndex.js": "main.js children/graphics.js",
     "main.js children/graphics.js children/backgroundRenderer.js": "main.js children/graphics.js",
     "main.js children/graphics.js children/objectRenderer.js": "main.js children/graphics.js",
     "main.js children/graphics.js children/vfx.js": "main.js children/graphics.js",

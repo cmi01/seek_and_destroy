@@ -412,6 +412,7 @@ lands; the Surface column says how far each file is from the bar.
 | `main.js children/graphics.js children/uiRenderer.js` | UI layer drawing | 3 fns | scheduled — pure draw-data fns |
 | `main.js children/graphics.js children/objectRenderer.js` | board-object layer | 6 fns | scheduled |
 | `main.js children/graphics.js children/backgroundRenderer.js` | background layer | 4 fns | scheduled |
+| `main.js children/graphics.js children/terrainTileIndex.js` | terrain-cache tile index | `terrainTileIndex` | 1 fn ✓ |
 | `main.js children/graphics.js children/vfx.js` | effects layer | `drawAnimation` | 1 fn ✓ — flatten shape |
 | `main.js children/sounds.js` | audio context + sound nodes | core | scheduled — command lists become pure; playback → `main.js` |
 | `main.js children/sounds.js children/sfx.js` | one-shot effects | 4 fns | scheduled |

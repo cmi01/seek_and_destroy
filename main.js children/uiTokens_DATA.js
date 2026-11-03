@@ -44,7 +44,6 @@ const uiTokensTable = {
   strokeRegular: 1.5,
   strokeHeavy: 2,
   strokeFocus: 2.2,
-  terrainBudgetSide: 4096,
   labels: {
     closeCampaign: "CLOSE [ESC]",
     closeBridge: "RESUME [SPC]",

@@ -1,0 +1,158 @@
+{
+  "fails": [],
+  "rows": [
+    {
+      "row": "os100",
+      "displaySize": 1070,
+      "renderScale": 1,
+      "devicePx": 1070,
+      "canvasWidth": 1070,
+      "clientWidth": 1070,
+      "offsetWidth": 1072,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 1,
+      "uiTextPx": 21
+    },
+    {
+      "row": "os125",
+      "displaySize": 854,
+      "renderScale": 1.25,
+      "devicePx": 1068,
+      "canvasWidth": 1068,
+      "clientWidth": 854,
+      "offsetWidth": 856,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 1.25,
+      "uiTextPx": 17
+    },
+    {
+      "row": "os150",
+      "displaySize": 710,
+      "renderScale": 1.5,
+      "devicePx": 1065,
+      "canvasWidth": 1065,
+      "clientWidth": 710,
+      "offsetWidth": 712,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 1.5,
+      "uiTextPx": 14
+    },
+    {
+      "row": "os200",
+      "displaySize": 530,
+      "renderScale": 2,
+      "devicePx": 1060,
+      "canvasWidth": 1060,
+      "clientWidth": 530,
+      "offsetWidth": 532,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 2,
+      "uiTextPx": 10
+    },
+    {
+      "row": "os250",
+      "displaySize": 422,
+      "renderScale": 2.5,
+      "devicePx": 1055,
+      "canvasWidth": 1055,
+      "clientWidth": 422,
+      "offsetWidth": 424,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 2.5,
+      "uiTextPx": 8
+    },
+    {
+      "row": "win200",
+      "displaySize": 200,
+      "renderScale": 1,
+      "devicePx": 200,
+      "canvasWidth": 200,
+      "clientWidth": 200,
+      "offsetWidth": 202,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 1,
+      "uiTextPx": 4
+    },
+    {
+      "row": "dpr-before",
+      "displaySize": 590,
+      "renderScale": 1,
+      "devicePx": 590,
+      "canvasWidth": 590,
+      "clientWidth": 590,
+      "offsetWidth": 592,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 1,
+      "uiTextPx": 12
+    },
+    {
+      "row": "dpr-after",
+      "displaySize": 590,
+      "renderScale": 2,
+      "devicePx": 1180,
+      "canvasWidth": 1180,
+      "clientWidth": 590,
+      "offsetWidth": 592,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 2,
+      "uiTextPx": 12
+    },
+    {
+      "row": "gs12-dpr1",
+      "displaySize": 758,
+      "renderScale": 1,
+      "devicePx": 758,
+      "canvasWidth": 758,
+      "clientWidth": 758,
+      "offsetWidth": 760,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 1,
+      "uiTextPx": 15,
+      "viewSpan": 5
+    },
+    {
+      "row": "gs12-dpr2",
+      "displaySize": 758,
+      "renderScale": 2,
+      "devicePx": 1516,
+      "canvasWidth": 1516,
+      "clientWidth": 758,
+      "offsetWidth": 760,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 2,
+      "uiTextPx": 15,
+      "viewSpan": 5
+    },
+    {
+      "row": "gs12-cache",
+      "density": 2,
+      "tilePx": 1820,
+      "tiles": 1,
+      "visible": 1
+    },
+    {
+      "row": "gs12-mean-abs",
+      "meanAbsRgb": 0.9061781339125551,
+      "dpr1": [
+        379,
+        379
+      ],
+      "dpr2": [
+        758,
+        758
+      ]
+    }
+  ],
+  "out": "/home/ubuntu/.hermes/kanban/workspaces/t_bb5cd1af/snd/dev/docs/gui-scaling-audit-screenshots/v111",
+  "port": 8147
+}

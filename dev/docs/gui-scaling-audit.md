@@ -225,7 +225,7 @@ Implemented on branch `v107` from tag `v106`. The shell owns scale facts. Shared
 | GS-09 | fixed | Endgame panel, wrapped body lines, and buttons come from the HUD DTO. Body bottom stays above the button row at every harness size, including DS 200. |
 | GS-10 | fixed | Bridge close no longer floors at 88px. At DS 200 it is 36×7 and does not intersect the first card. The renderer draws the HUD close rect. |
 | GS-11 | fixed | Node radius follows `uiScale` (9px at DS 200, not a 22px floor). Node centers are clamped so the label band stays in the canvas. |
-| GS-12 | partial | Terrain cache is allocated at `css × density`, density `min(renderScale, 4096 / cssSide)`, and the blit uses that source scale. Full device detail when the cache is under the budget (viewSpan 16 at dpr 2). At viewSpan 5 the 4096 budget still caps the cache, so that extreme zoom does not gain a full dpr-2 bake. Sprite atlas stays 106px tiles — deferred, no art source in the repo. |
+| GS-12 | terrain fixed; atlas deferred | Terrain is a grid of tile canvases (max 2048 device px/side) baked at full `renderScale`, LRU ~64M device px, blit of visible tiles only. viewSpan 5 at dpr 2 is no longer capped by a 4096-side budget. Sprite atlas stays 106px tiles — deferred, no art source in the repo (#3). |
 | GS-13 | fixed | HUD `lineWidth` literals read `metrics.ui.stroke` (hairline floor is `max(1/renderScale, width × uiScale)`, only in the resolver). World reticles scale with `fontScale`, not `uiScale`. |
 
 Deferred, not a defect row: a higher-resolution atlas (strategy R8) until the art source exists. The optional structure-audit checker for `Math.max` floors was not added; the review-gate question is in `ARCHITECTURE_COMPLIANCE.md` §7.2 item 10.
@@ -281,7 +281,7 @@ offsetWidth is displaySize+2 (1px border outside the content box).
 | GS-09 | pass | pass | pass | pass | pass at DS 200 | `v108/win200-endgame.png` | `v105/win200-endgame.png` | verified |
 | GS-10 | pass | pass | pass | pass | pass at 250% and DS 200 | `v108/win200-bridge.png` | `v105/win200-bridge.png` | verified |
 | GS-11 | pass | pass | pass | pass | pass at DS 200 | `v108/win200-campaign.png` | `v105/win200-campaign.png` | verified |
-| GS-12 | — | — | — | — | still partial (atlas + viewSpan-5 budget) | `v105/dpr1-span5.png`, `v105/dpr2-span5.png` | same | deferred |
+| GS-12 | — | — | — | — | terrain fixed in v111 (atlas still deferred) | `v105/dpr1-span5.png`, `v105/dpr2-span5.png` | same | terrain: see Verification (v111) |
 | GS-13 | pass | pass | pass | pass | hairline follows `max(1/rs, 1×uiScale)` in the layout check | `v108/win200-base.png` | `v105/win200-base.png` | verified |
 
 Visual read of `v108/os100-campaign.png`: subtitle ends with a period (`…secure it.`), button is `CLOSE [ESC]`. `v105/os100-campaign.png` still shows `CLOSE [...]` and an ellipsized subtitle. `v108/os125-endgame.png`: `REDEPLOY SECTOR` and `SECTOR MAP` complete, body above the buttons. `v108/win200-help.png`: panel and `CLOSE` on the canvas.
@@ -292,9 +292,20 @@ Ad-hoc, not "the suite is green": `node --check` on the new script; `structure_a
 
 ### Follow-ups
 
-GS-12 remains partial. Follow-up issues:
+GS-12 terrain is fixed in v111 (tile cache). Remaining:
 
 - https://github.com/cmi01/seek_and_destroy/issues/3 — higher-resolution sprite atlas (no art source)
-- https://github.com/cmi01/seek_and_destroy/issues/4 — terrain cache 4096 budget still caps viewSpan 5 at dpr 2
 
 The optional `Math.max` floor checker is still not in `structure_audit.py`.
+
+## Verification (v111)
+
+Terrain cache replaced the single 4096-side canvas with a grid of tile canvases (max 2048 device px per side, full `renderScale`, LRU budget 64M device px). Repeatable check:
+
+```
+python3 dev/scripts/gui_scale_browser_check.py
+```
+
+GS-12 method: CSS 1024×768, `SD.State.viewSpan = 5`, dpr 1 vs dpr 2. Mean abs RGB of the dpr-2 capture downsampled 2× vs the dpr-1 capture (center 50% crop) must be clearly above the v105 baseline of 0.05. Measured (v111, `dev/docs/gui-scaling-audit-screenshots/v111/measurements.json`): **0.9062** vs the 0.05 baseline. Cache at dpr 2 / viewSpan 5: density 2 (was capped below 2 in v105–v108), tilePx 1820 ≤ 2048, visible tiles 1. Layout check ALL PASS at 100/125/150/200/250% plus DS 200; browser check ALL PASS (incl. the GS-12 terrain-density assertion); `?test` suites 25/25 game + 5/5 audio. Structure audit 0 violations / 18 warnings and reference audit 6+27+2 identical to the v110 baseline (which contains v108).
+
+Harness note: a Playwright screenshot resets the page's `devicePixelRatio` to 1 and the shell then re-bakes terrain at the new density, so `gui_scale_browser_check.py` reads metrics and cache state before any screenshot.

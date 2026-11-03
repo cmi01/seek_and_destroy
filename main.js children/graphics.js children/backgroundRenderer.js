@@ -16,18 +16,25 @@
     const { canvas, state, bp, gridSize, CP, FS, shapes, TC: rawTC } = cmd;
     const TC = typeof rawTC === "function" ? rawTC : (c => c);
     if (!canvas) return;
-    const totalPx = canvas.width || Math.max(64, Math.ceil(gridSize * CP));
+    const originGx = (typeof cmd.originGx === "number") ? cmd.originGx : 0;
+    const originGy = (typeof cmd.originGy === "number") ? cmd.originGy : 0;
+    const gx0 = (typeof cmd.gx0 === "number") ? cmd.gx0 : 0;
+    const gy0 = (typeof cmd.gy0 === "number") ? cmd.gy0 : 0;
+    const gx1 = (typeof cmd.gx1 === "number") ? cmd.gx1 : gridSize;
+    const gy1 = (typeof cmd.gy1 === "number") ? cmd.gy1 : gridSize;
+    const ox = originGx * CP;
+    const oy = originGy * CP;
     const tctx = canvas.getContext("2d");
-    tctx.clearRect(0, 0, totalPx, totalPx);
+    tctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    for (let gx = 0; gx < gridSize; gx++) {
+    for (let gx = gx0; gx < gx1; gx++) {
       const col = state.terrain && state.terrain[gx];
       if (!col) continue;
-      for (let gy = 0; gy < gridSize; gy++) {
+      for (let gy = gy0; gy < gy1; gy++) {
         const t = col[gy];
         if (t !== "NEBULA" && t !== "ASTEROID") continue;
-        const cx = (gx + 0.5) * CP;
-        const cy = (gy + 0.5) * CP;
+        const cx = (gx + 0.5) * CP - ox;
+        const cy = (gy + 0.5) * CP - oy;
 
         if (t === "NEBULA") {
           const nebGrad = tctx.createRadialGradient(cx, cy, 2, cx, cy, CP * 1.15);
@@ -35,7 +42,7 @@
           nebGrad.addColorStop(0.6, bp.neb1);
           nebGrad.addColorStop(1, bp.neb2);
           tctx.fillStyle = nebGrad;
-          tctx.fillRect(gx * CP, gy * CP, CP, CP);
+          tctx.fillRect(gx * CP - ox, gy * CP - oy, CP, CP);
         } else if (t === "ASTEROID") {
           const shape = (shapes && shapes[gx] && shapes[gx][gy]) ? shapes[gx][gy] : null;
           if (!shape) continue;
@@ -74,7 +81,7 @@
   function drawBattleGridAndTerrain(cmd) {
     const {
       ctx, visMatrix, state, bp, gridSize,
-      CP, FS, DX0, DX1, DY0, DY1, terrainCanvas
+      CP, FS, DX0, DX1, DY0, DY1
     } = cmd;
 
     // 1. Batched grid lines (minor + major) (ISS-030)
@@ -120,10 +127,10 @@
     ctx.stroke();
 
     // 3. Cached procedural terrain (active visibility at 1.0 alpha, explored memory at 0.45 alpha) (ISS-030, ISS-069)
-    const cacheCanvas = terrainCanvas || null;
+    const tiles = Array.isArray(cmd.terrainTiles) ? cmd.terrainTiles : null;
     const explored = state.exploredCells;
     const d = (typeof cmd.terrainDensity === "number" && cmd.terrainDensity > 0) ? cmd.terrainDensity : 1;
-    if (cacheCanvas) {
+    if (tiles && tiles.length) {
       ctx.save();
       for (let gx = DX0; gx < DX1; gx++) {
         const col = state.terrain && state.terrain[gx];
@@ -134,9 +141,18 @@
           const isVis = Boolean(visMatrix[gx] && visMatrix[gx][gy]);
           const isExp = Boolean(explored && explored[gx] && explored[gx][gy]);
           if (!isVis && !isExp) continue;
+          let tile = null;
+          for (let i = 0; i < tiles.length; i++) {
+            const cand = tiles[i];
+            if (gx >= cand.gx0 && gx < cand.gx0 + cand.cellsX && gy >= cand.gy0 && gy < cand.gy0 + cand.cellsY) {
+              tile = cand;
+              break;
+            }
+          }
+          if (!tile || !tile.canvas) continue;
           ctx.globalAlpha = isVis ? 1.0 : 0.45;
-          const sx = gx * CP * d, sy = gy * CP * d, sw = CP * d;
-          ctx.drawImage(cacheCanvas, sx, sy, sw, sw, gx * CP, gy * CP, CP, CP);
+          const sx = (gx - tile.originGx) * CP * d, sy = (gy - tile.originGy) * CP * d, sw = CP * d;
+          ctx.drawImage(tile.canvas, sx, sy, sw, sw, gx * CP, gy * CP, CP, CP);
         }
       }
       ctx.restore();

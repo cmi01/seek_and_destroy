@@ -26,7 +26,7 @@
   load("main.js children/resolveUiMetrics.js", ["resolveUiMetrics"]);
   load("main.js children/game.js children/hud.js children/buildCampaignLayout.js", ["buildCampaignLayout"]);
   load("main.js children/game.js children/hud.js children/buildEndgameButtons.js", ["buildEndgameButtons"]);
-  load("main.js children/game.js children/hud.js children/buildBridgeShopButtons.js", ["buildBridgeShopButtons"]);
+  load("main.js children/game.js children/hud.js children/buildReserveButtons.js", ["buildReserveButtons"]);
   load("main.js children/game.js children/hud.js children/buildHelpPanel.js", ["buildHelpPanel"]);
   load("main.js children/game.js children/hud.js children/buildTopBarChrome.js", ["buildTopBarChrome"]);
 
@@ -127,7 +127,7 @@
       egBudget + 1 >= "REDEPLOY SECTOR".length * ui.charW * 0.9,
       "budget=" + egBudget + " estimate=" + ("REDEPLOY SECTOR".length * ui.charW).toFixed(1) + " w=" + retry.w);
 
-    const shop = ctx.buildBridgeShopButtons(inp, { cards: [
+    const shop = ctx.buildReserveButtons(inp, { cards: [
       { shipName: "Fighter", affordable: true },
       { shipName: "Probe", affordable: true }
     ]});
