@@ -1,3 +1,11 @@
+---
+title: Seek & Destroy — Architecture Compliance
+version: v99.1
+date: 2026-11-03
+owner: default
+status: structural compliance standard
+---
+
 # Seek & Destroy — Architecture Compliance
 
 Status: the structural compliance standard for every file in the repository.

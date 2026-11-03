@@ -1,3 +1,11 @@
+---
+title: Seek & Destroy — Unified Game Design Document
+version: v99.1
+date: 2026-11-03
+owner: default
+status: authoritative design source
+---
+
 # Seek & Destroy — Unified Game Design Document
 
 Project: SG58 · Platform: Web (vanilla JS + HTML5 canvas)
