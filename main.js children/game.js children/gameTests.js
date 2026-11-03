@@ -821,6 +821,142 @@ const runGameTests = function (bridge, testName) {  const suite = {
       };
     },
 
+
+    // M3(c): fleets are detected at N squares = N ships (map visibility).
+    testMapDetectionRadius() {
+      const m = bridge.mapFromTable();
+      const pf = m.fleets.find(f => f.faction === "player");
+      const probe = JSON.parse(JSON.stringify(m));
+      probe.fleets = probe.fleets.filter(f => f.faction === "player");
+      probe.fleets.push({ id: "probe-fleet", faction: "Syndicate", x: pf.x + 4, y: pf.y, fuel: 0, ships: [{}, {}, {}] });
+      const near = bridge.mapScan(probe, "player");
+      probe.fleets[1].x = pf.x + 6;
+      const far = bridge.mapScan(probe, "player");
+      const pass = near.detectedFleets.some(f => f.id === "probe-fleet") &&
+        !far.detectedFleets.some(f => f.id === "probe-fleet") &&
+        near.detectedFleets.filter(f => f.faction === "player").length === 1;
+      return {
+        name: "M3 DETECTION RADIUS = SHIP COUNT (N squares = N ships)",
+        pass,
+        detail: pass
+          ? ("5-ship fleet detects probe at d=4, hides it at d=6")
+          : ("near=" + near.detectedFleets.map(f => f.id).join(",") + " far=" + far.detectedFleets.map(f => f.id).join(","))
+      };
+    },
+
+    // M3(c): nebula squares hide battles (never reserves).
+    testNebulaHidesBattles() {
+      const m = bridge.mapFromTable();
+      const withBattles = JSON.parse(JSON.stringify(m));
+      withBattles.locations.push({ id: "syn-nebula", kind: "nebula", name: "Syn Nebula", x: 60, y: 60, well: 6 });
+      withBattles.battles = [
+        { x: 60, y: 60, locationId: "syn-nebula" },
+        { x: 2, y: 2, locationId: "open-space" }
+      ];
+      const vis = bridge.mapScan(withBattles, "player");
+      const pass = vis.battles.length === 1 && vis.battles[0].locationId === "open-space";
+      return {
+        name: "M3 NEBULA SQUARES HIDE BATTLES",
+        pass,
+        detail: pass
+          ? ("nebula battle hidden, open-space battle visible")
+          : ("battles=" + vis.battles.map(b => b.locationId).join(","))
+      };
+    },
+
+    // M3(c): entering a fleet/location opens it (the encounter resolver) with the
+    // nearest map-relative entry edge; empty space opens nothing.
+    testMapEncounterOpensOnEntry() {
+      const m = bridge.mapFromTable();
+      const foe = m.fleets.find(f => f.faction !== "player");
+      const fleetEv = bridge.mapBattleEvent(m, m.locationId, { x: foe.x, y: foe.y });
+      const m2 = JSON.parse(JSON.stringify(m));
+      m2.locations.push({ id: "syn-fort", kind: "planet", name: "Syn Fort", x: 62, y: 62, well: 6, defenders: ["Fighter"], levelId: 102 });
+      const locEv = bridge.mapBattleEvent(m2, "syn-fort", { x: 58, y: 62 });
+      const empty = bridge.mapBattleEvent(m, "", { x: 2, y: 2 });
+      const edgeOk = locEv && locEv.entry && Math.abs(locEv.entry.x - 56) < 1e-9 && Math.abs(locEv.entry.y - 62) < 1e-9 && locEv.entry.edge === "W";
+      const pass = fleetEv && fleetEv.kind === "fleet" && fleetEv.joinNextTurn === true &&
+        locEv && locEv.kind === "location" && locEv.levelId === 102 && edgeOk &&
+        empty === null;
+      return {
+        name: "M3 ENCOUNTER OPENS ON ENTRY (fleet/location; edge = nearest)",
+        pass,
+        detail: pass
+          ? ("fleet + defended-location setups; entry W edge at (56,62)")
+          : ("fleetEv=" + (fleetEv && fleetEv.kind) + " locEv=" + (locEv && locEv.kind) + " edgeOk=" + edgeOk + " empty=" + empty)
+      };
+    },
+
+    // M3(c) Q4: a fleet entering an in-progress battle joins at the nearest
+    // map-relative edge on the NEXT turn.
+    testMapJoinNextTurnQ4() {
+      const m = bridge.mapFromTable();
+      const foe = m.fleets.find(f => f.faction !== "player");
+      const frozen = JSON.parse(JSON.stringify(m));
+      frozen.battleActive = true;
+      const join = bridge.mapBattleEvent(frozen, frozen.locationId, { x: foe.x, y: foe.y });
+      const pass = join && join.kind === "join" && join.joinNextTurn === true &&
+        join.entry && typeof join.entry.edge === "string";
+      return {
+        name: "M3 ENTERING FLEET JOINS AT NEAREST EDGE NEXT TURN (Q4)",
+        pass,
+        detail: pass
+          ? ("join setup kind=" + join.kind + " edge=" + join.entry.edge)
+          : ("join=" + JSON.stringify(join))
+      };
+    },
+
+    // M3(c): an opened encounter enters battle on the NEXT turn through the
+    // M2 seam (startSector -> the deployment step), and the map stays the
+    // encounter source (the level ladder is retired).
+    testMapEncounterNextTurnLaunch() {
+      const m = bridge.mapFromTable();
+      const foe = m.fleets.find(f => f.faction !== "player");
+      const before = JSON.parse(JSON.stringify(m));
+      before.fleets = before.fleets.map(f => f.faction === "player" ? { ...f, x: foe.x - 1, y: foe.y } : f);
+      before.pendingEncounter = null;
+      bridge.mapSet(before);
+      bridge.mapTravelLive({ x: foe.x, y: foe.y });
+      const after = bridge.mapSection();
+      const opened = Boolean(after.pendingEncounter && after.pendingEncounter.kind === "fleet");
+      const hail = opened ? bridge.hailModel(after.pendingEncounter) : null;
+      const hailOk = Boolean(hail && hail.options.join(",") === "talk,threaten,leave");
+      // The NEXT turn commits the encounter to battle (M2 seam: deploy step).
+      bridge.mapEndTurn();
+      const launched = bridge.activeModal() === "deploy";
+      bridge.closeDeploy();
+      bridge.mapSet(before);
+      const pass = opened && hailOk && launched;
+      return {
+        name: "M3 ENCOUNTER -> BATTLE NEXT TURN VIA M2 SEAM (ladder retired)",
+        pass,
+        detail: pass
+          ? ("entry opened fleet encounter; next-turn commit reached the deployment step")
+          : ("opened=" + opened + " hailOk=" + hailOk + " launched=" + launched + " modal=" + bridge.activeModal())
+      };
+    },
+
+    // M3(c): the map HUD + hailing shell models (the HUD composer's children).
+    testMapHudAndHailModels() {
+      const m = bridge.mapFromTable();
+      const hud = bridge.mapHudModel(m, { wallet: 25000 });
+      const hail = bridge.hailModel({ kind: "fleet", encounterFaction: "Syndicate", locationId: "sol-gate" });
+      const hudHail = bridge.mapHudModel(m, { wallet: 25000, hail });
+      const btnOk = hudHail.hail && hudHail.hail.buttons.map(b => b.id).join(",") === "HAIL_TALK,HAIL_THREATEN,HAIL_LEAVE";
+      const pass = hud.levelTag.indexOf("MAP // ") === 0 && hud.detection === hud.ships &&
+        hud.turn === m.turn && hud.ships > 0 &&
+        hail.speaker.toUpperCase().indexOf("SYNDICATE") !== -1 &&
+        hail.options.join(",") === "talk,threaten,leave" &&
+        hudHail.hail && hudHail.hail.visible === true && btnOk;
+      return {
+        name: "M3 MAP HUD + HAILING SHELL MODELS (voice placeholder)",
+        pass,
+        detail: pass
+          ? ("tag=" + hud.levelTag + " hail buttons HAIL_TALK/THREATEN/LEAVE")
+          : ("tag=" + hud.levelTag + " btnOk=" + btnOk + " opts=" + (hail && hail.options))
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -838,7 +974,10 @@ const runGameTests = function (bridge, testName) {  const suite = {
         this.testMapFlagshipCrewGate(), this.testMapSlowestShipCapsMove(),
         this.testMapFrozenDuringBattle(), this.testMapSaveRoundTripAndMigration(),
         this.testMapJumpTransit(), this.testMapJumpPointRules(),
-        this.testMapJumpUnfuelled(), this.testMapFrameDto()
+        this.testMapJumpUnfuelled(), this.testMapFrameDto(),
+        this.testMapDetectionRadius(), this.testNebulaHidesBattles(),
+        this.testMapEncounterOpensOnEntry(), this.testMapJoinNextTurnQ4(),
+        this.testMapEncounterNextTurnLaunch(), this.testMapHudAndHailModels()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;

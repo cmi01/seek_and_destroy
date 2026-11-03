@@ -13,6 +13,7 @@ import { pointerClick } from '../helpers/input';
 test('hud buttons: MENU opens the dropdown and clicking outside the board closes it', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounter();
   await game.clickCanvasButton('DEPLOY_CONFIRM');
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);
 
@@ -33,6 +34,7 @@ test('hud buttons: MENU opens the dropdown and clicking outside the board closes
 test('hud buttons: MENU_THEME cycles the active theme', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounter();
   await game.clickCanvasButton('DEPLOY_CONFIRM');
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);
 
@@ -49,6 +51,7 @@ test('hud buttons: MENU_THEME cycles the active theme', async ({ page }) => {
 test('hud buttons: MENU_HELP opens the help modal and CLOSE_MODAL dismisses it', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounter();
   await game.clickCanvasButton('DEPLOY_CONFIRM');
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);
 
@@ -62,7 +65,9 @@ test('hud buttons: MENU_HELP opens the help modal and CLOSE_MODAL dismisses it',
 
 test('hud buttons: a disabled button rect is ignored and changes nothing', async ({ page }) => {
   const game = gamePage(page);
-  await game.boot(); // deploy modal is open at boot
+  await game.boot();
+  await game.engageMapEncounter();
+  // The map encounter opens the deploy modal (M3; pre-M3 it opened at boot).
 
   // The flagship row of the deployment modal is locked: id DEPLOY_LOCK:0,
   // enabled:false (hud.js buildDeploymentButtons).

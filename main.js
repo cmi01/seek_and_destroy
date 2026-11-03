@@ -251,7 +251,9 @@ function bootGame() {
   armDprWatch();
   initLayout();
   assertCanvasSetup();
-  Game.startSector(101);
+  // M3: the campaign map is the campaign's main screen — boot lands on the
+  // map (battles launch from map encounters; the level ladder is retired).
+  Game.enterMap();
   if (typeof SoundEngine !== "undefined" && typeof SoundEngine.step === "function") {
     SoundEngine.step();
   }
@@ -297,7 +299,9 @@ const HUD_WIDGET_SCRIPTS = [
   "main.js children/game.js children/hud.js children/buildIntelRect.js",
   "main.js children/game.js children/hud.js children/hudMenu.js",
   "main.js children/game.js children/hud.js children/hudMinimap.js",
-  "main.js children/game.js children/hud.js children/hudBanner.js"
+  "main.js children/game.js children/hud.js children/hudBanner.js",
+  "main.js children/game.js children/hud.js children/buildMapHudModel.js",
+  "main.js children/game.js children/hud.js children/buildHailModel.js"
 ];
 // The AI subtree is one function per file too, so its loading is an effect
 // that belongs here: every file below ai.js (its children, their children and
@@ -483,7 +487,9 @@ const GAME_LEAF_SCRIPTS = [
   "main.js children/game.js children/campaignMap.js children/merchantOffer.js",
   "main.js children/game.js children/campaignMap.js children/moveFleet.js",
   "main.js children/game.js children/campaignMap.js children/hyperspaceJump.js",
-  "main.js children/game.js children/campaignMap.js children/mapFrame.js"
+  "main.js children/game.js children/campaignMap.js children/mapFrame.js",
+  "main.js children/game.js children/campaignMap.js children/mapVisibility.js",
+  "main.js children/game.js children/campaignMap.js children/battleEventAt.js"
 ];
 
 async function startGame(){
@@ -522,6 +528,8 @@ async function startGame(){
       ["main.js children/game.js children/hud.js children/buildIntelRect.js",        () => typeof buildIntelRect === "function"],
       ["main.js children/game.js children/hud.js children/hudMenu.js",               () => typeof buildMenuModel === "function"],
       ["main.js children/game.js children/hud.js children/hudMinimap.js",            () => typeof buildMinimapModel === "function"],
+      ["main.js children/game.js children/hud.js children/buildMapHudModel.js",      () => typeof buildMapHudModel === "function"],
+      ["main.js children/game.js children/hud.js children/buildHailModel.js",        () => typeof buildHailModel === "function"],
       ["main.js children/game.js children/hud.js children/hudBanner.js",             () => typeof buildPriorityBanner === "function"]
     ]);
 
@@ -643,7 +651,9 @@ async function startGame(){
       ["main.js children/game.js children/campaignMap.js children/merchantOffer.js", () => typeof merchantOffer === "function"],
       ["main.js children/game.js children/campaignMap.js children/moveFleet.js", () => typeof moveFleet === "function"],
       ["main.js children/game.js children/campaignMap.js children/hyperspaceJump.js", () => typeof hyperspaceJump === "function"],
-      ["main.js children/game.js children/campaignMap.js children/mapFrame.js", () => typeof mapFrame === "function"]
+      ["main.js children/game.js children/campaignMap.js children/mapFrame.js", () => typeof mapFrame === "function"],
+      ["main.js children/game.js children/campaignMap.js children/mapVisibility.js", () => typeof mapVisibility === "function"],
+      ["main.js children/game.js children/campaignMap.js children/battleEventAt.js", () => typeof battleEventAt === "function"]
     ]);
 
     await Game.load();

@@ -13,6 +13,7 @@ import { advanceEndgameModal } from '../helpers/time';
 test('game over: losing the flagship ends the game, shows the endgame modal, and REDEPLOY restarts a fresh sector', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounter();
   await game.clickCanvasButton('DEPLOY_CONFIRM');
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);
 
@@ -50,6 +51,13 @@ test('game over: losing the flagship ends the game, shows the endgame modal, and
 test('victory: clearing the enemy fleet marks the level complete and folds the battle into the campaign', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounterOpenOnly();
+  // M3: the battle's level comes from the MAP encounter (the ladder is
+  // retired) — capture the encounter's level before the launch consumes it.
+  const encounterLevel = (((await getRawState(page)).campaign as {
+    map: { pendingEncounter: { levelId: number } };
+  }).map).pendingEncounter.levelId;
+  await game.commitMapTurn();
   await game.clickCanvasButton('DEPLOY_CONFIRM');
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);
 
@@ -77,7 +85,7 @@ test('victory: clearing the enemy fleet marks the level complete and folds the b
 
   expect(outcome.check).toBe(true);
   expect(outcome.gameOver).toBe(true);
-  expect(outcome.completed).toContain(101); // State.completedLevels.add(levelId)
+  expect(outcome.completed).toContain(encounterLevel); // State.completedLevels.add(levelId) — the encounter's level (M3)
 
   // Campaign fold (game.js checkEndgame → ApplyBattleResult): surviving hulls
   // plus the battle reserve become the next fleet, flagship retained — the

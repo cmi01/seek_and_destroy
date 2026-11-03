@@ -13,6 +13,7 @@ import { getRawState, withLiveState } from '../helpers/sd';
 test('firing: canShoot gates the shot and executeShoot costs 1 AP and drops target hp', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounter();
   await game.clickCanvasButton('DEPLOY_CONFIRM');
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);
 
@@ -50,6 +51,7 @@ test('firing: canShoot gates the shot and executeShoot costs 1 AP and drops targ
 test('firing: a lethal hit destroys the target and removes it from the board', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounter();
   await game.clickCanvasButton('DEPLOY_CONFIRM');
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);
 
@@ -73,6 +75,7 @@ test('firing: a lethal hit destroys the target and removes it from the board', a
 test('firing: a mirage is destroyed by any hit regardless of its hp', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounter();
   await game.clickCanvasButton('DEPLOY_CONFIRM');
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);
 

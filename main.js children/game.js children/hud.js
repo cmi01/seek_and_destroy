@@ -134,6 +134,10 @@ function createInitialView() {
       title: "SECTOR SECURED // VICTORY",
       body: ""
     },
+    // M3: the campaign-map HUD model and the open hailing shell's encounter
+    // (plain data; the shell content is rebuilt from it each update).
+    mapHud: null,
+    hailEncounter: null,
     panelRects: {
       topBar: null,
       minimap: null,
@@ -228,6 +232,25 @@ const createHud = function (deps) {
       menu: menu.menuRect
     };
     return { view: w, buttons: chrome.topButtons.concat(menu.buttons, chrome.bottomButtons) };
+  }
+
+  // ---- M3 map HUD + hailing shell --------------------------------------
+  // Rebuilds the map HUD model (map status line + hailing shell geometry)
+  // from the live map section. The shell content comes from the parent's
+  // other child, injected as plain data (hail: the dialogue model built
+  // from the stored encounter).
+  function _updateMapHud(view, input, mapState, extra) {
+    const w = _clone(view);
+    const d = (extra && typeof extra === "object") ? Object.assign({}, extra) : {};
+    d.metrics = input.metrics;
+    d.hail = w.hailEncounter ? buildHailModel(w.hailEncounter) : null;
+    w.mapHud = buildMapHudModel(mapState, d);
+    if (w.mapHud && w.mapHud.levelTag) w.levelTag = w.mapHud.levelTag;
+    const r = _compose({ view: w }, _syncLayout(w, input));
+    if (r.view.mapHud && r.view.mapHud.hail && Array.isArray(r.view.mapHud.hail.buttons)) {
+      r.buttons = (r.buttons || []).concat(r.view.mapHud.hail.buttons);
+    }
+    return _finalize(r);
   }
 
   function _updateLeftWing(view, input) {
@@ -516,6 +539,42 @@ const createHud = function (deps) {
     },
     toggleDeployModal(view, input, forceState = null) {
       return _finalize(_toggleDeployModal(view, input, forceState));
+    },
+
+    // M3: map HUD + hailing shell. The encounter is plain data in, the shell
+    // model is rebuilt from it on every map update (state lives in the map
+    // section; this view only mirrors it).
+    updateMapHud(view, input, mapState, extra = null) {
+      return _updateMapHud(view, input, mapState, extra);
+    },
+    showHailPanel(view, input, encounter) {
+      const w = _clone(view);
+      w.hailEncounter = encounter ? JSON.parse(JSON.stringify(encounter)) : null;
+      return _finalize(_compose({
+        view: w,
+        sounds: [{ kind: "ui.modal.open", payload: {} }],
+        flags: { clearInteraction: true }
+      }, _syncLayout(w, input)));
+    },
+    hideHailPanel(view, input) {
+      const w = _clone(view);
+      if (!w.hailEncounter) return _finalize({ view: w });
+      w.hailEncounter = null;
+      return _finalize(_compose({
+        view: w,
+        sounds: [{ kind: "ui.modal.close", payload: {} }],
+        flags: { clearInteraction: true }
+      }, _syncLayout(w, input)));
+    },
+
+    // Pure model reads (test/debug bridge): the two map children exposed as
+    // data-in/data-out with no view mutation.
+    hailModel(view, input, encounter) { return buildHailModel(encounter); },
+    mapHudModel(view, input, mapState, extra = null) {
+      const d = (extra && typeof extra === "object") ? Object.assign({}, extra) : {};
+      d.metrics = input.metrics;
+      d.hail = (view && view.hailEncounter) ? buildHailModel(view.hailEncounter) : (d.hail || null);
+      return buildMapHudModel(mapState, d);
     },
 
     showEndgameModal(view, input, isVictory) {

@@ -18,6 +18,7 @@ const GRID = 32;
 test('camera: wheel zoom steps the span along the ladder and anchors the cursor cell', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounter();
   await game.clickCanvasButton('DEPLOY_CONFIRM');
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);
 
@@ -61,6 +62,7 @@ test('camera: wheel zoom steps the span along the ladder and anchors the cursor 
 test('camera: WASD pans the viewport and clamps at the board edges', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounter();
   await game.clickCanvasButton('DEPLOY_CONFIRM');
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);
 

@@ -57,6 +57,45 @@ export class GamePage {
     await step(this.page);
   }
 
+  /**
+   * M3: reach the battle from the campaign map (the map is the campaign's
+   * main screen since M3; the level ladder is retired as the encounter
+   * source). Parks the player fleet one square from the first foreign fleet
+   * (live-state surgery seam), enters its square — the encounter OPENS (the
+   * hailing shell) — and commits the map turn, so the encounter enters
+   * battle on the next turn through the M2 seam. Leaves the DEPLOYMENT
+   * modal open for the caller's DEPLOY_CONFIRM click.
+   */
+  async engageMapEncounter(): Promise<void> {
+    await this.engageMapEncounterOpenOnly();
+    await this.commitMapTurn();
+  }
+
+  /** Park the fleet at the first encounter and enter its square — the
+   *  encounter OPENS (hailing shell) but the turn is NOT committed yet. */
+  async engageMapEncounterOpenOnly(): Promise<void> {
+    await this.page.evaluate(() => {
+      const s = (window as any).SD;
+      const st = s.getRawState();
+      const m = JSON.parse(JSON.stringify(st.campaign.map));
+      const foe = m.fleets.find((f: { faction: string }) => f.faction !== 'player');
+      const pf = m.fleets.find((f: { faction: string }) => f.faction === 'player');
+      pf.x = foe.x - 1;
+      pf.y = foe.y;
+      st.campaign.map.fleets = m.fleets;
+      s.Map.travel('player', { x: foe.x, y: foe.y });
+    });
+    await step(this.page);
+  }
+
+  /** Commit the map turn: an opened encounter enters battle (M2 seam). */
+  async commitMapTurn(): Promise<void> {
+    await this.page.evaluate(() => {
+      (window as any).SD.Map.endTurn();
+    });
+    await step(this.page);
+  }
+
   /** Click a grid cell's center (cell coords → viewport → normalized u,v). */
   async clickCell(gx: number, gy: number): Promise<void> {
     const geo = await this.page.evaluate(

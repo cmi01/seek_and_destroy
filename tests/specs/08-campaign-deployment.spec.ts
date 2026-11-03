@@ -12,8 +12,10 @@ import { advanceAiTurn as advanceTurn } from '../helpers/time';
 test('deployment: the flagship row is locked and confirm deploys the toggled selection with overflow to the reserve', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounter(); // M3: the deploy modal opens from the map encounter
 
-  // Boot contract: deployment modal over an ungenerated sector, campaign fleet
+  // Encounter contract (M3): the deploy modal opened by the map encounter
+  // sits over an ungenerated sector, campaign fleet
   // of 5 hulls behind it, flagship row locked, capacity 4 (campaign_DATA.js
   // cornerCapacity) → 1 hull overflows to the battle reserve.
   expect(await getActiveModal(page)).toBe('deploy');
@@ -55,6 +57,7 @@ test('deployment: the flagship row is locked and confirm deploys the toggled sel
 test('deployment: battle credits stay frozen across a full turn cycle', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounter(); // M3: the deploy modal opens from the map encounter
   await game.clickCanvasButton('DEPLOY_CONFIRM');
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);
 

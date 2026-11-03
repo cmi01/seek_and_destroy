@@ -918,6 +918,136 @@ function _applyHudResult(res){
   }
 }
 
+// ======================== M3 CAMPAIGN-MAP ORCHESTRATION ========================
+// The map domain's pure children answer questions (costs, events,
+// visibility); the effects (state patches, HUD, battle launch) live here.
+function _mapSection(){
+  const c = GetGameState().campaign;
+  return (c && c.map) || null;
+}
+
+// The debug handle's map read (same data as _mapSection; named so the
+// handle's methods never reach through window.SD to call each other).
+function _debugMapState(){ return _mapSection(); }
+
+// Patch the map section through the campaign save seam (new objects out).
+function _patchMap(mut){
+  const c = GetGameState().campaign;
+  if (!c || !c.map) return null;
+  const next = Object.assign({}, c.map, mut);
+  TryPatchGameState({ campaign: Object.assign({}, c, { map: next }) });
+  return next;
+}
+
+// Arrival check (M3): entering a fleet/location opens it — the encounter
+// is recorded on the map (persisted) and the hailing shell opens. The
+// battle itself enters on the NEXT turn (_mapTurnCommit / the next move).
+function _mapArrival(mapState, entering){
+  const setup = CampaignMapLib.BattleEventAt(mapState, mapState.locationId || "", entering);
+  if (setup){
+    _patchMap({ pendingEncounter: setup });
+    Hud.showHailPanel(setup);
+    GameAudio.play("ui.modal.open");
+  }
+  return setup;
+}
+
+function _mapTravel(dest){
+  const map = _mapSection();
+  if (!map) return null;
+  if (map.pendingEncounter){
+    // An opened encounter owns the next turn (M3: encounters enter battle
+    // on the next turn) — the move is refused and the battle launches.
+    return _launchEncounterBattle(map.pendingEncounter);
+  }
+  const res = CampaignMapLib.MoveFleet(map, "player", dest);
+  if (res.mapState){
+    _patchMap({ fleets: res.mapState.fleets, turn: res.mapState.turn, locationId: res.mapState.locationId });
+    const moved = res.events.some(function (e){ return e && e.kind === "fleetMoved"; });
+    if (moved){
+      const next = _mapSection();
+      const pf = (next.fleets || []).find(function (f){ return f.faction === "player"; });
+      // Arrival is the fleet's ACTUAL position (travel may cap at the
+      // slowest ship), not the requested destination.
+      _mapArrival(next, pf ? { x: pf.x, y: pf.y } : null);
+    }
+  }
+  Hud.updateAll();
+  return res.events;
+}
+
+function _mapJump(target){
+  const map = _mapSection();
+  if (!map) return null;
+  if (map.pendingEncounter){
+    return _launchEncounterBattle(map.pendingEncounter);
+  }
+  const res = CampaignMapLib.HyperspaceJump(map, "player", target);
+  if (res.mapState){
+    _patchMap({ fleets: res.mapState.fleets, turn: res.mapState.turn, locationId: res.mapState.locationId });
+    const jumped = res.events.some(function (e){ return e && e.kind === "fleetJumped"; });
+    if (jumped){
+      const next = _mapSection();
+      const pf = next.fleets.find(function (f){ return f.faction === "player"; });
+      _mapArrival(next, pf ? { x: pf.x, y: pf.y } : null);
+    }
+  }
+  Hud.updateAll();
+  return res.events;
+}
+
+// Map turn commit: with an encounter open, the next turn launches the
+// battle through the M2 seam (startSector -> deployment -> generate).
+function _mapTurnCommit(){
+  const map = _mapSection();
+  if (!map) return;
+  if (map.pendingEncounter){
+    _launchEncounterBattle(map.pendingEncounter);
+    return;
+  }
+  _patchMap({ turn: (typeof map.turn === "number") ? map.turn + 1 : 1 });
+  Hud.updateAll();
+}
+
+function _launchEncounterBattle(setup){
+  Hud.hideHailPanel();
+  _patchMap({ pendingEncounter: null });
+  GameAudio.play("ui.select");
+  Game.startSector(setup.levelId, { encounter: setup });
+}
+
+// Canvas click on the map screen: a click on/inside a gravity well jumps
+// there from a well, otherwise it moves the fleet toward the point (the
+// slowest ship caps travel inside the pure mover).
+function _mapClick(px, py, ds){
+  const map = _mapSection();
+  if (!map) return;
+  const span = 64;
+  const mx = px * span / ds;
+  const my = py * span / ds;
+  let target = null;
+  const locs = Array.isArray(map.locations) ? map.locations : [];
+  for (let i = 0; i < locs.length; i++){
+    const L = locs[i];
+    const dx = mx - L.x;
+    const dy = my - L.y;
+    const w = (typeof L.well === "number") ? L.well : 6;
+    if (dx * dx + dy * dy <= w * w){ target = L; break; }
+  }
+  const pf = (map.fleets || []).find(function (f){ return f.faction === "player"; });
+  const inWell = pf ? locs.find(function (L){
+    const dx = pf.x - L.x;
+    const dy = pf.y - L.y;
+    const w = (typeof L.well === "number") ? L.well : 6;
+    return dx * dx + dy * dy <= w * w;
+  }) : null;
+  if (target && inWell && target.id !== inWell.id){
+    _mapJump(target.id);
+  } else {
+    _mapTravel(target ? { x: target.x, y: target.y } : { x: mx, y: my });
+  }
+}
+
 const Hud = {
   // Pure reads over the game-owned view.
   isModalOpen(){ return HudLib.isModalOpen(_hudView); },
@@ -949,7 +1079,28 @@ const Hud = {
   toggleMenu(forceState = null){ _applyHudResult(HudLib.toggleMenu(_hudView, _hudInput(), forceState)); },
   isMenuOpen(){ return HudLib.isMenuOpen(_hudView); },
   toggleHelpModal(forceState = null){ _applyHudResult(HudLib.toggleHelpModal(_hudView, _hudInput(), forceState)); },
-  updateAll(){ _applyHudResult(HudLib.updateAll(_hudView, _hudInput())); },
+  updateAll(){
+    _applyHudResult(HudLib.updateAll(_hudView, _hudInput()));
+    Hud.updateMapHud();
+  },
+  // M3: the map screen's HUD (map status line + hailing shell) is rebuilt
+  // from the live map section on every update; no-ops outside the map.
+  updateMapHud(){
+    const c = GetGameState().campaign;
+    const mapSection = (c && c.map) || null;
+    if (!mapSection) return;
+    const clock = (c && c.clock) || {};
+    _applyHudResult(HudLib.updateMapHud(_hudView, _hudInput(), mapSection, {
+      wallet: (typeof c.wallet === "number") ? c.wallet : 0,
+      month: clock.month || 1,
+      year: clock.year || 2401
+    }));
+  },
+  showHailPanel(encounter){ _applyHudResult(HudLib.showHailPanel(_hudView, _hudInput(), encounter)); },
+  hideHailPanel(){ _applyHudResult(HudLib.hideHailPanel(_hudView, _hudInput())); },
+  // Pure model reads (test bridge): hail dialogue + map HUD models.
+  hailModel(encounter){ return HudLib.hailModel(_hudView, _hudInput(), encounter); },
+  mapHudModel(mapState, extra = null){ return HudLib.mapHudModel(_hudView, _hudInput(), mapState, extra); },
   setTheme(theme){
     // Game owns the active theme: it resolves the key and passes it down as
     // plain data; the child returns the requested theme in its result and
@@ -1133,9 +1284,24 @@ const InputProcessor = (() => {
       Hud.toggleMenu(false);
       Hud.toggleHelpModal(true);
     } else if (btn.id === "END_TURN"){
-      if (State.activeTeam === 1 && !State.gameOver){
+      const mapSection = _mapSection();
+      if (mapSection && mapSection.screen === "map"){
+        // Map screen: END TURN commits the map turn (an opened encounter
+        // launches its battle instead — M3: next turn).
+        _mapTurnCommit();
+      } else if (State.activeTeam === 1 && !State.gameOver){
         Actions.consumeAPAndCheckTurn(false, Math.max(1, State.ap));
       }
+    } else if (btn.id === "HAIL_TALK" || btn.id === "HAIL_THREATEN"){
+      // Placeholder dialogue response (M6 fills the voice banks); the
+      // hailing shell stays open over the map.
+      GameAudio.play("ui.select");
+    } else if (btn.id === "HAIL_LEAVE"){
+      // Declined the encounter: dismiss the shell and clear the pending
+      // battle (the map continues).
+      Hud.hideHailPanel();
+      _patchMap({ pendingEncounter: null });
+      GameAudio.play("ui.modal.close");
     } else if (btn.id === "CLOSE_MODAL"){
       if (_pendingDeploy){
         const lvlId = _pendingDeploy.levelId;
@@ -1188,11 +1354,12 @@ const InputProcessor = (() => {
         SectorGenerator.generate(lvlId, { choice: choice });
       }
     } else if (typeof btn.id === "string" && btn.id.indexOf("LEVEL_SELECT:") === 0){
-      const lvlId = Number(btn.id.slice("LEVEL_SELECT:".length));
-      Hud.hideEndgameModal();
-      GameAudio.play("ui.select");
-      Game.startSector(lvlId);
-      Hud.toggleCampaignModal(false);
+      // M3: RETIRED — the level ladder is no longer the encounter source.
+      // Battles launch from map encounters (the encounter resolver ->
+      // pendingEncounter -> the next turn starts the battle through the M2
+      // seam). The level table stays as battle flavor data the map rows
+      // point at.
+      GameAudio.play("ui.invalid");
     } else if (btn.id === "ENDGAME_RETRY"){
       Hud.hideEndgameModal();
       GameAudio.play("ui.select");
@@ -1367,6 +1534,17 @@ const InputProcessor = (() => {
       if (Hud.isIntelVisible()){
         Hud.hideIntelOverlay();
       }
+
+      // M3: on the campaign-map screen a canvas click moves the fleet
+      // (jump between gravity wells, travel otherwise) — the board's
+      // selection/combat hit-testing below is battle-screen only.
+      const mapScreen = _mapSection();
+      if (mapScreen && mapScreen.screen === "map"){
+        _mapClick(px, py, ds);
+        refreshHoverFromCamera();
+        return;
+      }
+
       if (State.gameOver || State.activeTeam !== 1){
         GameAudio.play("ui.invalid");
         return;
@@ -2344,6 +2522,24 @@ const api = {
     Hud.toggleDeployModal(true);
   },
 
+  // M3: the campaign map is the campaign's main screen. Boot lands here —
+  // no deployment modal, no level; battles launch from map encounters.
+  enterMap(){
+    Rules.initState({ preserve: ["profile", "campaign"] });
+    if (InitializeCampaign && !GetGameState().campaign) InitializeCampaign();
+    const c = GetGameState().campaign;
+    if (c && c.map){
+      TryPatchGameState({ campaign: Object.assign({}, c, {
+        map: Object.assign({}, c.map, {
+          screen: "map",
+          battleActive: false,
+          pendingEncounter: (c.map.pendingEncounter === undefined) ? null : c.map.pendingEncounter
+        })
+      }) });
+    }
+    Hud.updateAll();
+  },
+
   getViewSpan(){
     return (typeof GetGameState === "function" && State.viewSpan) ? State.viewSpan : 16;
   },
@@ -2567,7 +2763,25 @@ const api = {
       travelCost(fleet, distance, space){ return CampaignMapLib.FuelCost(fleet, distance, space); },
       mapJump(mapState, fleetId, target, opts){ return CampaignMapLib.HyperspaceJump(mapState, fleetId, target, opts); },
       mapView(mapState, view){ return CampaignMapLib.MapFrame(mapState, view); },
+      mapScan(mapState, observerFaction){ return CampaignMapLib.MapVisibility(mapState, observerFaction); },
+      mapBattleEvent(mapState, locationId, entering){ return CampaignMapLib.BattleEventAt(mapState, locationId, entering); },
+      hailModel(encounter){ return Hud.hailModel(encounter); },
+      mapHudModel(mapState, extra){ return Hud.mapHudModel(mapState, extra); },
       merchantQuote(mapState, fleetId, reason){ return CampaignMapLib.MerchantOffer(mapState, fleetId, reason); },
+      // M3(c) live-map seam (tests drive the orchestrator, not just the
+      // pure children): set the map section, travel/jump the player through
+      // the arrival check, commit a map turn (encounter → battle launch).
+      mapSet(mapState){
+        const c = GetGameState().campaign;
+        if (!c) return null;
+        TryPatchGameState({ campaign: Object.assign({}, c, { map: JSON.parse(JSON.stringify(mapState)) }) });
+        return _mapSection();
+      },
+      mapTravelLive(dest){ return _mapTravel(dest); },
+      mapJumpLive(target){ return _mapJump(target); },
+      mapEndTurn(){ _mapTurnCommit(); return _mapSection(); },
+      activeModal(){ return Hud.getActiveModal(); },
+      closeDeploy(){ _pendingDeploy = null; Hud.toggleDeployModal(false); },
       solidifyMirages(state){ return materializeMirages(state); },
       checkEndgameStatus(units){ return EndgameStatus.checkEndgameStatus(units); },
       executeWarpIn(unit, shipType, isAI, apCost, opts){
@@ -2673,6 +2887,9 @@ const api = {
       Map: {
         state(){ return (GetGameState().campaign && GetGameState().campaign.map) || null; },
         travel(fleetId, dest){
+          // Player moves go through the map orchestrator (arrival check →
+          // encounter opens → hail shell); foreign fleets move directly.
+          if (fleetId === "player") return _mapTravel(dest);
           const c = GetGameState().campaign;
           if (!c || !c.map) return null;
           const res = CampaignMapLib.MoveFleet(c.map, fleetId, dest);
@@ -2680,12 +2897,23 @@ const api = {
           return res.events;
         },
         jump(fleetId, target){
+          if (fleetId === "player") return _mapJump(target);
           const c = GetGameState().campaign;
           if (!c || !c.map) return null;
           const res = CampaignMapLib.HyperspaceJump(c.map, fleetId, target);
           if (res.mapState) TryPatchGameState({ campaign: Object.assign({}, c, { map: res.mapState }) });
           return res.events;
         },
+        endTurn(){ _mapTurnCommit(); return (_debugMapState() || {}).turn; },
+        visibility(faction){
+          const m = _debugMapState();
+          return m ? CampaignMapLib.MapVisibility(m, faction || "player") : null;
+        },
+        battleEvent(locationId, entering){
+          const m = _debugMapState();
+          return m ? CampaignMapLib.BattleEventAt(m, locationId, entering || null) : null;
+        },
+        hail(){ const m = _debugMapState(); return m && m.pendingEncounter ? Hud.hailModel(m.pendingEncounter) : null; },
         show(mode){
           const c = GetGameState().campaign;
           if (!c || !c.map) return null;

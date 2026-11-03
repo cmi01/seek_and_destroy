@@ -14,6 +14,7 @@ import { advanceAiTurn } from '../helpers/time';
 test('turn cycle: END_TURN hands off to the AI and back, advancing the turn counter', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounter();
   await game.clickCanvasButton('DEPLOY_CONFIRM');
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);
 

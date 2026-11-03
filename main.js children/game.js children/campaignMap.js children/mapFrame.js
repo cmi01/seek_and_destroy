@@ -10,11 +10,18 @@
 // { x, y, span } in map units (the whole sector fits span 64 by default).
 // hyperspace is true when the player fleet is outside every gravity well —
 // the render is the red SC2-style hyperspace with gravity wells only.
+// The optional third argument is injected data from the composing parent:
+// { visibleFleets, battles } — the fleet ids the observer detects (map
+// visibility: N squares = N ships) and the visible battle rows (nebula
+// squares hide battles). Without it every fleet is emitted (test/preview
+// shape). This child never names the visibility sibling — the lists arrive
+// as plain data.
 // ============================================================
 
-const mapFrame = function (mapState, view){
+const mapFrame = function (mapState, view, opts){
   const m = mapState || {};
   const v = view || {};
+  const o = opts || {};
   const span = (typeof v.span === "number" && v.span > 0) ? v.span : 64;
   const x = (typeof v.x === "number") ? v.x : 0;
   const y = (typeof v.y === "number") ? v.y : 0;
@@ -23,16 +30,19 @@ const mapFrame = function (mapState, view){
     return { id: L.id, kind: L.kind, name: L.name, x: L.x, y: L.y, well: L.well };
   });
 
-  const fleets = (Array.isArray(m.fleets) ? m.fleets : []).map(function (f){
-    return {
-      id: f.id,
-      faction: f.faction,
-      isPlayer: f.faction === "player",
-      x: f.x,
-      y: f.y,
-      ships: (Array.isArray(f.ships)) ? f.ships.length : 0
-    };
-  });
+  const visible = Array.isArray(o.visibleFleets) ? o.visibleFleets : null;
+  const fleets = (Array.isArray(m.fleets) ? m.fleets : [])
+    .filter(function (f){ return !visible || visible.indexOf(f.id) !== -1; })
+    .map(function (f){
+      return {
+        id: f.id,
+        faction: f.faction,
+        isPlayer: f.faction === "player",
+        x: f.x,
+        y: f.y,
+        ships: (Array.isArray(f.ships)) ? f.ships.length : 0
+      };
+    });
 
   const player = (Array.isArray(m.fleets) ? m.fleets : []).filter(function (f){ return f.faction === "player"; })[0] || null;
   let hyperspace = false;
@@ -55,6 +65,7 @@ const mapFrame = function (mapState, view){
     locationId: m.locationId || "",
     hyperspace: hyperspace,
     locations: locations,
-    fleets: fleets
+    fleets: fleets,
+    battles: Array.isArray(o.battles) ? o.battles.slice() : []
   };
 };

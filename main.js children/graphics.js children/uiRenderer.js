@@ -862,6 +862,50 @@
     ctx.restore();
   }
 
+  // M3 hailing shell: a dialogue panel over the campaign map (NOT a modal —
+  // the map stays visible behind it; no full-screen overlay, screen-flash
+  // policy). Reads the map HUD model's hail block (speaker/lines/panel) and
+  // draws the HAIL_* option buttons from the standard button list.
+  function _drawHailPanel(ctx, state, uiHud, bp, DS, US, F, C) {
+    const mapHud = uiHud && uiHud.mapHud;
+    const hail = mapHud && mapHud.hail;
+    if (!hail || !hail.visible) return;
+    const panel = hail.panel || null;
+    const mw = panel ? panel.w : Math.min(DS - Math.round(36 * US), Math.round(430 * US));
+    const mh = panel ? panel.h : Math.round(150 * US);
+    const mx = panel ? panel.x : Math.round((DS - mw) * 0.5);
+    const my = panel ? panel.y : Math.round(DS - mh - Math.round(64 * US));
+
+    ctx.save();
+    _drawChamferedRect(ctx, mx, my, mw, mh, Math.round(10 * US));
+    ctx.fillStyle = C["rgba(6, 8, 14, 0.92)"];
+    ctx.strokeStyle = bp.accent;
+    ctx.lineWidth = _stroke.heavy;
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = F["bold"];
+    ctx.fillStyle = bp.accent;
+    ctx.fillText(_fitTextToWidth(ctx, String(hail.speaker || "HAIL"), mw - Math.round(24 * US)), mx + Math.round(14 * US), my + Math.round(12 * US));
+
+    ctx.font = F["regular"];
+    ctx.fillStyle = C["#cbd5e1"];
+    const lines = Array.isArray(hail.lines) ? hail.lines : [];
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(_fitTextToWidth(ctx, String(lines[i]), mw - Math.round(28 * US)), mx + Math.round(14 * US), my + Math.round(34 * US) + i * Math.round(15 * US));
+    }
+
+    const btns = Array.isArray(state.canvasButtons) ? state.canvasButtons : [];
+    for (let i = 0; i < btns.length; i++) {
+      const b = btns[i];
+      if (!b || String(b.id).indexOf("HAIL_") !== 0) continue;
+      _drawButtonWidget(ctx, b, state.buttonHovered, state.buttonPressed, bp, US, F, C);
+    }
+    ctx.restore();
+  }
+
   function drawBattleWorldReticles(cmd) {
     const {
       ctx, now, state, bp, CP, FS, DX0, DX1, DY0, DY1,
@@ -1045,6 +1089,9 @@
 
     // 6. Operational Intel Overlay (top-left below HUD bar)
     _drawIntelOverlay(ctx, uiHud, topBarRect, bp, DS, US, F, C);
+
+    // 7. M3 hailing shell over the campaign map (map HUD model's hail block)
+    _drawHailPanel(ctx, state, uiHud, bp, DS, US, F, C);
   }
 
   function drawMinimapUi(cmd) {

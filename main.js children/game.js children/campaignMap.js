@@ -38,6 +38,18 @@ const campaignMap = function (){
     HyperspaceJump(mapState, fleetId, target, opts){
       return withOffers(hyperspaceJump(mapState, fleetId, target, costOpts(opts)));
     },
-    MapFrame(mapState, view){ return mapFrame(mapState, view); }
+    MapVisibility(mapState, observerFaction){ return mapVisibility(mapState, observerFaction); },
+    BattleEventAt(mapState, locationId, entering){ return battleEventAt(mapState, locationId, entering); },
+    MapFrame(mapState, view){
+      // The render sees only what the observer detects (map visibility:
+      // N squares = N ships; nebula squares hide battles). The visibility
+      // output arrives here as sibling data the composer injects — the
+      // frame child never names its sibling.
+      const vis = mapVisibility(mapState, "player");
+      return mapFrame(mapState, view, {
+        visibleFleets: vis.detectedFleets.map(function (f){ return f.id; }),
+        battles: vis.battles
+      });
+    }
   };
 };

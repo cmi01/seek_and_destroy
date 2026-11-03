@@ -32,9 +32,11 @@ test('boot: the game loads and renders its initial battle surface', async ({ pag
   expect(state.turnNumber).toBe(1);
   expect(state.activeTeam).toBe(1);
   expect(state.rngSeed).toBeNull(); // pristine boot: determinism seed not engaged
-  expect(state.units).toHaveLength(0); // sector not generated until DEPLOY_CONFIRM
-  // The pre-battle deployment modal is the documented boot state (since v112).
-  expect(await getActiveModal(page)).toBe('deploy');
+  expect(state.units).toHaveLength(0); // sector not generated until a map encounter reaches DEPLOY_CONFIRM
+  // M3 boot contract: the campaign MAP is the main screen — no modal at boot
+  // (pre-M3 the pre-battle deployment modal was the documented boot state).
+  expect(await getActiveModal(page)).toBeNull();
+  expect(((await getRawState(page)).campaign as { map: { screen: string } }).map.screen).toBe('map');
 
   // Canvas backing store pins to LayoutMetrics.devicePx (§6 secondary).
   const metrics = await getLayoutMetrics(page);
@@ -52,6 +54,7 @@ test('boot: deploy confirm starts the battle and units render on the board', asy
 
   // Confirming the deployment modal generates the sector (game.js
   // _handleCanvasButtonClick "DEPLOY_CONFIRM" → SectorGenerator.generate).
+  await game.engageMapEncounter();
   await game.clickCanvasButton('DEPLOY_CONFIRM');
 
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);

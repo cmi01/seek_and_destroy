@@ -24,6 +24,7 @@ function unitFingerprints(state: any): Array<Record<string, unknown>> {
 test('persistence: a battle snapshot round-trips through saveState/loadState', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounter();
   await game.clickCanvasButton('DEPLOY_CONFIRM');
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);
 

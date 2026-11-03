@@ -19,7 +19,8 @@ Judgment is explicit, not generous. “Met” means the acceptance criterion is 
 |-----------|----------|--------|
 | **M1** | **Mostly met** | Roster, campaign section, persistence and ×100 restore migration hold. Four design deviations, all documented; `game_balance.md` not regenerated. |
 | **M2** | **Partial** | Summon / mirage / flagship-lost **unit tests** and live summon-from-reserve hold. The battle↔campaign **seam is not on the live play path**: `beginBattle` / `applyBattleResult` are test-bridge only; sector generate is still the ladder. Boot logs a lifetime-map error for `battleReserve`. |
-| **M3–M6** | **Unmet** | Not started. Next batch. |
+| **M3** | **Met** | Campaign map shipped: `campaignMap.js` subtree (v126 movement/fuel/merchant + save migration, v129 hyperspace/render, v130 visibility/encounters/HUD/hailing). Battles launch from map encounters (level ladder retired); 40/40 in-page + 28/28 Playwright green at v130. |
+| **M4–M6** | **Unmet** | Not started. Next batch. |
 
 The slices **compose in-process** (M2 tree contains M1; M1 tests still pass on the M2 head). They do **not** yet compose with current `main` (`v107` GUI scaling, `d6b1174`): merge-base is `v106` `18788f9`. Four files changed on both sides; `git merge-tree` reported no `CONFLICT` markers.
 
@@ -74,10 +75,13 @@ Status: **met** / **partial** / **unmet**. Evidence is the M2 worktree unless no
 
 | # | Criterion | Status |
 |---|-----------|--------|
-| M3.1 Fuel formula / unfuelled merchant event / detection radius = ship count | **unmet** |
-| M3.2 Browser traverse system → hyperspace → system | **unmet** |
+| M3.1 Fuel formula / unfuelled merchant event / detection radius = ship count | **met** — exact formula + rejections + merchant offer (v126); detection radius = ship count (`mapVisibility.js`, v130). In-page "M3 FUEL FORMULA …" / "M3 DETECTION RADIUS …"; ad-hoc `/tmp/hermes-verify-t_ab74f8de/verify-m3.js` + `verify-m3c.js` |
+| M3.2 Browser traverse system → hyperspace → system | **met** — v129: live traverse with fuel 500 → 485 → 273.85 → 129.35; red gravity-well-only render screenshots at 1200/768 px (card evidence/) |
+| M3.3 Encounter entry → battle next turn via the M2 seam; result folds back to the map (Q4) | **met** — v130: `battleEventAt.js` + orchestrator; live chain (encounter → hail shell → next turn → deployment → battle → victory fold) + Playwright 11-campaign-map.spec.ts |
+| M3.4 Map HUD + hailing shell (voice placeholder) | **met** — v130: `buildMapHudModel.js` / `buildHailModel.js` (hud.js children) + `_drawHailPanel`; HAIL_TALK/THREATEN/LEAVE |
+| M3.5 Save/restore round-trip incl. map; old-save migration | **met** — in-page "M3 MAP SAVE ROUND-TRIP + MIGRATION" (no new persisted fields in v130: hail state is HUD-view only) |
 
-No `campaignMap.js` (or children `buildMapState`, `moveFleet`, `hyperspaceJump`, `fuelCost`, `mapVisibility`, `battleEventAt`, `merchantOffer`, `mapFrame`). No map HUD.
+Campaign-map subtree complete: `campaignMap.js` children `buildMapState`, `moveFleet`, `hyperspaceJump`, `fuelCost`, `mapVisibility`, `battleEventAt`, `merchantOffer`, `mapFrame`; hud.js children `buildMapHudModel`, `buildHailModel`. The map is the campaign's main screen at boot (the deploy modal opens from an encounter); the level ladder no longer launches battles (`LEVEL_SELECT` retired).
 
 ### M4 — Economy, stations, crew
 

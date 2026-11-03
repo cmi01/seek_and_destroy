@@ -13,6 +13,7 @@ import { getRawState, withLiveState } from '../helpers/sd';
 test('movement: clicking a unit selects it and clicking a reachable cell moves it for 1 AP', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounter();
   await game.clickCanvasButton('DEPLOY_CONFIRM');
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);
 
@@ -63,6 +64,7 @@ test('movement: clicking a unit selects it and clicking a reachable cell moves i
 test('collision: ramming an enemy hull resolves through the collision path and can destroy both', async ({ page }) => {
   const game = gamePage(page);
   await game.boot();
+  await game.engageMapEncounter();
   await game.clickCanvasButton('DEPLOY_CONFIRM');
   await expect.poll(async () => (await getRawState(page)).units.length).toBeGreaterThan(0);
 
