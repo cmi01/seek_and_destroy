@@ -1,4 +1,16 @@
 {
-  "$comment": "localStorage payloads for sd.audio.settings.v2 (test-architecture doc §2). Pure data. TODO(10-persistence-audio.spec.ts): fill in the canonical payload shape once the persistence spec pins it against observed localStorage output; keys and value shapes here must mirror what sounds.js actually writes.",
-  "payloads": {}
+  "$comment": "localStorage payloads for sd.audio.settings.v2 (test-architecture doc §2, scenario 10). Pure data. 'default' is the canonical shape sounds.js writes (STORAGE_KEY saveSettings) and reads back at boot — keys mirror the live settings object exactly. Grounded in observed storage output at v125.",
+  "payloads": {
+    "default": {
+      "master": 0.75,
+      "buses": {
+        "UI": 0.4,
+        "TELEMETRY": 0.65,
+        "SYSTEMS": 0.8,
+        "COMBAT": 0.95
+      },
+      "muted": false,
+      "reduced": false
+    }
+  }
 }

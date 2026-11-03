@@ -1,12 +1,24 @@
 // gamePage.ts — page object for the Seek & Destroy game shell (test-architecture doc §2).
 // Job: translate Playwright interaction with the game's single-canvas UI into
 // stable handles (boot URL + query params, canvas box, SD state reads) so specs
-// never hand-roll selectors. Thin stub for now — real rect math and button
-// dispatch land with the scenario specs (TODOs below).
-import type { Page, Locator } from '@playwright/test';
+// never hand-roll selectors. The game's UI is entirely canvas-drawn (audit §3):
+// buttons are Hud view-model rects in SD.LayoutMetrics.displaySize px space, and
+// clicks are normalized (u,v) pointer dispatch through helpers/input.ts.
+import { expect, type Page, type Locator } from '@playwright/test';
+import { getRawState, isBooted, type SdButton } from '../helpers/sd';
+import { pointerClick, wheelAt } from '../helpers/input';
+import { installClock, step } from '../helpers/time';
 
 export class GamePage {
   constructor(private readonly page: Page) {}
+
+  /** Boot the game under the virtual clock (doc §7) and wait for window.SD. */
+  async boot(path = '/'): Promise<void> {
+    await installClock(this.page);
+    await this.goto(path);
+    await expect.poll(() => isBooted(this.page), { timeout: 15_000 }).toBe(true);
+    await step(this.page);
+  }
 
   /** Boot the game. Query params (?test=1 preloads the test harness) go here. */
   async goto(path = '/'): Promise<void> {
@@ -23,11 +35,50 @@ export class GamePage {
     return this.page.locator('pre');
   }
 
-  // TODO(01-boot-smoke.spec.ts): canvasBox() helper — canvas bounding box in CSS px.
-  // TODO(06-hud-buttons.spec.ts): clickCanvasButton(id) — Hud view-model rect →
-  //      normalized (u,v) pointer dispatch via helpers/input.ts.
-  // TODO(09-camera-zoom.spec.ts): wheelAt(u, v, deltaY) — zoom gesture at a
-  //      normalized canvas position.
+  /** Canvas bounding box in CSS px. */
+  async canvasBox(): Promise<{ x: number; y: number; width: number; height: number }> {
+    const box = await this.canvas().boundingBox();
+    if (!box) throw new Error('#battle-canvas has no bounding box');
+    return box;
+  }
+
+  /** Live Hud button rect by id (null when the button is not on screen). */
+  async buttonRect(id: string): Promise<SdButton | null> {
+    const state = await getRawState(this.page);
+    return state.canvasButtons.find((b) => b.id === id) ?? null;
+  }
+
+  /** Click a canvas button by id: Hud rect → normalized (u,v) → pointer dispatch. */
+  async clickCanvasButton(id: string): Promise<void> {
+    const btn = await this.buttonRect(id);
+    if (!btn) throw new Error(`canvas button not on screen: ${id}`);
+    const ds = await this.page.evaluate(() => (window as any).SD.LayoutMetrics.displaySize as number);
+    await pointerClick(this.page, (btn.x + btn.w / 2) / ds, (btn.y + btn.h / 2) / ds);
+    await step(this.page);
+  }
+
+  /** Click a grid cell's center (cell coords → viewport → normalized u,v). */
+  async clickCell(gx: number, gy: number): Promise<void> {
+    const geo = await this.page.evaluate(
+      ([x, y]) => {
+        const s = (window as any).SD;
+        const ds = s.LayoutMetrics.displaySize;
+        const cellPx = ds / s.getRawState().viewSpan;
+        const px = ((x as number) + 0.5 - s.getRawState().viewX) * cellPx;
+        const py = ((y as number) + 0.5 - s.getRawState().viewY) * cellPx;
+        return { u: px / ds, v: py / ds };
+      },
+      [gx, gy] as [number, number],
+    );
+    await pointerClick(this.page, geo.u, geo.v);
+    await step(this.page);
+  }
+
+  /** Zoom gesture at a normalized canvas position (deltaY in px; 100 = 1 notch). */
+  async wheelAt(u: number, v: number, deltaY: number): Promise<void> {
+    await wheelAt(this.page, u, v, deltaY);
+    await step(this.page, 300); // zoom animation window is 180 ms
+  }
 }
 
 export function gamePage(page: Page): GamePage {
