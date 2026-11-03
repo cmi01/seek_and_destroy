@@ -52,14 +52,14 @@ Status: **met** / **partial** / **unmet**. Evidence is the M2 worktree unless no
 
 | # | Acceptance criterion (roadmap §4 M2) | Status | Evidence |
 |---|--------------------------------------|--------|----------|
-| M2.1 | Summon costs exactly 1 AP and 0 credits; any hit destroys a mirage; ram destroys both; losing the flagship → campaign-over | **partial** | Tests `M2 SUMMON 1 AP 0 CREDITS`, `M2 MIRAGE ANY HIT DESTROYS`, `M2 MIRAGE RAM DESTROYS BOTH`, `M2 FLAGSHIP-LOST CAMPAIGN OVER` all pass. Live `executeWarpIn` pulls `State.battleReserve`, does not debit credits, default `apCost=1`, sets `kind: "mirage"`. **But** battle still ticks `State.credits`/`income` on turn change (Q3 “no credits in battles” is only true for the shop). Live endgame still only sets `State.gameOver` + modal — it does not call `applyBattleResult`. |
-| M2.2 | Pure tests over a seeded battle: post-battle state equals specified carry-over | **partial** | `M2 BATTLE CARRY-OVER` pass: “parts +8, flagship crew 72, Probe retained” (Q1: parts = 50% of hull `capacity`). `openBattle` / `foldBattle` exist **only on the test bridge**. Live `SectorGenerator.generate` still builds from `CAMPAIGN_LEVELS` spawn lists. |
-| M2.3 | Suites green; audits at baseline | **met** | Same 24/24 + 5/5 and v106 audit counts as M1, on the integrated tree. |
+| M2.1 | Summon costs exactly 1 AP and 0 credits; any hit destroys a mirage; ram destroys both; losing the flagship → campaign-over | **met** | Tests still pass. Live `checkEndgame` folds via the campaign seam before the modal (flagship-lost → `campaignOver`). Turn change no longer ticks `credits`/`income` (Q3); HUD shows campaign wallet read-only. Test `M2 BATTLE CREDITS FROZEN`. |
+| M2.2 | Pure tests over a seeded battle: post-battle state equals specified carry-over | **met** | `M2 BATTLE CARRY-OVER` plus live-path `M2 LIVE PATH CARRY-OVER` (campaign fleet > corner capacity → reserve; finish battle → fleet/parts/crew/wallet JSON). `SectorGenerator.generate` takes hull lists from the battle-setup seam; ladder table is encounter source only. |
+| M2.3 | Suites green; audits at baseline | **met** | Count grows with the three new M2 live-path tests. Audits held at baseline (legacy 6 / child-names 0 / doc-window 27 / import-direction 2). |
 
 | Design §4.2 / §5.2 deliverable | Status | Notes |
 |--------------------------------|--------|-------|
-| `beginBattle` / `applyBattleResult` as the **only** battle↔campaign translators | **partial** | Functions exist and are pure. Live generate / checkEndgame do not call them. Hidden coupling remains: battle mutates `State` directly. |
-| `planDeployment` (overflow → reserve) | **partial** | Implemented (flagship-first, then `choice`, then roster order). Not used by `SectorGenerator.generate`. |
+| `beginBattle` / `applyBattleResult` as the **only** battle↔campaign translators | **met** | Live generate builds the encounter, then the setup seam; live `checkEndgame` packs a BattleResult and folds it before the modal. |
+| `planDeployment` (overflow → reserve) | **met** | Used on live generate. Overflow → `State.battleReserve`. Pre-battle deploy modal (HUD child, v107 metrics); default selection = seam order so no-input start stays deterministic. Flagship always deploys (Q2/F6 justified: warp locus + permadeath target). Test `M2 DEPLOYMENT FLAGSHIP FORCED`. |
 | `computeCrewLost` | **met** (as a function) | `Math.floor(crew * 0.5 * damage/maxHp)`. Used by `applyBattleResult` (tests), not by live combat. |
 | Summon = 1 AP, 0 credits; shop → reserve view | **met** for HUD + warp | `buildReserveModel` / `buildReserveButtons` replaced `buildBridgeShop*`. Cards show `cost: 0`. |
 | `materializeMirages`; `unit.kind` `"ship"` \| `"mirage"` | **met** | Live: called from `transitionToAITurn` / `transitionToPlayerTurn` for that team. Shoot/ram outcomes special-case mirage. |
@@ -68,7 +68,7 @@ Status: **met** / **partial** / **unmet**. Evidence is the M2 worktree unless no
 | `-shielded` latch folded into M2(a) if DESIGN unmet | **unmet** | Latch still written in `executeShield`, cleared on turn, gated in `canUnitShield`, described in `flagDescriptions`, seeded on spawn. No M2 grep+harness recorded. Follow-up F4. |
 | Injected sibling transforms / composer aliases | **justified** | `beginBattle(..., deployFn)`, `applyBattleResult(..., shipSpecs, crewLostFn)`; `game.js` methods `splitOverflow` / `crewLostFromDamage` / `listWarpCells` so the composer does not spell grandchild stems. |
 | HUD signatures `(state, hudDeps)` | **justified** | Existing HUD convention is `(deps, input)` / `(input, bridgeModal)`. |
-| `battleReserve` in the lifetime map | **unmet** | In `initialState` and `tryPatchGameState`, **absent** from `lifetimes.match`. Boot console: `[S&D state] lifetime map mismatch for keys: [battleReserve]`. Follow-up F1. |
+| `battleReserve` in the lifetime map | **met** | Landed in v110 (`lifetimes.match`). |
 
 ### M3 — Campaign map
 
@@ -139,14 +139,14 @@ Checked against design D1–D6, §4–§5, and the five seams.
 
 | ID | Deviation | Design clause | Follow-up |
 |----|-----------|---------------|-----------|
-| D-A | Live battles still launch from `SectorGenerator.generate(levelId)` + `CAMPAIGN_LEVELS`; seam is test-only | §4.2 “battle state and campaign state only meet through the two seam transforms”; roadmap “battles launch from campaign state” | F3 |
-| D-B | Live `checkEndgame` does not call `applyBattleResult` (no scrap/crew/capture persist) | §5.2 carry-over | F3 |
-| D-C | `battleReserve` missing from `lifetimes.match` | §5.1 persistence seam; boot already errors | F1 |
+| D-A | ~~Live battles still launch from generate + spawn lists~~ **closed (v112)** | Live generate consumes the setup seam; ladder is encounter source only | F3 |
+| D-B | ~~Live checkEndgame skipped the fold seam~~ **closed (v112)** | Fold runs before the modal | F3 |
+| D-C | `battleReserve` missing from `lifetimes.match` | **closed (v110)** | F1 |
 | D-D | `game_balance.md` still v70 after ×100 | roadmap §5.2, design R9 | F2 |
 | D-E | `-shielded` latch still live | design §7 fold-into-M2(a) | F4 |
-| D-F | In-battle `credits`/`income` still tick | roadmap Q3 / design §9.3 | F5 |
-| D-G | M1/M2 not rebased onto `v107` (`origin/main` `d6b1174`) | roadmap §5.4 shared-file hotspots; design §6 serialize `main.js` / `game.js` | F0 |
-| D-H | `planDeployment` always deploys the flagship first, then honours `choice` | design Q2 “player picks” | F6 (minor) |
+| D-F | ~~In-battle credits/income still tick~~ **closed (v112)** | Q3: no tick; HUD wallet read-only | F5 |
+| D-G | M1/M2 not rebased onto `v107` | **closed (v109/v110 on main)** | F0 |
+| D-H | Flagship always deploys before `choice` | **justified (Q2 ruling)**: flagship is the warp locus and permadeath target; player picks the remaining slots. Deploy UI added v112. | F6 |
 
 **Layering / hidden coupling**
 
@@ -282,9 +282,9 @@ Roadmap still says “16/16 game”; the live `SD.runTests()` total is **24** (1
 
 | ID | Work |
 |----|------|
-| **F3** | Wire `beginBattle` into live sector start (campaign fleet → corner deploy + `State.battleReserve` overflow; opponent from campaign entities). Wire `applyBattleResult` into live `checkEndgame` before the modal. Prove with a browser carry-over, not only `foldBattle`. |
-| **F5** | Decide Q3 strictly: either stop in-battle `credits`/`income` ticks or document them as leftover match UI. Default in the design is “no credits in battles”. |
-| **F6** | If Q2 is “player picks”, add a deployment step UI; today flagship is forced into the deployed set before `choice`. |
+| **F3** | **DONE (v112).** Live sector start goes through the setup seam; live endgame folds before the modal. Tests `M2 LIVE PATH CARRY-OVER`. |
+| **F5** | **DONE (v112).** No in-battle credit/income tick; HUD wallet read-only; in-battle purchase path (`SHOP_BUY`) removed. Test `M2 BATTLE CREDITS FROZEN`. |
+| **F6** | **DONE (v112), justified.** Flagship always deploys (warp locus + permadeath). Player picks remaining hulls in a pre-battle deploy modal. Test `M2 DEPLOYMENT FLAGSHIP FORCED`. |
 
 ### Deferred from M1 (do not block M3 if F0–F3 done)
 

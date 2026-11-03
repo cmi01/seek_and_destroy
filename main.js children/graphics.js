@@ -828,7 +828,7 @@ const Graphics = (() => {
       ctx.fillRect(0, 0, DS, DS);
 
       const uiHud = _graphicsBridge.uiHud || null;
-      const isOpaqueFullModal = Boolean(uiHud && (uiHud.activeModal === "bridge" || uiHud.activeModal === "campaign"));
+      const isOpaqueFullModal = Boolean(uiHud && (uiHud.activeModal === "bridge" || uiHud.activeModal === "campaign" || uiHud.activeModal === "deploy"));
 
       // Skip world-space board rendering when an opaque full-screen modal is open (ISS-030).
       if (isOpaqueFullModal) {
@@ -1004,7 +1004,7 @@ const Graphics = (() => {
     const visMatrix = rawVis || Array.from({ length: gridSize }, () => Array(gridSize).fill(true));
 
     const uiHud = frame.uiHud || null;
-    const isOpaqueFullModal = Boolean(uiHud && (uiHud.activeModal === "bridge" || uiHud.activeModal === "campaign"));
+    const isOpaqueFullModal = Boolean(uiHud && (uiHud.activeModal === "bridge" || uiHud.activeModal === "campaign" || uiHud.activeModal === "deploy"));
 
     if (!frame.battleOnly && !isOpaqueFullModal) {
       Renderer.drawMinimap(now, visMatrix);

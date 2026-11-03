@@ -123,6 +123,12 @@ function createInitialView() {
       nodes: [],
       layout: null
     },
+    deployModal: {
+      title: "DEPLOYMENT",
+      capText: "",
+      rows: [],
+      panel: null
+    },
     endgameModal: {
       isVictory: true,
       title: "SECTOR SECURED // VICTORY",
@@ -166,6 +172,18 @@ const createHud = function (deps) {
       w.campaignModal.layout = lay.layout;
       w.panelRects = { topBar: null, minimap: null, selectedCard: null, hoveredCard: null, intelOverlay: null, menu: null };
       return { view: w, buttons: lay.buttons };
+    }
+
+    if (w.activeModal === "deploy") {
+      const m = buildDeploymentModel(deps, input);
+      w.deployModal.title = m.title;
+      w.deployModal.capText = m.capText;
+      w.deployModal.rows = m.rows;
+      w.deployModal.wallet = m.wallet;
+      const built = buildDeploymentButtons(input, m);
+      w.deployModal.panel = built.panel;
+      w.panelRects = { topBar: null, minimap: null, selectedCard: null, hoveredCard: null, intelOverlay: null, menu: null };
+      return { view: w, buttons: built.buttons };
     }
 
     // HELP — fixed-size canvas panel holding the text that is otherwise
@@ -215,6 +233,7 @@ const createHud = function (deps) {
   function _updateLeftWing(view, input) {
     const w = _clone(view);
     w.levelTag = buildLevelTag(deps, input);
+    w.wallet = (input.state && typeof input.state.wallet === "number") ? input.state.wallet : 0;
     return { view: w };
   }
 
@@ -251,6 +270,29 @@ const createHud = function (deps) {
       w.intelOverlay.visible = false;
       if (w.panelRects) w.panelRects.intelOverlay = null;
       return _syncLayout(w, input);
+    }
+    return { view: w };
+  }
+
+  function _toggleDeployModal(view, input, forceState) {
+    const w = _clone(view);
+    const isOpen = w.activeModal === "deploy";
+    const nextState = forceState !== null ? Boolean(forceState) : !isOpen;
+    if (nextState) {
+      w.activeModal = "deploy";
+      return _compose({
+        view: w,
+        sounds: isOpen ? [] : [{ kind: "ui.modal.open", payload: {} }],
+        flags: { clearInteraction: true }
+      }, _syncLayout(w, input));
+    }
+    if (isOpen) {
+      w.activeModal = null;
+      return _compose({
+        view: w,
+        sounds: [{ kind: "ui.modal.close", payload: {} }],
+        flags: { clearInteraction: true }
+      }, _syncLayout(w, input));
     }
     return { view: w };
   }
@@ -386,6 +428,8 @@ const createHud = function (deps) {
     r = _compose(r, _updatePriorityBanner(r.view, input, true));
     if (r.view.activeModal === "bridge") {
       r = _compose(r, _renderBridgeShop(r.view, input, true));
+    } else if (r.view.activeModal === "campaign") {
+      r = _compose(r, _renderCampaignCards(r.view, input, true));
     }
     r = _compose(r, _syncLayout(r.view, input));
     return r;
@@ -469,6 +513,9 @@ const createHud = function (deps) {
     },
     renderCampaignCards(view, input, silent = false) {
       return _finalize(_renderCampaignCards(view, input, silent));
+    },
+    toggleDeployModal(view, input, forceState = null) {
+      return _finalize(_toggleDeployModal(view, input, forceState));
     },
 
     showEndgameModal(view, input, isVictory) {

@@ -287,6 +287,8 @@ const HUD_WIDGET_SCRIPTS = [
   "main.js children/game.js children/hud.js children/buildHelpPanel.js",
   "main.js children/game.js children/hud.js children/buildReserveModel.js",
   "main.js children/game.js children/hud.js children/buildReserveButtons.js",
+  "main.js children/game.js children/hud.js children/buildDeploymentModel.js",
+  "main.js children/game.js children/hud.js children/buildDeploymentButtons.js",
   "main.js children/game.js children/hud.js children/buildCampaignCards.js",
   "main.js children/game.js children/hud.js children/buildCampaignLayout.js",
   "main.js children/game.js children/hud.js children/buildEndgameModel.js",
@@ -473,7 +475,9 @@ const GAME_LEAF_SCRIPTS = [
   "main.js children/game.js children/campaignState.js children/tryPatchCampaignState.js",
   "main.js children/game.js children/campaignState.js children/rosterOf.js",
   "main.js children/game.js children/campaignState.js children/beginBattle.js",
-  "main.js children/game.js children/campaignState.js children/applyBattleResult.js"
+  "main.js children/game.js children/campaignState.js children/applyBattleResult.js",
+  "main.js children/game.js children/campaignState.js children/buildEncounterFromLevel.js",
+  "main.js children/game.js children/campaignState.js children/collectBattleResult.js"
 ];
 
 async function startGame(){
@@ -502,6 +506,8 @@ async function startGame(){
       ["main.js children/game.js children/hud.js children/buildHelpPanel.js",        () => typeof buildHelpPanel === "function"],
       ["main.js children/game.js children/hud.js children/buildReserveModel.js",  () => typeof buildReserveModel === "function"],
       ["main.js children/game.js children/hud.js children/buildReserveButtons.js", () => typeof buildReserveButtons === "function"],
+      ["main.js children/game.js children/hud.js children/buildDeploymentModel.js", () => typeof buildDeploymentModel === "function"],
+      ["main.js children/game.js children/hud.js children/buildDeploymentButtons.js", () => typeof buildDeploymentButtons === "function"],
       ["main.js children/game.js children/hud.js children/buildCampaignCards.js",    () => typeof buildCampaignCards === "function"],
       ["main.js children/game.js children/hud.js children/buildCampaignLayout.js",   () => typeof buildCampaignLayout === "function"],
       ["main.js children/game.js children/hud.js children/buildEndgameModel.js",     () => typeof buildEndgameModel === "function"],
@@ -623,7 +629,9 @@ async function startGame(){
       ["main.js children/game.js children/campaignState.js children/tryPatchCampaignState.js", () => typeof tryPatchCampaignState === "function"],
       ["main.js children/game.js children/campaignState.js children/rosterOf.js", () => typeof rosterOf === "function"],
       ["main.js children/game.js children/campaignState.js children/beginBattle.js", () => typeof beginBattle === "function"],
-      ["main.js children/game.js children/campaignState.js children/applyBattleResult.js", () => typeof applyBattleResult === "function"]
+      ["main.js children/game.js children/campaignState.js children/applyBattleResult.js", () => typeof applyBattleResult === "function"],
+      ["main.js children/game.js children/campaignState.js children/buildEncounterFromLevel.js", () => typeof buildEncounterFromLevel === "function"],
+      ["main.js children/game.js children/campaignState.js children/collectBattleResult.js", () => typeof collectBattleResult === "function"]
     ]);
 
     await Game.load();

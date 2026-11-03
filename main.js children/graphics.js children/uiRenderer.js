@@ -155,9 +155,10 @@
     ctx.fillStyle = isAI2 ? bp.hostile : bp.accent;
     const turnStr = `T${String(state.turnNumber).padStart(2, "0")} ${isAI2 ? "AI" : "BLUE"}`;
     const maxAp = state.maxAp || 4;
-    const credits = (state.credits && state.credits[1] !== undefined) ? state.credits[1] : 0;
-    const income = (state.income && state.income[1] !== undefined) ? state.income[1] : 0;
-    const row2 = `${turnStr}   AP ${state.ap}/${maxAp}   ${credits}ⒸB +${income}/T`;
+    const wallet = (uiHud && typeof uiHud.wallet === "number")
+      ? uiHud.wallet
+      : ((state.credits && state.credits[1] !== undefined) ? state.credits[1] : 0);
+    const row2 = `${turnStr}   AP ${state.ap}/${maxAp}   ${wallet}ⒸB`;
     ctx.fillText(_fitTextToWidth(ctx, row2, maxW), textX, pad + Math.round(25 * US));
 
     ctx.restore();
@@ -823,6 +824,44 @@
     ctx.restore();
   }
 
+  function _drawDeployModal(ctx, state, uiHud, bp, DS, US, F, C) {
+    const modal = (uiHud && uiHud.deployModal) ? uiHud.deployModal : { title: "DEPLOYMENT", capText: "", rows: [] };
+    const panel = modal.panel || null;
+    const mw = panel ? panel.w : Math.min(DS - Math.round(36 * US), Math.round(430 * US));
+    const mh = panel ? panel.h : Math.round(280 * US);
+    const mx = panel ? panel.x : Math.round((DS - mw) * 0.5);
+    const my = panel ? panel.y : Math.round((DS - mh) * 0.5);
+
+    ctx.save();
+    ctx.fillStyle = C["rgba(3, 5, 10, 0.86)"];
+    ctx.fillRect(0, 0, DS, DS);
+
+    _drawChamferedRect(ctx, mx, my, mw, mh, Math.round(10 * US));
+    ctx.fillStyle = C["#060911"];
+    ctx.strokeStyle = bp.accent;
+    ctx.lineWidth = _stroke.heavy;
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.font = F["bold"];
+    ctx.fillStyle = bp.accent;
+    ctx.fillText(_fitTextToWidth(ctx, modal.title || "DEPLOYMENT", mw - Math.round(24 * US)), mx + mw * 0.5, my + Math.round(14 * US));
+    ctx.font = F["regular"];
+    ctx.fillStyle = C["#cbd5e1"];
+    ctx.fillText(_fitTextToWidth(ctx, modal.capText || "", mw - Math.round(24 * US)), mx + mw * 0.5, my + Math.round(32 * US));
+    ctx.textAlign = "left";
+
+    const btns = Array.isArray(state.canvasButtons) ? state.canvasButtons : [];
+    for (let i = 0; i < btns.length; i++) {
+      const b = btns[i];
+      if (!b) continue;
+      _drawButtonWidget(ctx, b, state.buttonHovered, state.buttonPressed, bp, US, F, C);
+    }
+    ctx.restore();
+  }
+
   function drawBattleWorldReticles(cmd) {
     const {
       ctx, now, state, bp, CP, FS, DX0, DX1, DY0, DY1,
@@ -927,6 +966,10 @@
     }
     if (uiHud && uiHud.activeModal === "campaign") {
       _drawCampaignModal(ctx, state, uiHud, bp, DS, US, now, F, C);
+      return;
+    }
+    if (uiHud && uiHud.activeModal === "deploy") {
+      _drawDeployModal(ctx, state, uiHud, bp, DS, US, F, C);
       return;
     }
     if (uiHud && uiHud.activeModal === "help") {

@@ -21,6 +21,8 @@ const _stateBox = { current: null };
 // applies them (see the RESULT SHAPE documented at the top of hud.js).
 let _hudView = null;
 let _hudCache = { priorityKey: "", priorityLabel: null, hoveredSpotted: false };
+let _battleSnapshot = null;
+let _pendingDeploy = null;
 
 let RULES_DATA = null;
 let CAMPAIGN_DATA = null;
@@ -675,6 +677,14 @@ const Actions = {
     if(State.gameOver) return true;
     const status=EndgameStatus.checkEndgameStatus(State.units);
 
+    if(status.t1Defeated || status.t2Defeated){
+      if (CampaignLib && State.campaign){
+        const packed=CampaignLib.CollectResult(State.units, State.battleReserve, _battleSnapshot, status);
+        const folded=CampaignLib.ApplyBattleResult(State.campaign, packed, SHIP_SPECS, CombatMath.crewLostFromDamage);
+        if (folded && folded.state) TryPatchGameState({ campaign: folded.state });
+      }
+    }
+
     if(status.t1Defeated){
       State.gameOver=true;
       State.aiTimers.forEach(t=>clearTimeout(t));
@@ -726,7 +736,6 @@ const Actions = {
   transitionToAITurn(){
     State.activeTeam=2;
     State.ap=MAX_AP;
-    State.credits[2]+=State.income[2];
     State.historicalVectors=[];
     if (typeof materializeMirages === "function"){
       const out=materializeMirages({ units: State.units, team: 2 });
@@ -749,7 +758,6 @@ const Actions = {
     State.turnNumber+=1;
     State.activeTeam=1;
     State.ap=MAX_AP;
-    State.credits[1]+=State.income[1];
     if (typeof materializeMirages === "function"){
       const out=materializeMirages({ units: State.units, team: 1 });
       State.units=out.state.units;
@@ -820,7 +828,9 @@ function _hudInput(){
       inspectMode: Boolean(State.inspectMode),
       audioMuted: Boolean(State.audioSettings && State.audioSettings.muted),
       completedLevels: State.completedLevels ? Array.from(State.completedLevels) : [],
-      battleReserve: Array.isArray(State.battleReserve) ? State.battleReserve : []
+      battleReserve: Array.isArray(State.battleReserve) ? State.battleReserve : [],
+      wallet: (State.campaign && typeof State.campaign.wallet === "number") ? State.campaign.wallet : 0,
+      deployment: _pendingDeploy
     },
     metrics: {
       displaySize: DS,
@@ -908,6 +918,7 @@ const Hud = {
   renderBridgeShop(silent = false){ _applyHudResult(HudLib.renderBridgeShop(_hudView, _hudInput(), silent)); },
   toggleCampaignModal(forceState = null){ _applyHudResult(HudLib.toggleCampaignModal(_hudView, _hudInput(), forceState)); },
   renderCampaignCards(silent = false){ _applyHudResult(HudLib.renderCampaignCards(_hudView, _hudInput(), silent)); },
+  toggleDeployModal(forceState = null){ _applyHudResult(HudLib.toggleDeployModal(_hudView, _hudInput(), forceState)); },
   showEndgameModal(isVictory){ _applyHudResult(HudLib.showEndgameModal(_hudView, _hudInput(), isVictory)); },
   hideEndgameModal(){ _applyHudResult(HudLib.hideEndgameModal(_hudView, _hudInput())); },
   toggleMenu(forceState = null){ _applyHudResult(HudLib.toggleMenu(_hudView, _hudInput(), forceState)); },
@@ -1101,9 +1112,17 @@ const InputProcessor = (() => {
         Actions.consumeAPAndCheckTurn(false, Math.max(1, State.ap));
       }
     } else if (btn.id === "CLOSE_MODAL"){
-      Hud.toggleBridgeModal(false);
-      Hud.toggleCampaignModal(false);
-      Hud.toggleHelpModal(false);
+      if (_pendingDeploy){
+        const lvlId = _pendingDeploy.levelId;
+        const choice = (_pendingDeploy.selected || []).slice();
+        _pendingDeploy = null;
+        Hud.toggleDeployModal(false);
+        SectorGenerator.generate(lvlId, { choice: choice });
+      } else {
+        Hud.toggleBridgeModal(false);
+        Hud.toggleCampaignModal(false);
+        Hud.toggleHelpModal(false);
+      }
     } else if (typeof btn.id === "string" && btn.id.indexOf("RESERVE_SUMMON:") === 0){
       const shipName = btn.id.slice("RESERVE_SUMMON:".length);
       const us = State.units || [];
@@ -1117,29 +1136,42 @@ const InputProcessor = (() => {
       } else {
         GameAudio.play("ui.invalid");
       }
-    } else if (typeof btn.id === "string" && btn.id.indexOf("SHOP_BUY:") === 0){
-      const shipName = btn.id.slice("SHOP_BUY:".length);
-      const us = State.units || [];
-      let flag = null;
-      for (let i = 0; i < us.length; i++){
-        if (us[i].hp > 0 && us[i].team === 1 && us[i].flags.has("!flagship")){ flag = us[i]; break; }
+    } else if (typeof btn.id === "string" && btn.id.indexOf("DEPLOY_TOGGLE:") === 0){
+      const idx = Number(btn.id.slice("DEPLOY_TOGGLE:".length));
+      if (_pendingDeploy && Number.isFinite(idx)){
+        const fleet = _pendingDeploy.fleet || [];
+        const entry = fleet[idx];
+        const locked = entry && (entry.flagship === true || String(entry.hull || "").indexOf("Flagship") !== -1);
+        if (!locked){
+          const cur = _pendingDeploy.selected || [];
+          const pos = cur.indexOf(idx);
+          if (pos !== -1){
+            cur.splice(pos, 1);
+          } else if (cur.length < _pendingDeploy.capacity){
+            cur.push(idx);
+          }
+          _pendingDeploy.selected = cur;
+          Hud.toggleDeployModal(true);
+        }
       }
-      if (flag){
-        Hud.toggleBridgeModal(false);
-        Actions.executeWarpIn(flag, shipName, false);
-      } else {
-        GameAudio.play("ui.invalid");
+    } else if (btn.id === "DEPLOY_CONFIRM"){
+      if (_pendingDeploy){
+        const lvlId = _pendingDeploy.levelId;
+        const choice = (_pendingDeploy.selected || []).slice();
+        _pendingDeploy = null;
+        Hud.toggleDeployModal(false);
+        SectorGenerator.generate(lvlId, { choice: choice });
       }
     } else if (typeof btn.id === "string" && btn.id.indexOf("LEVEL_SELECT:") === 0){
       const lvlId = Number(btn.id.slice("LEVEL_SELECT:".length));
       Hud.hideEndgameModal();
       GameAudio.play("ui.select");
-      SectorGenerator.generate(lvlId);
+      Game.startSector(lvlId);
       Hud.toggleCampaignModal(false);
     } else if (btn.id === "ENDGAME_RETRY"){
       Hud.hideEndgameModal();
       GameAudio.play("ui.select");
-      SectorGenerator.generate(State.levelId);
+      SectorGenerator.generate(State.levelId, { choice: undefined });
     } else if (btn.id === "ENDGAME_MAP"){
       Hud.toggleCampaignModal(true);
     }
@@ -1713,10 +1745,37 @@ const SectorGenerator = {
     return u;
   },
 
-  generate(levelId){
+  generate(levelId, opts){
+    opts = opts || {};
     State.aiTimers.forEach(t => clearTimeout(t));
     GameAudio.clearAll();
-    Rules.initState({ preserve: ["profile"] });
+    Rules.initState({ preserve: ["profile", "campaign"] });
+    if (InitializeCampaign && !GetGameState().campaign) InitializeCampaign();
+
+    const section = GetGameState().campaign;
+    const spec = CAMPAIGN_LEVELS.find(l => l.id === levelId) || CAMPAIGN_LEVELS[0];
+    const cap = (typeof opts.capacity === "number") ? opts.capacity : ((CAMPAIGN_DATA && CAMPAIGN_DATA.campaign && CAMPAIGN_DATA.campaign.start &&
+      CAMPAIGN_DATA.campaign.start.battle && CAMPAIGN_DATA.campaign.start.battle.cornerCapacity) || 4);
+    let encSeed = (typeof opts.seed === "number") ? opts.seed : ((spec && spec.id) ? spec.id * 997 : 1);
+    let encState = encSeed | 0;
+    const encRnd = function (){
+      encState = (Math.imul(encState, 1664525) + 1013904223) | 0;
+      return (encState >>> 0) / 4294967296;
+    };
+    const encounter = CampaignLib.BuildEncounter(spec, SHIP_SPECS, {
+      capacity: cap,
+      seed: encSeed,
+      choice: opts.choice,
+      rnd: encRnd
+    });
+    const setup = CampaignLib.BeginBattle(section, encounter, ReservePlacement.splitOverflow);
+    _battleSnapshot = {
+      deployed: (setup.deployments[0] && setup.deployments[0].units) ? setup.deployments[0].units.slice() : [],
+      overflow: setup.overflow.slice(),
+      opponent: (setup.deployments[1] && setup.deployments[1].units) ? setup.deployments[1].units.slice() : []
+    };
+    const playerHulls = _battleSnapshot.deployed.map(e => e.hull || e.type);
+    const enemyHulls = _battleSnapshot.opponent.map(e => e.hull || e.type);
 
     const result = SectorGeneratorLib.generateSectorData({
       levelId,
@@ -1724,10 +1783,13 @@ const SectorGenerator = {
       shipSpecs: SHIP_SPECS,
       gridSize: GRID_SIZE,
       maxAp: MAX_AP,
-      rnd: RND
+      rnd: RND,
+      playerSpawnList: playerHulls,
+      enemySpawnList: enemyHulls
     });
 
     Rules.patchState(result.patch);
+    Rules.patchState({ battleReserve: setup.overflow.slice() });
 
     if (result.selectedUnitId !== null){
       const sel = State.units.find(u => u.id === result.selectedUnitId) || null;
@@ -2192,8 +2254,24 @@ const api = {
     Actions.bindInputs();
   },
 
-  startSector(levelId){
-    SectorGenerator.generate(levelId);
+  startSector(levelId, opts){
+    opts = opts || {};
+    if (opts.skipDeploy){
+      SectorGenerator.generate(levelId, opts);
+      return;
+    }
+    if (InitializeCampaign && !GetGameState().campaign) InitializeCampaign();
+    const section = GetGameState().campaign;
+    const cap = (CAMPAIGN_DATA && CAMPAIGN_DATA.campaign && CAMPAIGN_DATA.campaign.start &&
+      CAMPAIGN_DATA.campaign.start.battle && CAMPAIGN_DATA.campaign.start.battle.cornerCapacity) || 4;
+    const fleet = (section && Array.isArray(section.fleet)) ? section.fleet : [];
+    const split = ReservePlacement.splitOverflow(fleet, cap);
+    const selected = [];
+    for (let i = 0; i < fleet.length; i++){
+      if (split.deployed.indexOf(fleet[i]) !== -1) selected.push(i);
+    }
+    _pendingDeploy = { levelId: levelId, fleet: fleet, capacity: cap, selected: selected };
+    Hud.toggleDeployModal(true);
   },
 
   getViewSpan(){
@@ -2386,7 +2464,34 @@ const api = {
       resetState(){
         State.aiTimers.forEach(t => clearTimeout(t));
         GameAudio.clearAll();
+        _battleSnapshot = null;
+        _pendingDeploy = null;
         Rules.initState({ preserve: ["profile"] });
+      },
+      startCampaignBattle(opts){
+        const o = opts || {};
+        if (InitializeCampaign && !GetGameState().campaign) InitializeCampaign();
+        return SectorGenerator.generate(o.levelId || 101, {
+          skipDeploy: true,
+          choice: o.choice,
+          seed: o.seed,
+          capacity: o.capacity
+        });
+      },
+      checkEndgame(){ return Actions.checkEndgame(); },
+      transitionToPlayerTurn(){ return Actions.transitionToPlayerTurn(); },
+      transitionToAITurn(){ return Actions.transitionToAITurn(); },
+      defaultDeployChoice(){
+        const section = GetGameState().campaign;
+        const cap = (CAMPAIGN_DATA && CAMPAIGN_DATA.campaign && CAMPAIGN_DATA.campaign.start &&
+          CAMPAIGN_DATA.campaign.start.battle && CAMPAIGN_DATA.campaign.start.battle.cornerCapacity) || 4;
+        const fleet = (section && section.fleet) || [];
+        const split = ReservePlacement.splitOverflow(fleet, cap);
+        const selected = [];
+        for (let i = 0; i < fleet.length; i++){
+          if (split.deployed.indexOf(fleet[i]) !== -1) selected.push(i);
+        }
+        return { capacity: cap, selected: selected, overflow: split.overflow.length };
       }
     };
   },

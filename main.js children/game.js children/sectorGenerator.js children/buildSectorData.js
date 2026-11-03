@@ -44,7 +44,9 @@ const buildSectorData = function (params) {
     shipSpecs,
     gridSize = 32,
     maxAp = 4,
-    rnd
+    rnd,
+    playerSpawnList,
+    enemySpawnList
   } = params;
   const R = typeof rnd === "function" ? rnd : Math.random;
   const spec = campaignLevels.find(l => l.id === levelId) || campaignLevels[0];
@@ -166,7 +168,9 @@ const buildSectorData = function (params) {
     // Fog (nebula), asteroids and enemies are all randomly positioned by
     // the generators above and the placement loops below — nothing here is
     // pinned to fixed cells.
-    const playerUnits = spawnPlayerFormation(spec.t1SpawnList);
+    const playerUnits = spawnPlayerFormation(
+      (Array.isArray(playerSpawnList) && playerSpawnList.length) ? playerSpawnList : spec.t1SpawnList
+    );
 
     // The enemy arrangement is randomly generated: the level's fixed
     // composition (t2SpawnList) is scattered across the right half of the
@@ -200,7 +204,7 @@ const buildSectorData = function (params) {
       enemySpots.push(spot);
       spawnUnit(shipType, 2, spot.x, spot.y, false);
     };
-    const t2List = spec.t2SpawnList || [];
+    const t2List = (Array.isArray(enemySpawnList) && enemySpawnList.length) ? enemySpawnList : (spec.t2SpawnList || []);
     t2List.filter(n => !shipSpecs[n].flags.includes("!flagship"))
       .forEach(n => placeEnemy(n, 9, 27, 2));
     t2List.filter(n => shipSpecs[n].flags.includes("!flagship"))
@@ -210,22 +214,28 @@ const buildSectorData = function (params) {
     viewport = { viewSpan: 16, viewX: 0, viewY: 7 };
   } else {
     // Team 1 — the standard semicircle formation (flagship at the lead).
-    const t1Units = spawnPlayerFormation(spec.t1SpawnList);
+    const t1Units = spawnPlayerFormation(
+      (Array.isArray(playerSpawnList) && playerSpawnList.length) ? playerSpawnList : spec.t1SpawnList
+    );
     const t1Capitals = t1Units.filter(u => u.flags.has("#capital ship"));
     if (t1Capitals.length > 0) selectedUnit = t1Capitals[0];
 
     // Team 2
-    const t2FullList = [...spec.t2SpawnList];
-    let remBudget = spec.t2CompositionBudget || 0;
-    const pool = spec.t2ArchetypePool || [];
-    let safety = 0;
-    while (remBudget >= 5 && pool.length > 0 && safety < 50) {
-      safety++;
-      const affordable = pool.filter(name => shipSpecs[name].cost <= remBudget && shipSpecs[name].cost > 0);
-      if (affordable.length === 0) break;
-      const pickName = affordable[Math.floor(R() * affordable.length)];
-      t2FullList.push(pickName);
-      remBudget -= shipSpecs[pickName].cost;
+    const t2FullList = (Array.isArray(enemySpawnList) && enemySpawnList.length)
+      ? enemySpawnList.slice()
+      : [...spec.t2SpawnList];
+    if (!(Array.isArray(enemySpawnList) && enemySpawnList.length)) {
+      let remBudget = spec.t2CompositionBudget || 0;
+      const pool = spec.t2ArchetypePool || [];
+      let safety = 0;
+      while (remBudget >= 5 && pool.length > 0 && safety < 50) {
+        safety++;
+        const affordable = pool.filter(name => shipSpecs[name].cost <= remBudget && shipSpecs[name].cost > 0);
+        if (affordable.length === 0) break;
+        const pickName = affordable[Math.floor(R() * affordable.length)];
+        t2FullList.push(pickName);
+        remBudget -= shipSpecs[pickName].cost;
+      }
     }
     const t2Flagships = t2FullList.filter(n => n === "Flagship Battlecruiser");
     const t2Escorts = t2FullList.filter(n => n !== "Flagship Battlecruiser");

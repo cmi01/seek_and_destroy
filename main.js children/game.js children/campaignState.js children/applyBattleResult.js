@@ -103,6 +103,11 @@ const applyBattleResult = function (section, battleResult, shipSpecs, crewLostFn
   };
   events.push({ kind: "payout", parts: parts, credits: credits });
 
+  const leftoverReserve = Array.isArray(result.reserve) ? result.reserve : [];
+  for (let i = 0; i < leftoverReserve.length; i++){
+    nextFleet.push(copyEntry(leftoverReserve[i]));
+  }
+
   const flagshipLost = Boolean(result.playerFlagshipLost) || flagIdx < 0;
   if (flagshipLost){
     events.push({ kind: "campaignOver", reason: "flagship-lost" });

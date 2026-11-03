@@ -453,6 +453,80 @@ const runGameTests = function (bridge, testName) {  const suite = {
       };
     },
 
+
+    testLivePathCarryOver() {
+      bridge.initializeCampaign();
+      const before = JSON.parse(JSON.stringify(bridge.campaign));
+      bridge.startCampaignBattle({ levelId: 101 });
+      const st = bridge.state;
+      const t1 = st.units.filter(u => u.hp > 0 && u.team === 1);
+      const reserve = Array.isArray(st.battleReserve) ? st.battleReserve : [];
+      const overflowOk = reserve.length >= 1 && (t1.length + reserve.length) === before.fleet.length;
+      const wallet0 = before.wallet;
+      const parts0 = before.cargo.parts;
+      const livingReserve = reserve.slice();
+      st.units.forEach(u => { if (u.team === 2 && u.flags.has("!flagship")) u.hp = 0; });
+      st.units = st.units.filter(u => u.hp > 0);
+      const living1 = st.units.filter(u => u.team === 1);
+      bridge.checkEndgame();
+      const after = bridge.campaign;
+      const expectFleet = living1.length + livingReserve.length;
+      const partsGrew = after && after.cargo && after.cargo.parts >= parts0;
+      const walletSame = after && after.wallet === wallet0;
+      const fleetOk = after && Array.isArray(after.fleet) && after.fleet.length === expectFleet;
+      const flagOk = after && after.fleet.some(e => String(e.hull).indexOf("Flagship") !== -1);
+      const loadOk = after && after.fleet.every(e => before.fleet.some(b => b.hull === e.hull && JSON.stringify(b.loadout || []) === JSON.stringify(e.loadout || [])));
+      const pass = overflowOk && walletSame && partsGrew && fleetOk && flagOk && loadOk;
+      return {
+        name: "M2 LIVE PATH CARRY-OVER",
+        pass: pass,
+        detail: pass ? ("reserve "+reserve.length+", fleet "+after.fleet.length+", parts "+parts0+"->"+after.cargo.parts) : JSON.stringify({ overflowOk, walletSame, partsGrew, fleetOk, flagOk, loadOk, t1: t1.length, reserve: reserve.length, afterFleet: after && after.fleet && after.fleet.length, parts: after && after.cargo && after.cargo.parts })
+      };
+    },
+
+    testBattleCreditsFrozen() {
+      bridge.initializeCampaign();
+      bridge.startCampaignBattle({ levelId: 101 });
+      const st = bridge.state;
+      const c0 = st.credits[1];
+      const i0 = st.income[1];
+      const w0 = bridge.campaign.wallet;
+      bridge.transitionToAITurn();
+      const afterAI = st.credits[1] === c0 && st.income[1] === i0;
+      st.activeTeam = 2;
+      st.gameOver = false;
+      bridge.transitionToPlayerTurn();
+      const afterP = st.credits[1] === c0 && st.income[1] === i0 && bridge.campaign.wallet === w0;
+      const pass = afterAI && afterP;
+      return {
+        name: "M2 BATTLE CREDITS FROZEN",
+        pass: pass,
+        detail: pass ? ("credits "+c0+" wallet "+w0+" across turns") : ("c="+st.credits[1]+" i="+st.income[1]+" w="+bridge.campaign.wallet+" afterAI="+afterAI+" afterP="+afterP)
+      };
+    },
+
+    testDeploymentChoiceForcesFlagship() {
+      bridge.initializeCampaign();
+      const fleet = bridge.campaign.fleet;
+      const probeIdx = fleet.findIndex(e => e.hull === "Probe");
+      const setup = bridge.openBattle(bridge.campaign, { capacity: 2, choice: [probeIdx], opponent: [] });
+      const deployed = setup.deployments[0].units.map(e => e.hull);
+      const hasFlag = deployed.some(h => String(h).indexOf("Flagship") !== -1);
+      const hasProbe = deployed.indexOf("Probe") !== -1;
+      const sizeOk = deployed.length === 2;
+      bridge.startCampaignBattle({ levelId: 101, capacity: 2, choice: [probeIdx] });
+      const live = bridge.state.units.filter(u => u.hp > 0 && u.team === 1).map(u => u.type);
+      const liveFlag = live.some(h => String(h).indexOf("Flagship") !== -1);
+      const liveProbe = live.indexOf("Probe") !== -1;
+      const liveSize = live.length === 2;
+      const pass = hasFlag && hasProbe && sizeOk && liveFlag && liveProbe && liveSize;
+      return {
+        name: "M2 DEPLOYMENT FLAGSHIP FORCED",
+        pass: pass,
+        detail: pass ? "flagship+Probe at cap 2 (seam+live)" : JSON.stringify({ deployed, live, hasFlag, hasProbe, sizeOk, liveFlag, liveProbe, liveSize })
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -460,6 +534,7 @@ const runGameTests = function (bridge, testName) {  const suite = {
         this.testSummonCostsOneAp(), this.testMirageAnyHitDestroys(), this.testMirageRamDestroysBoth(),
         this.testFlagshipLostCampaignOver(), this.testBattleCarryOver(),
         this.testLifetimeMapCoversInitialState(),
+        this.testLivePathCarryOver(), this.testBattleCreditsFrozen(), this.testDeploymentChoiceForcesFlagship(),
         this.testKiting(), this.testFlagshipGuard(), this.testFocusFire(), this.testDoctrine(),
         this.testFlagshipShieldAlwaysUp(), this.testRailgunAvoidance(), this.testFleeWhenOutgunned(),
         this.testRecedingHorizon(), this.testBudgetAwarePlanning(),

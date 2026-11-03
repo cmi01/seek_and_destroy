@@ -18,6 +18,7 @@ const campaignDataPayload = (() => ({
     start: {
       wallet: 25000,
       startFleet: ["Flagship Battlecruiser", "Fighter", "Fighter", "Attack Frigate", "Probe"],
+      battle: { cornerCapacity: 4 },
       cargo: { goods: 0, fuel: 20, crew: 0, parts: 5 },
       clock: { month: 1, year: 2401 },
       map: { locationId: "sol-gate" }
