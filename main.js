@@ -329,6 +329,64 @@ function reportBootFailure(err){
   document.body.appendChild(pre);
 }
 
+// Game leaf scripts (v102: closed boot list). game.js loads ONLY its direct
+// children; these leaf grandchildren load here, in the central shell, before
+// Game.load() runs its composers. main.js is the exempt central loader
+// (REFERENCE_POLICY §4.1), so the leaf inbounds stay within their owners.
+const GAME_LEAF_SCRIPTS = [
+  "main.js children/game.js children/gameState.js children/initializeGameState.js",
+  "main.js children/game.js children/gameState.js children/getGameState.js",
+  "main.js children/game.js children/gameState.js children/tryPatchGameState.js",
+  "main.js children/game.js children/gameState.js children/getStateLifetimes.js",
+  "main.js children/game.js children/gameState.js children/buildStateSave.js",
+  "main.js children/game.js children/gameState.js children/restoreStateSave.js",
+  "main.js children/game.js children/themes.js children/themeTables.js",
+  "main.js children/game.js children/themes.js children/normalizeThemeKey.js",
+  "main.js children/game.js children/themes.js children/nextTheme.js",
+  "main.js children/game.js children/themes.js children/themePalette.js",
+  "main.js children/game.js children/themes.js children/remapColor.js",
+  "main.js children/game.js children/rulesConfig.js children/getFlagDescriptions.js",
+  "main.js children/game.js children/rulesConfig.js children/getGridSize.js",
+  "main.js children/game.js children/rulesConfig.js children/getSpawnRadius.js",
+  "main.js children/game.js children/rulesConfig.js children/getMaxAp.js",
+  "main.js children/game.js children/rulesConfig.js children/getEnemyActionIntervalMs.js",
+  "main.js children/game.js children/rulesConfig.js children/getZoomLadder.js",
+  "main.js children/game.js children/rulesConfig.js children/getWheelNotchPx.js",
+  "main.js children/game.js children/rulesConfig.js children/getMaxZoomStepsPerEvent.js",
+  "main.js children/game.js children/rulesConfig.js children/getDefaultDifficulty.js",
+  "main.js children/game.js children/rulesConfig.js children/getDifficultyProfiles.js",
+  "main.js children/game.js children/rulesConfig.js children/getShipSpecs.js",
+  "main.js children/game.js children/rulesConfig.js children/getCombatRules.js",
+  "main.js children/game.js children/boardQueries.js children/cellOnBoard.js",
+  "main.js children/game.js children/boardQueries.js children/cellDistance.js",
+  "main.js children/game.js children/boardQueries.js children/cellsWithinRange.js",
+  "main.js children/game.js children/boardQueries.js children/terrainOfCell.js",
+  "main.js children/game.js children/boardQueries.js children/occupancyKey.js",
+  "main.js children/game.js children/boardQueries.js children/indexLivingUnits.js",
+  "main.js children/game.js children/boardQueries.js children/unitOnCell.js",
+  "main.js children/game.js children/visionQueries.js children/unitScanRange.js",
+  "main.js children/game.js children/visionQueries.js children/cellVisibleToTeam.js",
+  "main.js children/game.js children/visionQueries.js children/unitSpottedByTeam.js",
+  "main.js children/game.js children/actionLegality.js children/canUnitMove.js",
+  "main.js children/game.js children/actionLegality.js children/canUnitCapture.js",
+  "main.js children/game.js children/actionLegality.js children/canUnitShoot.js",
+  "main.js children/game.js children/actionLegality.js children/canUnitShield.js",
+  "main.js children/game.js children/actionLegality.js children/priorityActionAt.js",
+  "main.js children/game.js children/combatMath.js children/resolveShootOutcome.js",
+  "main.js children/game.js children/combatMath.js children/resolveCollisionOutcome.js",
+  "main.js children/game.js children/combatMath.js children/isLethalShot.js",
+  "main.js children/game.js children/combatMath.js children/isShootableFrom.js",
+  "main.js children/game.js children/cameraMath.js children/resolveZoomStep.js",
+  "main.js children/game.js children/cameraMath.js children/clampViewportToBoard.js",
+  "main.js children/game.js children/cameraMath.js children/computeRenderedViewport.js",
+  "main.js children/game.js children/cameraMath.js children/pixelToCell.js",
+  "main.js children/game.js children/cameraMath.js children/computeCellCentre.js",
+  "main.js children/game.js children/selectionQueries.js children/getSelectedUnit.js",
+  "main.js children/game.js children/selectionQueries.js children/cellForUnit.js",
+  "main.js children/game.js children/sectorGenerator.js children/buildUnitRecord.js",
+  "main.js children/game.js children/sectorGenerator.js children/buildSectorData.js"
+];
+
 async function startGame(){
   try {
     await _loadScripts(INTERFACE_SCRIPTS);
@@ -370,6 +428,63 @@ async function startGame(){
     const inputChannel = createInputInterface();
     const graphicsChannel = createGraphicsInterface();
     const audioChannel = createAudioInterface();
+
+    // Load the game leaf grandchildren (v102 closed boot list) BEFORE
+    // Game.load() composes them: game.js awaits only its direct children.
+    await _loadScripts(GAME_LEAF_SCRIPTS);
+    _verifyLoaded([
+      ["main.js children/game.js children/gameState.js children/initializeGameState.js", () => typeof initializeGameState === "function"],
+      ["main.js children/game.js children/gameState.js children/getGameState.js",        () => typeof getGameState === "function"],
+      ["main.js children/game.js children/gameState.js children/tryPatchGameState.js",   () => typeof tryPatchGameState === "function"],
+      ["main.js children/game.js children/gameState.js children/getStateLifetimes.js",   () => typeof getStateLifetimes === "function"],
+      ["main.js children/game.js children/gameState.js children/buildStateSave.js",      () => typeof buildStateSave === "function"],
+      ["main.js children/game.js children/gameState.js children/restoreStateSave.js",    () => typeof restoreStateSave === "function"],
+      ["main.js children/game.js children/themes.js children/themeTables.js",            () => typeof themeTables === "function"],
+      ["main.js children/game.js children/themes.js children/normalizeThemeKey.js",      () => typeof normalizeThemeKey === "function"],
+      ["main.js children/game.js children/themes.js children/nextTheme.js",              () => typeof nextTheme === "function"],
+      ["main.js children/game.js children/themes.js children/themePalette.js",           () => typeof themePalette === "function"],
+      ["main.js children/game.js children/themes.js children/remapColor.js",             () => typeof remapColor === "function"],
+      ["main.js children/game.js children/rulesConfig.js children/getFlagDescriptions.js", () => typeof getFlagDescriptions === "function"],
+      ["main.js children/game.js children/rulesConfig.js children/getGridSize.js",       () => typeof getGridSize === "function"],
+      ["main.js children/game.js children/rulesConfig.js children/getSpawnRadius.js",    () => typeof getSpawnRadius === "function"],
+      ["main.js children/game.js children/rulesConfig.js children/getMaxAp.js",          () => typeof getMaxAp === "function"],
+      ["main.js children/game.js children/rulesConfig.js children/getEnemyActionIntervalMs.js", () => typeof getEnemyActionIntervalMs === "function"],
+      ["main.js children/game.js children/rulesConfig.js children/getZoomLadder.js",     () => typeof getZoomLadder === "function"],
+      ["main.js children/game.js children/rulesConfig.js children/getWheelNotchPx.js",   () => typeof getWheelNotchPx === "function"],
+      ["main.js children/game.js children/rulesConfig.js children/getMaxZoomStepsPerEvent.js", () => typeof getMaxZoomStepsPerEvent === "function"],
+      ["main.js children/game.js children/rulesConfig.js children/getDefaultDifficulty.js", () => typeof getDefaultDifficulty === "function"],
+      ["main.js children/game.js children/rulesConfig.js children/getDifficultyProfiles.js", () => typeof getDifficultyProfiles === "function"],
+      ["main.js children/game.js children/rulesConfig.js children/getShipSpecs.js",      () => typeof getShipSpecs === "function"],
+      ["main.js children/game.js children/rulesConfig.js children/getCombatRules.js",    () => typeof getCombatRules === "function"],
+      ["main.js children/game.js children/boardQueries.js children/cellOnBoard.js",      () => typeof cellOnBoard === "function"],
+      ["main.js children/game.js children/boardQueries.js children/cellDistance.js",     () => typeof cellDistance === "function"],
+      ["main.js children/game.js children/boardQueries.js children/cellsWithinRange.js", () => typeof cellsWithinRange === "function"],
+      ["main.js children/game.js children/boardQueries.js children/terrainOfCell.js",    () => typeof terrainOfCell === "function"],
+      ["main.js children/game.js children/boardQueries.js children/occupancyKey.js",     () => typeof occupancyKey === "function"],
+      ["main.js children/game.js children/boardQueries.js children/indexLivingUnits.js", () => typeof indexLivingUnits === "function"],
+      ["main.js children/game.js children/boardQueries.js children/unitOnCell.js",       () => typeof unitOnCell === "function"],
+      ["main.js children/game.js children/visionQueries.js children/unitScanRange.js",   () => typeof unitScanRange === "function"],
+      ["main.js children/game.js children/visionQueries.js children/cellVisibleToTeam.js", () => typeof cellVisibleToTeam === "function"],
+      ["main.js children/game.js children/visionQueries.js children/unitSpottedByTeam.js", () => typeof unitSpottedByTeam === "function"],
+      ["main.js children/game.js children/actionLegality.js children/canUnitMove.js",    () => typeof canUnitMove === "function"],
+      ["main.js children/game.js children/actionLegality.js children/canUnitCapture.js", () => typeof canUnitCapture === "function"],
+      ["main.js children/game.js children/actionLegality.js children/canUnitShoot.js",   () => typeof canUnitShoot === "function"],
+      ["main.js children/game.js children/actionLegality.js children/canUnitShield.js",  () => typeof canUnitShield === "function"],
+      ["main.js children/game.js children/actionLegality.js children/priorityActionAt.js", () => typeof priorityActionAt === "function"],
+      ["main.js children/game.js children/combatMath.js children/resolveShootOutcome.js", () => typeof resolveShootOutcome === "function"],
+      ["main.js children/game.js children/combatMath.js children/resolveCollisionOutcome.js", () => typeof resolveCollisionOutcome === "function"],
+      ["main.js children/game.js children/combatMath.js children/isLethalShot.js",       () => typeof isLethalShot === "function"],
+      ["main.js children/game.js children/combatMath.js children/isShootableFrom.js",    () => typeof isShootableFrom === "function"],
+      ["main.js children/game.js children/cameraMath.js children/resolveZoomStep.js",    () => typeof resolveZoomStep === "function"],
+      ["main.js children/game.js children/cameraMath.js children/clampViewportToBoard.js", () => typeof clampViewportToBoard === "function"],
+      ["main.js children/game.js children/cameraMath.js children/computeRenderedViewport.js", () => typeof computeRenderedViewport === "function"],
+      ["main.js children/game.js children/cameraMath.js children/pixelToCell.js",        () => typeof pixelToCell === "function"],
+      ["main.js children/game.js children/cameraMath.js children/computeCellCentre.js",  () => typeof computeCellCentre === "function"],
+      ["main.js children/game.js children/selectionQueries.js children/getSelectedUnit.js", () => typeof getSelectedUnit === "function"],
+      ["main.js children/game.js children/selectionQueries.js children/cellForUnit.js",  () => typeof cellForUnit === "function"],
+      ["main.js children/game.js children/sectorGenerator.js children/buildUnitRecord.js", () => typeof buildUnitRecord === "function"],
+      ["main.js children/game.js children/sectorGenerator.js children/buildSectorData.js", () => typeof buildSectorData === "function"]
+    ]);
 
     await Game.load();
     await Graphics.load();
