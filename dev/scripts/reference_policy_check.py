@@ -25,6 +25,9 @@ SCRUBS (declarations, not references):
   - a source's header banner lines (`// ... job: ...`, `// Owner: ...`).
   - `X children/...` path literals are layout declarations and are blanked
     from mention scanning (they produce load-path edges instead).
+  - `Name.<filename-extension>` (e.g. prose `main.js`) is a basename mention
+    of a file, not a use of a binding named `Name` — the binding edge is
+    scrubbed (the basename-mention edge to the named file still fires).
   - self-mentions; names the source defines or receives as parameters.
 
 INTERPRETATIONS (see dev/docs/REFERENCE_POLICY_VIOLATIONS.md §2):
@@ -111,6 +114,12 @@ def scrub_headers(text):
 
 
 CHILDREN_LIT_RE = re.compile(r"\"[^\"\n]* children/[^\"\n]*\"|'[^'\n]* children/[^'\n]*'")
+
+# `Name.<ext>` where <ext> is a filename extension (longest-first so `.jsx`
+# does not stop at `.js`): a basename-shaped token, never a property access.
+FILENAME_EXT_RE = re.compile(
+    r"\.(?:jsx|tsx|html|css|json|yaml|conf|txt|yml|mp3|wav|ogg|svg|png|ico|md|py|sh|js|ts)"
+    r"(?![\w$])")
 
 
 def blank_children_literals(text):
@@ -285,6 +294,14 @@ def build_graph(root, count_main_js, count_dev_referrers):
                     edge = {"from": src, "to": dst, "kind": kind, "line": line_no,
                             "context": mask[off]}
                     if kind == "binding-mention":
+                        # filename-extension scrub: `Name.<ext>` (prose
+                        # `main.js`) is a basename mention of a file, not a
+                        # use of a binding named `Name` (the basename-mention
+                        # edge to the named file already fires). This is the
+                        # prose-filename false-positive class (v114's `main`
+                        # binding vs prose "main.js").
+                        if FILENAME_EXT_RE.match(text[m.end():]):
+                            continue
                         # v102 scrub refinement: an object-literal method key
                         # (`GetGameState(box) { ... }`) is a declaration of the
                         # composer surface, not a use of the parent binding —
@@ -651,7 +668,9 @@ def render_report(violations, graph, args, exemptions):
       "normative reference instrument.")
     a("2. Scrubbed as declarations, not references: header banner lines "
       "(`— job:` / `job:` / `Owner:`), `X children/...` path literals (layout "
-      "declarations; they produce `load-path` edges instead), self-mentions, "
+      "declarations; they produce `load-path` edges instead), "
+      "`Name.<filename-extension>` tokens like prose `main.js` (basename "
+      "mentions of a file, not uses of a binding named `Name`), self-mentions, "
       "and names the source defines or receives as parameters (shadowing).")
     a("3. Comment and string mentions count as references (a file being named "
       "is the policy's concern; `reference_audit.py` check 1 counts raw text "

@@ -44,7 +44,9 @@ file is a reference; the policy is about who names whom, not only about
 executable imports. Scrubs (declarations, not references): a source's own
 header banner lines (`// … job: …`, `// Owner: …`), `X children/…` path
 literals (layout declarations — they produce load-path edges instead),
-self-mentions, and names the source defines or takes as parameters.
+`Name.<filename-extension>` tokens such as prose `main.js` (a basename
+mention of a file, not a use of a binding named `Name`), self-mentions, and
+names the source defines or takes as parameters.
 
 ### 2.3 Owner edge
 
