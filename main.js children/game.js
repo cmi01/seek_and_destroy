@@ -449,7 +449,7 @@ function _shootableEvidence(ctx, u, dest, target){
 // the AI turn runner in aiController.js.
 const Actions = {
   bindInputs(){
-    // Inputs process is bound directly by main.js to InputInterface (V66).
+    // Inputs process is bound directly by the central shell to InputInterface (V66).
   },
 
   addAnimation(anim){ State.animations.push({...anim,start:performance.now()}); },
@@ -1735,9 +1735,9 @@ function initializeSubsystems(){
 }
 
 // ======================== TOP-LEVEL GAME FACADE ========================
-// The single entry point main.js uses to load, initialize, step, publish frames,
-// test, and inspect the game domain without main.js referencing any internal
-// domain files or globals.
+// The single entry point the central shell uses to load, initialize, step,
+// publish frames, test, and inspect the game domain without the shell
+// referencing any internal domain files or globals.
 // Inline loader: this file loads ONLY its own direct children.
 function _loadScripts(list){
   return Promise.allSettled(list.map(src => new Promise((resolve, reject) => {

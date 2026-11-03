@@ -146,7 +146,7 @@ const themesDataPayload = (() => ({
   },
 
   // UI / VFX colour remap. Renderers write their colours as default-theme
-  // literals and pass them through Themes.color(); for other themes each
+  // literals and pass them through the theme colour remap; for other themes each
   // listed hex colour or rgb triplet is swapped (alpha is preserved).
   // Unlisted colours (faction red/orange, gold, white, black) are kept on
   // purpose so their gameplay meaning is identical in every theme.

@@ -563,7 +563,7 @@
   // One node per campaign level, connected in campaign order like a star
   // chart. Node geometry comes from the HUD snapshot (uiHud.campaignModal.nodes
   // / .layout), computed once by hud._computeStarmapLayout, so what is drawn
-  // here exactly matches the clickable hit regions in State.canvasButtons.
+  // here exactly matches the clickable hit regions registered for level select.
   // Clicking a node fires the same "LEVEL_SELECT:<id>" button the old screen
   // used, which the input handler routes to the sector-start path.
   function _drawCampaignModal(ctx, state, uiHud, bp, DS, US, now, F, C) {
