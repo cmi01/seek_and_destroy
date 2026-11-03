@@ -71,6 +71,44 @@ python3 dev/scripts/structure_audit.py
 python3 dev/scripts/reference_audit.py
 ```
 
+### Reference-graph analyzer (`dev/scripts/reference_graph.py`)
+
+Computes, for every file in the repo, the files that reference it (inbound)
+and the files it references (outbound). Emits a JSON graph — nodes tagged
+`inside-game-dir` / `inside-dev-dir` / `other`, edges as `(from, to, kind)`
+with per-file `inbound`/`outbound` counts — plus a summary table sorted by
+inbound count descending. Non-code references are covered too: asset paths,
+resource UIDs (`uid://`), scene/prefab links (`res://`), and path literals in
+build manifests, configs, scripts and docs.
+
+```bash
+python3 dev/scripts/reference_graph.py
+#   -> JSON graph in dev/reference_graph.json, summary table on stdout
+python3 dev/scripts/reference_graph.py --json-out - --summary-out out.txt
+python3 dev/scripts/reference_graph.py --root /path/to/repo --fail-on-unresolved
+```
+
+Flags: `--root`, `--json-out`, `--summary-out` (either may be `-` for stdout),
+`--dev-dir` (tag root, default `dev`), `--exclude GLOB` (repeatable extra
+skip), `--allowlist FILE` (fnmatch patterns for accepted unresolved
+specifiers), `--fail-on-unresolved` (exit 2 — CI gate), `--quiet`.
+
+Extractors are per language: ES `import`/`require`, dynamic script-loader
+path literals (this project's parent→child loads), HTML `src`/`href`, CSS
+`url()`/`@import`, C `#include`, Python imports, Lua `require` and GDScript
+`preload`/`load`. Unresolved references warn unless they match the built-in
+allowlist — external URLs and data URIs, node builtins, bare module
+specifiers, system `#include` — or a `--allowlist` pattern. Generic string
+literals (`path-literal`, `manifest-entry`, `doc-mention`) only record
+resolved hits and never warn.
+
+**Adding a new file type:** write an extractor returning
+`(spec, kind, line)` triples and register it in `EXTRACTORS` by extension.
+If the type needs its own resolution scheme (a path prefix or ID type),
+teach `Resolver.resolve()` about it. Unregistered types still get generic
+string-literal scanning, so most path references work before any code
+change.
+
 ## Working on a new version
 
 ```bash
