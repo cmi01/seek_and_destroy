@@ -229,3 +229,72 @@ Implemented on branch `v107` from tag `v106`. The shell owns scale facts. Shared
 | GS-13 | fixed | HUD `lineWidth` literals read `metrics.ui.stroke` (hairline floor is `max(1/renderScale, width × uiScale)`, only in the resolver). World reticles scale with `fontScale`, not `uiScale`. |
 
 Deferred, not a defect row: a higher-resolution atlas (strategy R8) until the art source exists. The optional structure-audit checker for `Math.max` floors was not added; the review-gate question is in `ARCHITECTURE_COMPLIANCE.md` §7.2 item 10.
+
+## Verification (v108)
+
+Re-measured on tag `v107` (`d6b1174`) from a clean `v108` worktree. Dirty checkout at `/home/ubuntu/seek-and-destroy` (v105 WIP) was not used. Platform: Linux x86_64, HeadlessChrome/145, same 1920×1080 OS-scale rows as the original audit.
+
+Checked-in instruments (repeatable; no application code):
+
+```
+node dev/scripts/gui_scale_layout_check.js
+python3 dev/scripts/gui_scale_browser_check.py
+```
+
+The layout check is the no-browser CI command (HUD rects and label budgets at 100/125/150/200/250% plus DS 200/400/768/1440). The browser check forces Chrome device-metrics, asserts GS-01/02/03 numerically, hooks `fillText` so GS-04..GS-11 labels are drawn without `…`, and writes after-shots under `dev/docs/gui-scaling-audit-screenshots/v108/`. Cited v105 before-shots are in `…/v105/` (subset of the original 19 MB capture).
+
+### Manual checklist (one OS row)
+
+1. `dev/serve.sh` from the repo root. Maximize Chrome on a 1920×1080 panel at that display scale, or `--force-device-scale-factor=N --window-size=W,H` using the table in "How this was run".
+2. Console: `document.getElementById("battle-canvas").clientWidth === SD.LayoutMetrics.displaySize` and `getComputedStyle(c).boxSizing === "content-box"` (GS-01). `c.width === Math.round(displaySize * devicePixelRatio)` (GS-02).
+3. `SD.Hud.toggleCampaignModal(true)` — subtitle fully wrapped, `CLOSE [ESC]` complete (GS-04, GS-05).
+4. `SD.Hud.showEndgameModal(false)` — `REDEPLOY SECTOR` / `SECTOR MAP` complete; body above the buttons (GS-06, GS-09). Reload before the next modal; endgame pins `gameOver`.
+5. Shrink until the canvas stops at 200px. HUD `REINFORCEMENTS` complete (GS-07). Help panel and CLOSE on-canvas (GS-08). Starmap nodes/labels inside the dialog (GS-11). Bridge close does not sit on the first card (GS-10).
+6. Load at dpr 1, CSS 800×600. Change dpr to 2 without resizing. `canvas.width` should double (GS-03).
+
+### Live metrics (browser check, port 8148)
+
+| Row | displaySize | dpr | clientWidth | backing | box-sizing | GS-01/02 |
+|---|---|---|---|---|---|---|
+| os100 | 1070 | 1.00 | 1070 | 1070 | content-box | pass |
+| os125 | 854 | 1.25 | 854 | 1068 | content-box | pass |
+| os150 | 710 | 1.50 | 710 | 1065 | content-box | pass |
+| os200 | 530 | 2.00 | 530 | 1060 | content-box | pass |
+| os250 | 422 | 2.50 | 422 | **1055** | content-box | pass (was capped 848) |
+| win200 | 200 | 1.00 | 200 | 200 | content-box | pass |
+| dpr 1→2 no resize | 590 | 2.00 | 590 | **1180** (was 590) | content-box | GS-03 pass |
+
+offsetWidth is displaySize+2 (1px border outside the content box).
+
+### Defect pass/fail
+
+| ID | 100% | 125% | 150% | 200% | 250% / extra | After shot | Before shot | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| GS-01 | pass | pass | pass | pass | pass at 250% and DS 200 | `v108/os100-base.png` | `v105/os100-base.png` | verified |
+| GS-02 | — | — | — | — | pass: backing 1055 at dpr 2.5 | `v108/os250-base.png` | `v105/os250-base.png` | verified |
+| GS-03 | — | — | — | — | pass: 590 → 1180 without resize | `v108/dpr-after-no-resize.png` | `v105/dpr-stale-no-resize.png` | verified |
+| GS-04 | pass | pass | pass | pass | pass at 250% and DS 200 | `v108/os100-campaign.png` | `v105/os100-campaign.png` | verified |
+| GS-05 | pass | pass | pass | pass | pass at 250% and DS 200 | `v108/os100-campaign.png` | `v105/os100-campaign.png` | verified |
+| GS-06 | pass | pass | pass | pass | pass at DS 200 | `v108/os125-endgame.png` | `v105/os125-endgame.png` | verified |
+| GS-07 | — | — | — | — | pass at DS 200 (`textPx` 4, full `REINFORCEMENTS`) | `v108/win200-base.png` | `v105/win200-base.png` | verified |
+| GS-08 | pass | pass | pass | pass | pass at DS 200 (CLOSE on-canvas) | `v108/win200-help.png` | `v105/win200-help.png` | verified |
+| GS-09 | pass | pass | pass | pass | pass at DS 200 | `v108/win200-endgame.png` | `v105/win200-endgame.png` | verified |
+| GS-10 | pass | pass | pass | pass | pass at 250% and DS 200 | `v108/win200-bridge.png` | `v105/win200-bridge.png` | verified |
+| GS-11 | pass | pass | pass | pass | pass at DS 200 | `v108/win200-campaign.png` | `v105/win200-campaign.png` | verified |
+| GS-12 | — | — | — | — | still partial (atlas + viewSpan-5 budget) | `v105/dpr1-span5.png`, `v105/dpr2-span5.png` | same | deferred |
+| GS-13 | pass | pass | pass | pass | hairline follows `max(1/rs, 1×uiScale)` in the layout check | `v108/win200-base.png` | `v105/win200-base.png` | verified |
+
+Visual read of `v108/os100-campaign.png`: subtitle ends with a period (`…secure it.`), button is `CLOSE [ESC]`. `v105/os100-campaign.png` still shows `CLOSE [...]` and an ellipsized subtitle. `v108/os125-endgame.png`: `REDEPLOY SECTOR` and `SECTOR MAP` complete, body above the buttons. `v108/win200-help.png`: panel and `CLOSE` on the canvas.
+
+### Other suites
+
+Ad-hoc, not "the suite is green": `node --check` on the new script; `structure_audit.py` 0 violations / one-function 0; `reference_audit.py` legacy 6, child-names 0, doc-window 27, import-direction 2 (v107 baseline); `reference_policy_gate.py` PASS. In-browser on fresh port 49945: `SD.runTests` 16/16 and `SD.runAudioTests` 5/5.
+
+### Follow-ups
+
+GS-12 remains partial. Follow-up issues:
+
+- https://github.com/cmi01/seek_and_destroy/issues/3 — higher-resolution sprite atlas (no art source)
+- https://github.com/cmi01/seek_and_destroy/issues/4 — terrain cache 4096 budget still caps viewSpan 5 at dpr 2
+
+The optional `Math.max` floor checker is still not in `structure_audit.py`.

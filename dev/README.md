@@ -69,7 +69,18 @@ Debug handle is exposed as `window.SD` in the browser console (includes
 ```bash
 python3 dev/scripts/structure_audit.py
 python3 dev/scripts/reference_audit.py
+node dev/scripts/gui_scale_layout_check.js
 ```
+
+The layout check is the no-browser HUD geometry regression at 100/125/150/200/250% plus the 200px minimum canvas (GS-04 through GS-11, GS-13 stroke tokens). It is the command to run in CI or before a scaling-related release.
+
+Live DPI (GS-01 content box, GS-02 uncapped backing store, GS-03 DPR-without-resize, drawn labels without ellipsis) needs Chromium and playwright:
+
+```bash
+python3 dev/scripts/gui_scale_browser_check.py
+```
+
+Screenshots land in `dev/docs/gui-scaling-audit-screenshots/v108/`. Procedure and pass/fail table: `dev/docs/gui-scaling-audit.md` (Verification section). A GitHub Actions workflow for the layout check is not in tree yet — the deploy credential cannot push `.github/workflows/` (`workflows` scope); same constraint as `reference-policy.yml`.
 
 ### Reference-policy check (CI gate)
 
