@@ -6,8 +6,12 @@
 // ============================================================
 
 // The composer validates the payload and resets the container before this
-// runs; here only the restored, template-known keys land.
+// runs; here only the restored, template-known keys land. A pre-M1 payload
+// (version V58-1.0, no campaign key) has its credits and income scaled ×100
+// and receives a campaign section. A payload already at DATA.version is
+// copied unchanged, so a current save cannot be scaled twice.
 const restoreStateSave = function (DATA, stateBox, data){
+  const PRE_M1_VERSION = "V58-1.0";
   const allowedKeys = new Set(Object.keys(DATA.initialState));
 
   function fromPlain(v){
@@ -22,7 +26,37 @@ const restoreStateSave = function (DATA, stateBox, data){
     return v;
   }
 
-  const restored = fromPlain(data.state);
+  function scaleMoney(map){
+    if (!map || typeof map !== "object" || Array.isArray(map)) return map;
+    const out = {};
+    Object.keys(map).forEach(k => {
+      out[k] = (typeof map[k] === "number") ? map[k] * 100 : map[k];
+    });
+    return out;
+  }
+
+  function campaignSection(){
+    return {
+      fleet: [],
+      wallet: 0,
+      cargo: { goods: 0, fuel: 0, crew: 0, parts: 0 },
+      reputation: {},
+      clock: { month: 1, year: 2401 },
+      map: { locationId: "" }
+    };
+  }
+
+  const payload = data.state || {};
+  const hadCampaign = Object.prototype.hasOwnProperty.call(payload, "campaign");
+  const restored = fromPlain(payload);
   Object.keys(restored).forEach(k => { if (allowedKeys.has(k)) stateBox.current[k] = restored[k]; });
+
+  const preM1 = data.version !== DATA.version && (data.version === PRE_M1_VERSION || data.version == null);
+  if (preM1) {
+    const st = stateBox.current;
+    if (st.credits) st.credits = scaleMoney(st.credits);
+    if (st.income) st.income = scaleMoney(st.income);
+  }
+  if (!hadCampaign) stateBox.current.campaign = campaignSection();
   return stateBox.current;
 };

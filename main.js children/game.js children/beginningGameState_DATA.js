@@ -5,9 +5,12 @@
 // Owner: game.js. Holds no state unless it is a core.
 // ============================================================
 const beginningGameStateDataPayload = (() => ({
-  version: "V58-1.0",
+  version: "M1-1.0",
   schema: "seek-and-destroy.beginning-game-state",
   initialState: {
+    // ---- campaign: the M1 campaign section (fleet/wallet/cargo/reputation/clock/map) ----
+    campaign: null,
+
     // ---- profile: survives sector changes ----
     completedLevels: [],
     theme: "default",
@@ -20,8 +23,8 @@ const beginningGameStateDataPayload = (() => ({
     turnNumber: 1,
     activeTeam: 1,
     ap: 4,
-    credits: { 1: 35, 2: 0 },
-    income: { 1: 5, 2: 0 },
+    credits: { 1: 3500, 2: 0 },
+    income: { 1: 500, 2: 0 },
     terrain: [],
     exploredCells: [],
     asteroidSeeds: [],
@@ -79,6 +82,10 @@ const beginningGameStateDataPayload = (() => ({
   },
 
   lifetimes: {
+    // Design §5.1 names {profile, fleet, campaign}. This map is the real seam:
+    // profile / match / ai / camera, plus campaign. There is no fleet lifetime;
+    // the roster lives inside the campaign section. Do not reshape the map.
+    campaign: ["campaign"],
     profile: ["completedLevels", "theme", "audioSettings", "rng", "rngSeed"],
     match: ["levelId", "turnNumber", "activeTeam", "ap", "credits", "income", "terrain", "exploredCells", "asteroidSeeds",
             "units", "nextUnitId", "aiDoctrine", "historicalVectors", "turnReportQueue", "gameOver"],

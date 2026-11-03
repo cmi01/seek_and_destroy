@@ -28,6 +28,7 @@ let BEGINNING_GAME_STATE_DATA = null;
 let THEME_DATA = null;
 
 let InitializeGameState = null;
+let InitializeCampaign = null;
 let GetGameState = null;
 let TryPatchGameState = null;
 let GetStateLifetimes = null;
@@ -1717,6 +1718,7 @@ const SectorGenerator = {
 // Called once by Game.init() AFTER Game.load() and Game.bindInterfaces() have run.
 function initializeSubsystems(){
   Rules.initState();
+  if (InitializeCampaign && !GetGameState().campaign) InitializeCampaign();
   GameAudio.bind();
   if (_graphicsProducer && typeof _graphicsProducer.publishStaticConfig === "function"){
     _graphicsProducer.publishStaticConfig({
@@ -1832,6 +1834,7 @@ const api = {
         "main.js children/game.js children/beginningGameState_DATA.js",
         "main.js children/game.js children/themes_DATA.js",
         "main.js children/game.js children/gameState.js",
+        "main.js children/game.js children/campaignState.js",
         "main.js children/game.js children/themes.js",
         "main.js children/game.js children/rulesConfig.js",
         "main.js children/game.js children/boardQueries.js",
@@ -1876,6 +1879,7 @@ const api = {
         selectionQueries: typeof selectionQueries === "function" ? selectionQueries : null,
         sectorGenerator:  typeof sectorGenerator === "function" ? sectorGenerator : null,
         gameState:        typeof gameState === "function" ? gameState : null,
+        campaignState:    typeof campaignState === "function" ? campaignState : null,
         boardQueries:     typeof boardQueries === "function" ? boardQueries : null,
         visionQueries:    typeof visionQueries === "function" ? visionQueries : null,
         actionLegality:   typeof actionLegality === "function" ? actionLegality : null
@@ -1897,6 +1901,7 @@ const api = {
         ["main.js children/game.js children/beginningGameState_DATA.js", _modules.beginningGameStateData],
         ["main.js children/game.js children/themes_DATA.js",             _modules.themesData],
         ["main.js children/game.js children/gameState.js",               kids.gameState],
+        ["main.js children/game.js children/campaignState.js",           kids.campaignState],
         ["main.js children/game.js children/themes.js",                  kids.themes],
         ["main.js children/game.js children/rulesConfig.js",             kids.rulesConfig],
         ["main.js children/game.js children/boardQueries.js",            kids.boardQueries],
@@ -1943,6 +1948,20 @@ const api = {
       GetStateLifetimes = () => stateLib.GetStateLifetimes();
       SerializeGameState = () => stateLib.SerializeGameState(_stateBox);
       DeserializeGameState = data => stateLib.DeserializeGameState(_stateBox, data);
+
+      // M1 campaign state: pure children over the campaign section only.
+      // initializeCampaign() rebuilds State.campaign from the frozen
+      // campaign_DATA starting package; persistence flows through the
+      // gameState campaign lifetime.
+      const campaignLib = kids.campaignState();
+      InitializeCampaign = () => {
+        const fresh = campaignLib.InitializeCampaignState(CAMPAIGN_DATA.campaign, SHIP_SPECS);
+        if (!TryPatchGameState({ campaign: fresh })) {
+          console.error("[S&D campaign] initializeCampaign: patch rejected.");
+          return null;
+        }
+        return GetGameState().campaign;
+      };
 
       // Pure-function theme library: Game owns the active theme (State.theme)
       // and passes the key explicitly to every call.
@@ -2263,6 +2282,10 @@ const api = {
     return _loadTests();
   },
 
+  initializeCampaign(){
+    return InitializeCampaign();
+  },
+
   async runTest(testName){
     await _loadTests();
     return _modules.tests(this.createTestBridge(), testName);
@@ -2274,7 +2297,16 @@ const api = {
       get difficulty(){ return DIFFICULTY; },
       get difficultyTable(){ return DIFFICULTY_TABLE; },
       get shipSpecs(){ return SHIP_SPECS; },
+      get weapons(){ return RULES_DATA.weapons; },
       get state(){ return State; },
+      get campaign(){ return State.campaign; },
+      initializeCampaign(){ return InitializeCampaign(); },
+      saveState(){ return SerializeGameState(); },
+      loadState(data){
+        const ok = DeserializeGameState(data);
+        if (ok) { Visibility.invalidate(); Visibility.ensureCache(); }
+        return Boolean(ok);
+      },
       dist(a, b){ return MathGrid.dist(a, b); },
       resolveZoom(viewX, viewY, viewSpan, mousePx, deltaY, displaySize){
         return MathGrid.resolveZoom(viewX, viewY, viewSpan, mousePx, deltaY, displaySize);
@@ -2335,7 +2367,7 @@ const api = {
         console.log("SD.Hud              — HUD / modal view-model (hud.js)");
         console.log("SD.Graphics / SD.Sound — renderer and audio engine modules");
         console.log("SD.setSeed(1234)    — make sector generation repeatable (then SD.SectorGenerator.generate(levelId))");
-        console.log("SD.runTests()       — load tests/test.js on demand and run the AI + sprite self-tests (16)");
+        console.log("SD.runTests()       — load tests/test.js on demand and run the AI + sprite self-tests (19)");
         console.log("                      (returns a Promise the first time; add ?test=1 to the URL to preload tests)");
         console.log("SD.Harness.runAll() — same as SD.runTests()");
         console.log("SD.runAudioTests()  — validate the audio clip manifest, event routing, loops, themes & buses (5)");

@@ -8,7 +8,7 @@
 // Only the persistent lifetimes are written; input/runtime fields (timers,
 // hit boxes, caches, the live RNG closure) are rebuilt fresh on load.
 const buildStateSave = function (DATA, stateBox){
-  const PERSISTENT_LIFETIMES = ["profile", "match", "ai", "camera"];
+  const PERSISTENT_LIFETIMES = ["campaign", "profile", "match", "ai", "camera"];
   const LIFETIMES = DATA.lifetimes;
 
   function toPlain(v){
