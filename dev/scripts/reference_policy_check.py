@@ -43,6 +43,12 @@ INTERPRETATIONS (see dev/docs/REFERENCE_POLICY_VIOLATIONS.md §2):
 
 Exit codes: 0 = clean, 1 = violations found, 2 = usage/IO error.
 
+Stdout listing (plain text, CI-log friendly; ANSI color only on a TTY):
+violations are grouped by violating file, and each block states the file, its
+referrers (kind + context + line), the rule violated in plain language, and a
+concrete remedy naming the files to touch; a summary line (total violations,
+files affected, contributor-doc pointer) closes the output.
+
 Usage:
   python3 dev/scripts/reference_policy_check.py                 # scan + report to stdout
   python3 dev/scripts/reference_policy_check.py --repo PATH     # scan another tree
@@ -352,6 +358,73 @@ REMEDY_DEV_BOUNDARY = ("Move the referenced file out of dev/, duplicate the "
                        "needed logic into the game tree, or invert the "
                        "dependency behind an interface the game tree owns.")
 
+# Plain-language rule statements printed in the violation listing so a
+# contributor can fix a finding without opening the policy document.
+RULE_TEXT = {
+    "R1-inbound-cap": ("file referenced by more than one file — a game file "
+                       "may be referenced by at most one other file"),
+    "R2-dev-boundary": ("file references into dev/ — a file outside dev/ may "
+                        "never reference a file inside dev/"),
+}
+
+# Contributor-doc pointer printed in the summary line of the violation
+# listing (kept in sync with dev/scripts/reference_policy_gate.py).
+DOC_POINTER = 'dev/docs/REFERENCE_POLICY_CI.md ("Approved remedies")'
+
+
+def quote(path):
+    return "'%s'" % path
+
+
+def fmt_names(paths):
+    return ", ".join(quote(p) for p in sorted(paths))
+
+
+def concrete_remedy_r1(target, parent, extra, remedies_so_far):
+    """First-line remedy naming the actual files involved (task-level
+    requirement: 'move this function into <X> or inline it into <Y>')."""
+    best = {}
+    for e in extra:
+        f = e["from"]
+        if f not in best or (e["context"] == "code" and best[f]["context"] != "code"):
+            best[f] = e
+    # code-context referrers first: they are the ones that must change code
+    extra_files = sorted(best, key=lambda f: (best[f]["context"] != "code", f))
+    if not extra_files:
+        return None
+    if any(e.get("note") == "X._register handshake" for e in extra):
+        return ("Retire the X._register handshake in %s: %s must capture this "
+                "file's single function at load instead of the file registering "
+                "itself." % (fmt_names(extra_files),
+                             quote(parent) if parent else "its owner"))
+    if all(e["context"] in ("comment", "string") for e in extra):
+        return ("Reword the comment/string mention in %s — a file may be named "
+                "only by its owner %s (no code change required)."
+                % (fmt_names(extra_files),
+                   quote(parent) if parent else "(none yet)"))
+    gp_note = (REMEDY_FACADE in remedies_so_far)
+    if gp_note and parent:
+        return ("Collapse the facade re-export: %s must consume %s's composed "
+                "surface instead of naming this file directly."
+                % (fmt_names(extra_files), quote(parent)))
+    if parent:
+        return ("Move this file's code into %s or inline it into %s, then drop "
+                "the remaining direct mention from %s — a game file may have "
+                "exactly one referencing file."
+                % (quote(parent), quote(extra_files[0]),
+                   fmt_names(extra_files[1:]) if len(extra_files) > 1
+                   else quote(extra_files[0])))
+    return ("Give this file exactly one owner: move it under %s children/ and "
+            "load it only from %s; drop the direct mentions from %s."
+            % (quote("main.js"), quote("main.js"), fmt_names(extra_files)))
+
+
+def concrete_remedy_r2(source, target):
+    return ("Move %s out of dev/ into the game tree where %s can own it, "
+            "duplicate the small needed logic into %s, or invert the "
+            "dependency behind an interface the game tree owns."
+            % (quote(target), quote(source), quote(source)))
+
 
 def parent_of(rel, tracked):
     """Ownership parent from the '<exact filename> children' folder convention."""
@@ -415,6 +488,9 @@ def check_policy(graph, exemptions):
         if parent is None or not any(e["from"] == parent for e in refs):
             remedies.append("No single owner claims this file via the folder "
                             "convention — assign exactly one owning parent.")
+        concrete = concrete_remedy_r1(dst, parent, extra, remedies)
+        if concrete:
+            remedies.insert(0, concrete)
         violations.append({
             "rule": "R1-inbound-cap",
             "target": dst,
@@ -450,7 +526,7 @@ def check_policy(graph, exemptions):
             "line": es[0]["line"],
             "lines": [e["line"] for e in es],
             "context": es[0]["context"],
-            "remedies": [REMEDY_DEV_BOUNDARY],
+            "remedies": [concrete_remedy_r2(src, dst), REMEDY_DEV_BOUNDARY],
         })
     return violations
 
@@ -469,28 +545,68 @@ def summarize(violations):
 
 
 def render_stdout(violations, graph, args):
-    by_rule, by_dir = summarize(violations)
+    """Plain-text, CI-log-friendly listing, grouped by violating file.
+
+    Every violation block states: the violating file path, the files that
+    reference it (the referrers), the rule violated in plain language, and a
+    concrete remedy naming the files to touch.  Multiple broken rules on one
+    file share a single FILE block.  A summary line closes the output.
+
+    Color is added only when stdout is a TTY (and NO_COLOR is unset); no
+    information is carried by color alone.  Exit-code contract is unchanged:
+    non-zero on any violation.
+    """
+    use_color = sys.stdout.isatty() and "NO_COLOR" not in os.environ
+
+    def st(code, s):
+        return "\033[%sm%s\033[0m" % (code, s) if use_color else s
+
     print("reference-policy check — repo:", graph.get("repo", args.repo))
-    print("TOTAL VIOLATIONS:", len(violations))
-    for rule in sorted(by_rule):
-        print("  %-18s %d" % (rule, by_rule[rule]))
-    print()
+    if not violations:
+        print("TOTAL VIOLATIONS: 0")
+        return 0
+
+    # group by violating file: R1 flags the target (it is over-referenced),
+    # R2 flags the source (it is the file reaching into dev/).
+    groups = {}
     for v in violations:
-        if v["rule"] == "R1-inbound-cap":
-            print("VIOLATION [R1-inbound-cap] %s  (inbound=%d, owner=%s)"
-                  % (v["target"], v["inbound"], v["parent"] or "?"))
-            for r in v["referrers"]:
-                note = "  [%s]" % r["note"] if r.get("note") else ""
-                print("    referenced by %s  (%s %s:%d)%s"
-                      % (r["file"], r["kind"], r["context"], r["line"], note))
-            for rem in v["remedies"]:
-                print("    remedy: %s" % rem)
-        else:
-            print("VIOLATION [R2-dev-boundary] %s -> %s  (%s %s:%d)"
-                  % (v["source"], v["target"], v["kind"], v["context"], v["line"]))
-            for rem in v["remedies"]:
-                print("    remedy: %s" % rem)
+        key = v["target"] if v["rule"] == "R1-inbound-cap" else v["source"]
+        groups.setdefault(key, []).append(v)
+
+    def group_key(item):
+        path, vs = item
+        return (-len(vs), path)
+
+    for path, vs in sorted(groups.items(), key=group_key):
         print()
+        print(st("1", "FILE %s" % path))
+        for v in vs:
+            rule = v["rule"]
+            print("  %s  %s" % (st("31", "rule %s:" % rule),
+                                RULE_TEXT.get(rule, rule)))
+            if rule == "R1-inbound-cap":
+                print("  this file is referenced by %d file(s) (cap: 1) — "
+                      "owner (folder convention): %s"
+                      % (v["inbound"], v["parent"] or "(none)"))
+                print("  referrers (files that reference it):")
+                for r in v["referrers"]:
+                    note = "  [%s]" % r["note"] if r.get("note") else ""
+                    print("    - %s  (%s %s:%d)%s"
+                          % (r["file"], r["kind"], r["context"], r["line"], note))
+            else:
+                print("  this file references dev/ files it may not touch:")
+                print("    - %s  (%s %s:%d)"
+                      % (v["target"], v["kind"], v["context"], v["line"]))
+            print("  %s" % st("32", "suggested remedy:"))
+            for rem in v["remedies"]:
+                print("    - %s" % rem)
+    print()
+    by_rule, _ = summarize(violations)
+    print(st("1", "SUMMARY"))
+    print("  TOTAL VIOLATIONS: %d in %d file(s)  (%s)"
+          % (len(violations), len(groups),
+             ", ".join("%s: %d" % (r, by_rule[r]) for r in sorted(by_rule))))
+    print("  Rules and approved remedies: %s" % DOC_POINTER)
     return len(violations)
 
 
