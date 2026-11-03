@@ -110,6 +110,24 @@ VIOLATION [R1-inbound-cap] main.js children/game.js children/hud.js children/hud
   (`REFERENCE_POLICY.md` §4.7): a workflow naming the dev/ tooling it
   dispatches is a declaration, not a reference.
 
+## Repository-admin setup (one-time)
+
+Branch protection is not codified in the repo (no rulesets/Terraform config),
+so a repo admin does two steps by hand on GitHub:
+
+1. **Add `.github/workflows/reference-policy.yml` to the default branch.**
+   The file ships uncommitted in the repo working tree: the deploy credential
+   is a GitHub App with `contents: write` but not `workflows: write`, so it
+   cannot commit workflow files (both `git push` and the Contents API refuse
+   — the push error names the missing `workflows` permission).
+2. **Require the check:** Settings → Branches → the `main` rule → "Require
+   status checks to pass before merging" → add `reference-policy`. Needs
+   repo-admin rights (`administration: write`); the deploy credential cannot
+   set this via API either.
+
+Until both steps are done the gate has local force only: `python3
+dev/scripts/reference_policy_gate.py` gives the identical verdict anywhere.
+
 ## Approved remedies
 
 Fix the violation kind the listing names. Canonical remedy order:
