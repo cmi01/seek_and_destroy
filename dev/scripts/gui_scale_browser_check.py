@@ -151,6 +151,7 @@ def open_screen(page, name: str) -> None:
           if (H.toggleHelpModal) H.toggleHelpModal(false);
           if (H.toggleBridgeModal) H.toggleBridgeModal(false);
           if (H.toggleCampaignModal) H.toggleCampaignModal(false);
+          if (H.toggleDeployModal) H.toggleDeployModal(false);
           window.__sdFillText && (window.__sdFillText.length = 0);
           if (name === "campaign") H.toggleCampaignModal(true);
           else if (name === "endgame") H.showEndgameModal(false);

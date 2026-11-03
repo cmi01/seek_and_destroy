@@ -7,20 +7,6 @@
   const _hasFlag = (u, f) => Boolean(u && u.flags && (typeof u.flags.has === "function" ? u.flags.has(f) : Array.isArray(u.flags) && u.flags.includes(f)));
 
   const TAU = Math.PI * 2;
-  const DEFAULT_SPRITE_CONFIG = {
-    tilePx: 106,
-    shipRows: [
-      "Shuttle", "Fighter", "Probe", "Bomber", "Boarding APC",
-      "Attack Frigate", "Missile Frigate", "Attack Destroyer", "Railgun Destroyer", "Missile Destroyer",
-      "Light Cruiser", "Railgun Cruiser", "Heavy Cruiser", "Missile Cruiser",
-      "Battlecruiser", "Missile Battleship", "Battleship", "Flagship Battlecruiser"
-    ],
-    marineSentRows: {
-      "Boarding APC": 18,
-      "Missile Battleship": 19,
-      "Battleship": 20
-    }
-  };
 
   // M1 roster growth: the four hulls added by the campaign roster have no
   // dedicated art rows yet. Until the atlas bake ships new art, they render
@@ -43,12 +29,15 @@
 
   // Pure data query: numeric sprite-slice descriptor + sheet key. No live
   // Image handles — the parent resolves sheetKey to the atlas Image itself.
+  // The whole atlas manifest (tile edge + row tables) arrives as
+  // spriteConfig from the theme tables via the graphics core, so the tile
+  // size has exactly one source of truth and a regenerated atlas needs no
+  // edit here.
   function getSpriteSlice(unit, tKey, spriteConfig) {
-    if (!unit) return null;
-    const cfg = spriteConfig || DEFAULT_SPRITE_CONFIG;
-    const tilePx = cfg.tilePx || 106;
-    const shipOrder = cfg.shipRows || DEFAULT_SPRITE_CONFIG.shipRows;
-    const marineSentRow = cfg.marineSentRows || DEFAULT_SPRITE_CONFIG.marineSentRows;
+    if (!unit || !spriteConfig || !spriteConfig.tilePx) return null;
+    const tilePx = spriteConfig.tilePx;
+    const shipOrder = spriteConfig.shipRows || [];
+    const marineSentRow = spriteConfig.marineSentRows || {};
     const sentMarines = _hasFlag(unit, "#space marines") && _hasFlag(unit, "-sent boarding party");
     const spriteType = SPRITE_ROW_ALIASES[unit.type] || unit.type;
     const row = (sentMarines && marineSentRow[unit.type] !== undefined)

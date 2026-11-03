@@ -309,3 +309,40 @@ python3 dev/scripts/gui_scale_browser_check.py
 GS-12 method: CSS 1024×768, `SD.State.viewSpan = 5`, dpr 1 vs dpr 2. Mean abs RGB of the dpr-2 capture downsampled 2× vs the dpr-1 capture (center 50% crop) must be clearly above the v105 baseline of 0.05. Measured (v111, `dev/docs/gui-scaling-audit-screenshots/v111/measurements.json`): **0.9062** vs the 0.05 baseline. Cache at dpr 2 / viewSpan 5: density 2 (was capped below 2 in v105–v108), tilePx 1820 ≤ 2048, visible tiles 1. Layout check ALL PASS at 100/125/150/200/250% plus DS 200; browser check ALL PASS (incl. the GS-12 terrain-density assertion); `?test` suites 25/25 game + 5/5 audio. Structure audit 0 violations / 18 warnings and reference audit 6+27+2 identical to the v110 baseline (which contains v108).
 
 Harness note: a Playwright screenshot resets the page's `devicePixelRatio` to 1 and the shell then re-bakes terrain at the new density, so `gui_scale_browser_check.py` reads metrics and cache state before any screenshot.
+
+## Verification (v118)
+
+GS-12a prep only — no atlas regenerated (issue #3 stays open). The baked
+sprite tile edge is now one named value: `SPRITE_ATLAS_TILE_PX` in
+`themes_DATA.js` (was `tilePx: 106`), and the object layer's two hidden
+copies of it (`DEFAULT_SPRITE_CONFIG.tilePx`, the `cfg.tilePx || 106`
+fallback in the slice math) are gone — slice rects derive solely from the
+`spriteAtlas` manifest. `_blitSprite` names its draw constant
+(`SPRITE_OVERDRAW_CELLS = 2.2`) and writes the source-tile-to-draw-size
+ratio down: `(2.2 × cellPx × renderScale) / tilePx`. With the shipped atlas
+the ratio reaches ~8.3× at dpr 2 (viewSpan 5, ~1000px display); for ≤ ~1×
+at dpr 2 the regenerated tile must be ≥ the sprite's on-screen device size
+— 212px tiles give exactly 1.0× at the 768px design at viewSpan 16, 256px
+~1.07× at viewSpan 16 on a 1000px display, and viewSpan 5 would need
+~880px tiles which the 8×21 embedded atlas cannot hold (accepted residual,
+as in R8). The draw is deliberately not clamped to the tile: that would
+shrink the 2.2-cell footprint on a low-resolution atlas and tie the
+footprint to `renderScale`.
+
+Harness fix: `gui_scale_browser_check.py` `open_screen` now also closes the
+deploy modal. Since v112 the boot opens the pre-battle deployment modal —
+an opaque full-modal — so the "base" probe measured that modal instead of
+the top bar and the check was red at v114 for this alone (flaky 6–14 label
+fails per run). With the fix the pre-change (v114) tree also reports ALL
+PASS through the same harness, isolating the red to the harness gap.
+
+Measured (v118, `dev/docs/gui-scaling-audit-screenshots/v118/`): layout
+check ALL PASS at 100/125/150/200/250% plus DS 200/400/768/1440; browser
+check ALL PASS (12 rows). `?test` suites 29/29 game + 5/5 audio, zero page
+errors — identical on the clean pre-change tree. Sprite blit parity vs the
+pre-change tree is byte-identical (fnv over unit pixels for Fighter /
+Battleship / marines-sent Boarding APC at cellPx 24/48/153/205), so
+behaviour is unchanged until the new atlas lands. `structure_audit` 0
+violations / 17 warnings (18 before — objectRenderer.js is now under 300
+lines); `reference_policy_check` 0; `reference_audit` 0 child-names / 27
+doc-window / 2 import-direction = baseline.

@@ -4,6 +4,28 @@
 // themes_DATA.js — job: return the theme tables.
 // Owner: game.js. Holds no state unless it is a core.
 // ============================================================
+
+// Baked sprite-atlas tile edge, in atlas pixels — THE single knob for atlas
+// resolution. Every consumer derives from spriteAtlas.tilePx below (the
+// object layer's slice math and the graphics core's blit contract), so a
+// regenerated atlas (GS-12 sprite half, issue #3) is consumed by changing
+// this one value.
+//
+// Sizing contract: a board sprite draws at 2.2 × cellPx CSS px under the
+// renderScale world transform — 2.2 × cellPx × renderScale device px,
+// stretched from this tile. The source-tile-to-draw-size ratio is
+// (2.2 × cellPx × renderScale) / tilePx; to keep it at most ~1x at dpr 2
+// (no upscale — the atlas tile is then >= the on-screen pixel size) the
+// regenerated tile must cover 2.2 × cellPx × 2 device px at the zooms that
+// must be crisp. Reference numbers (viewSpan, ~1000px display, dpr 2):
+// 212px tiles are exactly 1.0x at viewSpan 16 (the 2x-density rebake of the
+// shipped tile), 256px tiles are ~1.07x at viewSpan 16 and ~1.0x at
+// viewSpan 8; viewSpan 5 close zoom would need ~880px tiles, which the
+// 8×21 embedded atlas cannot hold, so the residual upscale there stays an
+// accepted limitation (the atlas refactor's acceptance covers
+// viewSpan >= 16 at RS 2).
+const SPRITE_ATLAS_TILE_PX = 106;
+
 const themesDataPayload = (() => ({
   version: "V58-1.0",
   schema: "seek-and-destroy.theme-data",
@@ -182,9 +204,11 @@ const themesDataPayload = (() => ({
   },
 
   // Baked sprite-atlas layout (shared by all themes): row index of each
-  // ship type and the extra rows for "marines sent" variants.
+  // ship type and the extra rows for "marines sent" variants. The tile edge
+  // is the single named value above; when the atlas is regenerated, that
+  // constant is the only edit.
   spriteAtlas: {
-    tilePx: 106,
+    tilePx: SPRITE_ATLAS_TILE_PX,
     shipRows: [
       "Shuttle", "Fighter", "Probe", "Bomber", "Boarding APC",
       "Attack Frigate", "Missile Frigate", "Attack Destroyer", "Railgun Destroyer", "Missile Destroyer",

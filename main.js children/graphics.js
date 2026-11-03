@@ -337,14 +337,31 @@ const Graphics = (() => {
     return { sheet, sx: slice.sx, sy: slice.sy, sw: slice.sw, sh: slice.sh };
   }
 
+  // A board sprite covers SPRITE_OVERDRAW_CELLS logical cells so ships
+  // overhang their tile for readability. The on-screen footprint is design
+  // geometry: it must not depend on the atlas resolution or on renderScale
+  // (a footprint in device px would make ships change size with the
+  // display's pixel ratio).
+  const SPRITE_OVERDRAW_CELLS = 2.2;
+
   // Accepts either resolved material ({sheet, …}) or a plain slice
-  // ({sheetKey, …}) and blits it centered at (cx, cy).
+  // ({sheetKey, …}) and blits it centered at (cx, cy). The blit runs under
+  // the renderScale world transform, so the sprite.sw tile is stretched to
+  // SPRITE_OVERDRAW_CELLS × cellPx × renderScale device px — a
+  // source-tile-to-draw-size ratio of
+  // (SPRITE_OVERDRAW_CELLS × cellPx × renderScale) / sprite.sw: up to ~8.3x
+  // upscale at dpr 2 with the shipped tile (GS-12). The tile edge is one
+  // named value (spriteAtlas.tilePx in the theme tables), so when the atlas
+  // is regenerated at >= the on-screen pixel size this same math draws at
+  // 1:1 or better — ratio <= 1 at dpr 2 — with no edit here. Do not clamp
+  // the draw to the tile: that would shrink the 2.2-cell footprint on a
+  // low-resolution atlas and tie the footprint to renderScale.
   function _blitSprite(ctx, sprite, cx, cy, targetCellPx) {
     if (!sprite) return;
     const sheet = sprite.sheet || (sprite.sheetKey ? _atlasState.images[sprite.sheetKey] : null);
     if (!sheet) return;
-    const lw = Math.ceil(targetCellPx * 2.2);
-    const lh = Math.ceil(targetCellPx * 2.2);
+    const lw = Math.ceil(targetCellPx * SPRITE_OVERDRAW_CELLS);
+    const lh = Math.ceil(targetCellPx * SPRITE_OVERDRAW_CELLS);
     ctx.drawImage(sheet, sprite.sx, sprite.sy, sprite.sw, sprite.sh, cx - lw / 2, cy - lh / 2, lw, lh);
   }
 

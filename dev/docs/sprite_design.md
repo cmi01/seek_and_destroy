@@ -4,7 +4,7 @@
 
 ## Baked atlas
 
-Ships are drawn from a pre-baked sprite atlas (one PNG per theme: `sprites_default.png`, `sprites_retro.png`, `sprites_alien.png`), loaded at runtime out of `assets/graphics.pak`. Each cell is **106×106 px** (`tilePx`). On the board a sprite is blitted at **2.2× the logical cell size**, so ships overhang their tile for readability.
+Ships are drawn from a pre-baked sprite atlas (one PNG per theme: `sprites_default.png`, `sprites_retro.png`, `sprites_alien.png`), loaded at runtime out of `assets/graphics.pak`. Each cell is **`tilePx` × `tilePx` px** — one named value, `SPRITE_ATLAS_TILE_PX` in `themes_DATA.js` (the shipped atlas bakes 106px tiles; regenerate + update that constant for a higher-resolution atlas). On the board a sprite is blitted at **2.2× the logical cell size**, so ships overhang their tile for readability.
 
 **Rows (one per ship type, fixed order):** Shuttle, Fighter, Probe, Bomber, Boarding APC, Attack Frigate, Missile Frigate, Attack Destroyer, Railgun Destroyer, Missile Destroyer, Light Cruiser, Railgun Cruiser, Heavy Cruiser, Missile Cruiser, Battlecruiser, Missile Battleship, Battleship, Flagship Battlecruiser. Three extra rows (18–20) hold the "marines deployed" variants for Boarding APC, Missile Battleship, and Battleship.
 
