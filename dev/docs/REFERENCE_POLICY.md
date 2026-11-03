@@ -97,6 +97,19 @@ These are written into the checker, not left to reviewer judgement:
    the dev/ tooling it dispatches — same declaration-not-reference shape as
    the central-loader allowance (item 1). The gate that enforces this policy
    is dispatched exactly this way.
+8. **A path token names a file, not a binding.** A binding/stem token
+   followed by `.ext` that together spell a tracked file's basename
+   (`main.js`) is a mention of that file — already recorded by the basename
+   pattern — never a use of a same-named binding in another file. Without
+   this, the `main.js` path token read as a use of the game-balance
+   generator's `main` binding and flagged R2 (the v114 false positives).
+9. **A CommonJS module's surface is its `module.exports`.** A Node file's
+   module-scoped internals (`const fs = require(...)`, `const path =
+   require("path")`, `function main()`) cannot be referenced across files
+   and are not its referenceable surface; only the exported names
+   (`module.exports = { … }`, `module.exports = fn`, `exports.x =`) generate
+   binding patterns. Non-module files keep the full top-level
+   factory-global surface.
 
 ## 5. Remedies (canonical, in preference order)
 

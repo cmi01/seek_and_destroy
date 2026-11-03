@@ -29,6 +29,10 @@ SCRUBS (declarations, not references):
     of a file, not a use of a binding named `Name` — the binding edge is
     scrubbed (the basename-mention edge to the named file still fires).
   - self-mentions; names the source defines or receives as parameters.
+  - path-token scrub: a binding/stem token followed by `.ext` that together
+    spell a tracked file's basename (`main.js`) is a mention of THAT file
+    (already recorded by the basename pattern), never a use of a colliding
+    binding in another file.
 
 INTERPRETATIONS (see dev/docs/REFERENCE_POLICY_VIOLATIONS.md §2):
   - main.js is exempt as a REFERRER (central-loader allowance: the loader names
@@ -43,6 +47,10 @@ INTERPRETATIONS (see dev/docs/REFERENCE_POLICY_VIOLATIONS.md §2):
     REFERRERS (the workflow layer lives there by platform mandate and names
     the tooling it dispatches — same declaration-not-reference shape as the
     central-loader allowance).
+  - exports-only module surface: a CommonJS file (its text has a
+    `module.exports` / `exports.` line) exposes ONLY its exported names as
+    binding patterns; module-scoped internals are not referenceable
+    cross-file (REFERENCE_POLICY.md §4.8–4.9).
 
 Exit codes: 0 = clean, 1 = violations found, 2 = usage/IO error.
 
@@ -194,6 +202,27 @@ def top_bindings(text):
     return names
 
 
+def exported_bindings(text):
+    """Referenceable surface of a CommonJS module: its module.exports names.
+
+    A Node file's top-level `const fs = require(...)` / `function main()` are
+    module-scoped: no other file can reference them, so they must not pollute
+    the surface (a dev CLI's `main` collided with the `main.js` path token;
+    `path` / `fmt` / `pct` would collide with any game prose naming them).
+    """
+    names = set()
+    for m in re.finditer(r"module\.exports\s*=\s*\{([^}]*)\}", text):
+        for p in m.group(1).split(","):
+            p = p.strip().split(":")[0].strip()
+            if re.fullmatch(r"[A-Za-z_$][\w$]*", p or ""):
+                names.add(p)
+    for m in re.finditer(r"^module\.exports\s*=\s*([A-Za-z_$][\w$]*)\b", text, re.M):
+        names.add(m.group(1))
+    for m in re.finditer(r"^(?:module\.)?exports\.([A-Za-z_$][\w$]*)\s*=", text, re.M):
+        names.add(m.group(1))
+    return names
+
+
 # ---- graph construction ----------------------------------------------------
 
 def tag_of(rel):
@@ -212,7 +241,14 @@ def patterns_for(rel, file_texts):
             pats.append(("stem-mention", stem, True))
         text = file_texts.get(rel)
         if text is not None:
-            for b in sorted(top_bindings(scrub_headers(text))):
+            # A CommonJS module's referenceable surface is its exports
+            # (REFERENCE_POLICY.md §4.9): module-scoped internals cannot be
+            # referenced across files. Non-module files keep the full
+            # top-level factory-global surface.
+            surface = (exported_bindings(text)
+                       if re.search(r"^(?:module\.)?exports\b", text, re.M)
+                       else top_bindings(scrub_headers(text)))
+            for b in sorted(surface):
                 if b != stem and b != base:
                     pats.append(("binding-mention", b, True))
     return pats
@@ -221,6 +257,7 @@ def patterns_for(rel, file_texts):
 def build_graph(root, count_main_js, count_dev_referrers):
     files = list_files(root)
     tracked = set(files)
+    base_names = {os.path.basename(f) for f in files}
     file_texts = {}
     for rel in files:
         t = read_text(os.path.join(root, rel))
@@ -293,6 +330,15 @@ def build_graph(root, count_main_js, count_dev_referrers):
                             break
                     edge = {"from": src, "to": dst, "kind": kind, "line": line_no,
                             "context": mask[off]}
+                    if kind in ("binding-mention", "stem-mention"):
+                        # Path-token scrub (REFERENCE_POLICY.md §4.8): a token
+                        # that spells a tracked file's basename (`main.js`)
+                        # names THAT file — its basename-mention edge already
+                        # records it — and is never a use of a colliding
+                        # binding/stem in another file.
+                        tail = re.match(r"\.\w+", text[m.end():])
+                        if tail and (pat + tail.group(0)) in base_names:
+                            continue
                     if kind == "binding-mention":
                         # filename-extension scrub: `Name.<ext>` (prose
                         # `main.js`) is a basename mention of a file, not a
@@ -691,8 +737,18 @@ def render_report(violations, graph, args, exemptions):
       "exempt as *referrers* — the workflow layer lives there by platform "
       "mandate and necessarily names the dev/ tooling it dispatches (same "
       "declaration-not-reference shape as the central-loader allowance).")
+    a("8. **A path token names a file, not a binding.** A binding/stem token "
+      "followed by `.ext` that together spell a tracked file's basename "
+      "(`main.js`) is a mention of that file — already recorded by the "
+      "basename pattern — never a use of a same-named binding in another "
+      "file.")
+    a("9. **A CommonJS module's surface is its `module.exports`.** A Node "
+      "file's module-scoped internals (`const fs = require(...)`, "
+      "`function main()`) cannot be referenced across files and are not its "
+      "referenceable surface; only the exported names generate binding "
+      "patterns.")
     if exemptions:
-        a("8. Pair exemptions applied: %d (see `--exemptions`)." % len(exemptions))
+        a("10. Pair exemptions applied: %d (see `--exemptions`)." % len(exemptions))
     a("")
     a("## 3. Summary per directory")
     a("")
