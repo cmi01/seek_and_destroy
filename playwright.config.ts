@@ -1,12 +1,8 @@
 // playwright.config.ts — pinned shape per test-architecture doc §3 (test architecture, v121).
 // Chromium-only matrix per §4; webServer launch per §5 (file:// is impossible:
 // dynamic <script> loads + assets/*.pak fetches need HTTP).
-//
-// ONE deviation from test-architecture doc §3, per this task's deliverable spec: trace is
-// 'on-first-retry', not the doc's 'retain-on-failure'. Note that with retries at
-// the Playwright default (0) no trace is ever recorded — if failure forensics are
-// wanted, reconcile with the doc ('retain-on-failure') or set retries >= 1.
-// TODO(reconcile): pick one trace policy with the doc owner before CI lands.
+// Trace policy reconciled (v124): trace 'retain-on-failure' per doc §3 — with retries
+// at the Playwright default (0), a retry-gated trace mode would never record a trace.
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
@@ -19,7 +15,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:8123',
     headless: true,
-    trace: 'on-first-retry', // task spec; doc §3 says 'retain-on-failure' — see header
+    trace: 'retain-on-failure', // per doc §3
     screenshot: 'only-on-failure',
     video: 'off',
   },
