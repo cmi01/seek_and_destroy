@@ -8,6 +8,16 @@ updates. Where this document and DESIGN.md disagree on behavior, DESIGN.md wins.
 `dev/docs/` (this file) and `dev/docs/architecture/` (review + execution plan)
 per standing decision (g). Repo-root `docs/` must not exist.
 
+## 0. Status — COMPLETE (2026-11-04, final review at v158)
+
+All six milestones are delivered and verified on `origin/main` (final review:
+`dev/docs/architecture/roadmap-compliance-review.md` §12, verdict MET).
+Per-milestone releases: M1 v109 · M2 v110/v112/v113/v114 · M3 v126/v129/v130 ·
+M4 v134/v135/v138/v139 · M5 v143–v147 · M6 v152/v153/v155–v158. Open items
+from the final review (three integration defects + one stale test fixture)
+are tracked on a follow-up fix card; standing decomposition debt
+(`game.js`/`gameTests.js` size) is tracked separately.
+
 ## 1. Product goal
 
 Deliver the game DESIGN.md specifies — turn-based fleet battles plus a living
@@ -74,7 +84,7 @@ if staffing allows, at the cost of shared-file collisions (see §5).
 
 ## 4. Milestones
 
-### M1 — Campaign state model, roster conformance, persistence
+### M1 — Campaign state model, roster conformance, persistence — DONE (v109)
 
 Deliverables:
 - A campaign state model as frozen plain data: fleet roster (hull, loadout, HP,
@@ -103,7 +113,7 @@ Risks/unknowns: the ×100 rescale invalidates all current balance (5–95 → 50
 `game_balance.md` (v70) is stale and must be regenerated, not patched; Q10 (8,750
 vs 9,500) is assumed resolved as the 2.5× rule.
 
-### M2 — Battle ↔ campaign integration
+### M2 — Battle ↔ campaign integration — DONE (v110, v112–v114)
 
 Deliverables:
 - Battles launch from campaign state: fleet deployment into corner spawn regions,
@@ -133,7 +143,7 @@ Risks/unknowns: changes the current battle economy (removing in-battle purchase)
 — needs a balance re-check and QA on the tutorial level's teaching text;
 Q6 and Q7 need requester rulings for exact formulas.
 
-### M3 — Campaign map: movement, fuel, hyperspace, encounters
+### M3 — Campaign map: movement, fuel, hyperspace, encounters — DONE (v126, v129, v130)
 
 Deliverables:
 - Turn-based map movement: real space (systems) and hyperspace between systems;
@@ -161,7 +171,7 @@ Risks/unknowns: Q1 (battle↔map clock) and Q7 (hyperspace jump points / gravity
 mechanics) are open; defaults stated in §7 so work can proceed. This milestone
 touches renderers the compliance sweep is re-shaping — coordinate branches.
 
-### M4 — Economy, stations, crew
+### M4 — Economy, stations, crew — DONE (v134, v135, v138, v139)
 
 Deliverables:
 - Commodities (goods, fuel, crew, parts) with fluctuating prices: deterministic
@@ -186,7 +196,7 @@ trade tables, `hud.js children` (station modal), `gameState.js children`, `main.
 effects (clock, storage). Risks/unknowns: Q8/Q9 confirmations (wage cadence,
 rounding); balance of the ×100 scale is unverified until play-tested.
 
-### M5 — Outfitting and multi-weapon loadouts
+### M5 — Outfitting and multi-weapon loadouts — DONE (v143–v147)
 
 Deliverables:
 - Slot-based outfitting at stations: swap weapons within hull capacity, mount
@@ -211,7 +221,7 @@ Scope: new `outfitting.js` children (slot math, validation), `actionLegality.js`
 Risks/unknowns: Q2 blocks the exact red-number contract; the damage-number DTO
 is render-coupled, so parity evidence is mandatory.
 
-### M6 — Factions, reputation, missions, world life
+### M6 — Factions, reputation, missions, world life — DONE (v152, v153, v155–v158)
 
 Deliverables:
 - Five factions per §4.7: doctrine-weighted fleet composition, AI doctrine,

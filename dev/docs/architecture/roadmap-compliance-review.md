@@ -687,3 +687,190 @@ implementer's report. M6 is released to start.
 4. Hotspots for M6: `game.js`, `aiThreatScorer.js`, `rules_DATA.js` (M5's
    hotspots) plus `hud.js` / `campaign_DATA.js` / `main.js` (§9.6/§10.6
    carry-over) — serialize M6 work against these.
+
+## 12. Final review — roadmap M1–M6 complete (2026-11-04)
+
+**Verdict: MET — the roadmap is delivered on `origin/main` @ `a2eb43d`
+(v158).** Every roadmap §4 acceptance criterion M1–M6 and every design §4/§5
+deliverable was re-verified by the reviewer on a detached worktree, in the
+live `/v158/`, and in one end-to-end campaign run — not quoted from
+implementer reports. Three user-facing integration defects (D1–D3) and one
+stale Playwright fixture (D4) were found by the end-to-end run; they are
+routed to one fix card per the gate rule and named in this section. The
+roadmap criteria themselves pass; D1–D3 sit in seams around them (state
+surviving the battle fold; the fold's kill/mission event hooks; the reserve
+summon button's affordance).
+
+### 12.1 Standing gates re-run (detached review worktree @ a2eb43d = origin/main = v158)
+
+| Gate | Result |
+|---|---|
+| `node --check` (all 200 `.js`, quoted loop) | 0 failed |
+| `structure_audit.py` | 0 violations / 20 warnings; one-function check 0 |
+| `reference_audit.py` | legacy 6 / child-names 0 / doc-window 27 / import-direction 2 — **= baseline** |
+| in-page `?test`, fresh port 8712 (my worktree build) | 85/85 game + 5/5 audio, zero page errors |
+| live `https://…/v158/?test&bust=finalrev1` | 85/85 + 5/5 |
+| Playwright (`npx playwright test`, my worktree) | 29/30 — 1 stale fixture (D4, `11-campaign-map.spec.ts:37` still expects the pre-M6 3-option hail list; the game correctly offers the Q11 `HAIL_TRADE` too) |
+| ad-hoc harness (run this turn, left on disk) | 2/3 — `/tmp/hermes-verify-t_3f182083/verify-final-review.js`; the 1 FAIL is D1's regression guard (see §12.6) |
+
+### 12.2 End-to-end campaign run (real canvas clicks; measurements, not report quotes)
+
+New campaign (wallet 25000, 5-ship fleet) → map (boot lands on MAP // SOL GATE
+STATION) → **station trade**: BUY 10 GOODS at the posted 356 (wallet
+25000→21440) and SELL 10 back (→24630) — the realized spread is 370, not the
+static-quote 430, because buying moves the local quote before the sell (the
+station note documents this; the exact-spread criterion is the T-M4a
+static-quote test) → **weapon buys** Light Missile Battery (487 ⒸB) and
+Unguided Torpedo (614 ⒸB) into cargo stock → **outfit**: mounting the missile
+alongside the flagship's Heavy Cannon is rejected **NO FIT** at 42/42 slots
+(the §3.2 slot-capacity validation, live); UNMOUNT returns the cannon to
+stock and the flagship leaves dock with `["Unguided Torpedo","Light Missile
+Battery"]` — a legal two-weapon loadout → **MISSION_ACCEPT c1-wolfpack-bounty**
+(real click). Map travel: 4 capped moves (distance 4 each) sol-gate →
+aurora-prime; move costs 20 ⒸB normal and 60 hyperspace (5 × distance, ×3),
+map-ledger fuel 480→300; NPC world life visible without input
+(syndicate-picket @ wolfpack-debris, syndicate-raiders @ phantom-drift,
+merchant-caravan @ khepri-station). Arrival opens the encounter
+(`pendingEncounter`, `joinNextTurn`) with the M6 hail panel (TRADE / TALK /
+THREATEN / LEAVE); TALK renders the dialogue model. Next turn: the
+**deployment step** (DEPLOY_LOCK flagship forced ON with the `!flagship`
+warp-locus/permadeath rationale, 4 toggles; the Probe left OFF lands in
+`State.battleReserve`) → real DEPLOY_CONFIRM click → 16-unit battle board.
+**Multi-weapon A/B (Q8)**: picking Unguided Torpedo makes every reach cell
+report `firepower 7` (D:7 R:1 cone); picking Light Missile Battery flips
+every cell to `firepower 1` across the R:8 cone; the hovered cell (5,15)
+mirrors the pick — read at 1280×800 and 1600×1000 (`overlayNumbers()`). The
+chosen weapon fired in combat both ways (missile chip damage + torpedo
+strikes). **Summon**: the REINFORCEMENTS reserve row is dead (D3); through
+the sanctioned `SD.Actions.executeWarpIn` op the Probe warps in for exactly
+1 AP and 0 credits (AP 4→3), a second reserve entry likewise (3→2), and each
+summons a `kind:"mirage"` that materializes to `kind:"ship"` next turn (M2
+mirage semantics). Battle: two hostile hulls destroyed by real board clicks
+(ids 15, 16), escorts traded fire with the advancing AI (one of my ships
+lost to AI fire on its turn), then the flagship rush ended in **defeat at
+turn 6** (flagship lost) — `campaignOver` (reason flagship-lost) fires and
+the fold returns to the map (screen "map", freeze lifted): surviving fleet
+[Attack Frigate hp 1/4, Probe], **parts 5→35** (scrapping payout = 50% of
+scrapped hull slot value), wallet 23529. The fold exposed **D1** (contracts
+section dropped) and **D2** (no kill-reputation / destroy-contract movement:
+`player|Syndicate` stayed −20 through 8 hostile kills). Contract completion
+re-driven with real clicks after crediting the two kills through the
+documented `SD.Missions.advance('destroy', 2)` seam: **wallet 23529→27529
+(+4000 payout), player|Capital 20→35 (+15 mission event), c1 → done** — the
+same deltas as the M6 review's accept/complete run. **Save/restore round
+trip**: `SD.saveState()` payload (version **M6-1.0**) → hard reload (fresh
+campaign: wallet 25000, goods 0) → `SD.loadState(payload)` → the campaign
+fingerprint restores exactly (wallet 21440, goods 10 — the M1 round-trip
+criterion, live). Screenshots at two resolutions:
+`e2e-map-{1280,1600}.png`, `e2e-station-{missions-1280,outfit-1600}.png`,
+`e2e-battle-{1280,1600}.png` (all in the ad-hoc harness dir).
+
+### 12.3 Roadmap §4 acceptance — verdicts (M1–M6)
+
+| # | Criterion | Verdict | Evidence (mine) |
+|---|---|---|---|
+| M1.1 | Hull §3.1 invariants + default-loadout fit (pure tests) | **met** | conformance specs in the 85/85 battery (green live + locally); roster values pinned in `verify-m5*`-era harnesses |
+| M1.2 | Round-trip save→restore deep-equals campaign state | **met** | §12.2 live round trip (wallet 21440/goods 10 restored exactly after a fresh reload) |
+| M1.3 | Suites green + audits at v99 baseline | **met** | §12.1 |
+| M2.1 | Summon = 1 AP, 0 credits; mirage any-hit / ram-both; flagship loss = campaign-over | **met** | §12.2 live (AP 4→3→2, mirage materialization, `campaignOver` fold on defeat) + battery T-M2 |
+| M2.2 | Seeded carry-over (payout, crew transfer, captured retention) | **met** | live fold: parts +30 = 50% slot-value scrapping, survivors carried, reserve folded into fleet; crew/capture cases in the battery |
+| M2.3 | Deployment selection on overflow (Q2) | **met** | live deployment step: flagship forced, player toggles, overflow → `battleReserve` (§12.2) |
+| M3.1 | Fuel formula / unfuelled rejection + merchant event / detection radius | **met** | battery; live move costs 20 normal / 60 hyperspace (×3) with the map-ledger fuel trail |
+| M3.2 | Browser traverse system→hyperspace→system, red gravity-well render, two resolutions | **met** | live traverse (sol-gate → hyperspace → aurora-prime) + `e2e-map-{1280,1600}.png` |
+| M4.1 | Same-seed price table; buy-then-sell loses exactly the spread | **met** | T-M4a static-quote test; live quote-drift variant measured in §12.2 (documented market behavior) |
+| M4.2 | Crew casualty / 50% incapacitation / wage tick | **met** | battery T-M4c; §10 gate re-verified independently |
+| M4.3 | Station buy updates wallet/cargo/fleet consistently | **met** | §12.2 trades + weapon buys; §10 gate's hull-buy flow |
+| M5.1 | Slot-sum validation; two weapons fire with own dmg/range | **met** | live NO FIT at 42/42, two-weapon mount, per-shot damage 7 vs 1 in combat |
+| M5.2 | Red numbers = chosen weapon's pre-commit damage, A/B two resolutions | **met** | §12.2 `overlayNumbers()` A/B (7↔1 flip) at 1280×800 and 1600×1000; §11.2 pixel captures |
+| M6.1 | Reputation quintile boundaries + band flip | **met** | T-M6b-1 (green live); live mission event +15 (20→35) lands in the next quintile without a flip |
+| M6.2 | Seeded two-NPC interaction, no player input | **met** | T-M6e (green live, deterministic); live map shows the seeded NPC fleets acting on their turns |
+| M6.3 | Doctrine-weighted generation (statistical, ≥90% Armoury capital) | **met** | T-M6a-2 (green live) |
+| M6 deliverable | Missions at stations: payouts + completion tracking | **met — with D1** | accept/complete clicks pay +4000 and +15 rep (§12.2); but the `contracts` section does not survive a battle fold (D1) |
+
+Design §4/§5 boundaries: D1–D6 as accepted at §9.4/§10.4/§11.5 stand; every
+M6 subtree (`factions.js`, `reputation.js`, `missions.js`, `mapAi.js`
+children) is born compliant (one pure function, Owner header, folder mirrors
+ownership) and every release gate held the audits at the exact baseline.
+Frozen surfaces (§5.0) unchanged: `Actions.*` spellings, frame DTO additive
+only, `window.SD`, the AI env facade.
+
+### 12.4 Per-milestone releases (all pushed; `git ls-remote` parity verified per release)
+
+| Milestone | Releases | Content |
+|---|---|---|
+| M1 | v109 | campaign state model, roster conformance, persistence, Q12 doc move |
+| M2 | v110, v112, v113, v114 | battle-campaign seam + battleReserve lifetime (F1); live beginBattle/applyBattleResult + deployment step + credits frozen (F3/F5/F6); shield latch removed (F4); generated game_balance.md (F2) |
+| M3 | v126, v129, v130 | map subtree (moveFleet/fuelCost/merchantOffer + save migration); hyperspaceJump + red gravity-well render; mapVisibility + battleEventAt + map HUD/hailing shell |
+| M4 | v134, v135, v138, v139 | seeded economy subtree; station storefront; crew model + manning gate; merchant rescue flow |
+| M5 | v143–v147 | outfitting seam; battle adopts `unit.loadout`; multi-weapon fire (Q8); station outfitting + legal generation; M5 review rows |
+| M6 | v152, v153, v155, v156, v157, v158 | factions/doctrine/hull themes; reputation (Q10); dialogue + hail panel (Q11); missions chain (Q9); save migration (M6-1.0); NPC map AI world life |
+| docs/tooling lanes | v108, v111, v115–v124, v127, v128, v131–v133, v136–v138, v141, v142, v148, v151, v154 | GUI-scaling, reference-policy, Playwright suite + CI, gate-review docs, test fixes (co-lane releases; v150 remains a local-only off-main snapshot — the workflows-scope deviation recorded at v152) |
+
+### 12.5 Prior follow-ups and open questions
+
+F0–F6 all closed: F0/F1 (v109/v110), F3/F5/F6 (v112), F4 (v113), F2 (v114)
+— re-verified in the tree, not just the markers. Roadmap §7 open questions
+1–13 are all resolved by the adopted decisions (Q1–Q13 in the execution
+plan); the one carried deviation (non-Syndicate default alignment 20,
+pending design confirmation) is recorded at v152 and unchanged.
+
+### 12.6 Defects found by this review (routed to one fix card)
+
+| # | Defect | Root cause (file:line) | Live evidence |
+|---|---|---|---|
+| D1 | The battle fold **drops `campaign.contracts`** (accepted contracts, progress and `campaignComplete` vanish after any battle) | `campaignState.js children/applyBattleResult.js` rebuilds `next` with keys `fleet,wallet,cargo,reputation,clock,map,market` — no `contracts` | post-fold campaign keys lack `contracts`; harness check 1 RED |
+| D2 | Kill-reputation and destroy-contract hooks **never fire on the live path** | `game.js` `checkEndgame` counts `State.units[i].hp <= 0`, but `executeMove`/`executeShoot` (game.js:578, 678) do `State.units = State.units.filter(u => u.hp > 0)` — dead ships are gone before the fold counts them (`dead` is always 0) | 8 hostile kills in the run, `player|Syndicate` stayed −20 and contract progress stayed empty; pure hooks move the pair −20→−30 and progress to `{kills:3}` (harness checks 2–3) |
+| D3 | **Reserve summon is impossible from the UI**: every `RESERVE_SUMMON` card is born `enabled:false` and the click is rejected by the `btn.enabled === false` gate | `buildReserveModel.js` reads `input.state.units`, but `game.js _hudInput()` exposes units at `input.units` — `flag` is always null → `affordable` false; the modal even shows "LOCUS OFFLINE: No friendly !flagship" with the flagship on the board | row `enabled:false` with 99 valid warp cells and AP available; `SD.Actions.executeWarpIn` succeeds immediately |
+| D4 | Stale Playwright fixture: `11-campaign-map.spec.ts:37` expects `['HAIL_TALK','HAIL_THREATEN','HAIL_LEAVE']` but M6(c) (v155) added the Q11 `HAIL_TRADE` option | spec expectation predates M6(c) | suite 29/30; isolated re-run shows the exact array diff (+ HAIL_TRADE) |
+
+Acceptance for the fix card: D1–D3 fixed with regression guards that run the
+live path (fold a battle with an accepted contract and assert the section
+survives; assert a kill moves the pair and advances destroy progress when a
+battle folds; click the reserve row and assert the mirage appears for 1 AP);
+D4's expectation updated to the four Q11 options (fixture-pin convention).
+The harness `/tmp/hermes-verify-t_3f182083/verify-final-review.js` goes
+3/3 green (check 1 is its regression guard).
+
+### 12.7 Audit counts vs v107 and the structure-warning trend
+
+Reference audit: **6/0/27/2 at every gate from v107 through v158** — no drift
+across the whole program. Structure: 0 violations throughout; warnings 18
+(M2-era) → **20** (v158). Line-count trend on the named hotspots:
+
+| File | M2-era (§5.2) | v158 | Δ |
+|---|---|---|---|
+| `game.js` | 2462 | **3905** | +1443 |
+| `gameTests.js` | 460 | **2193** | +1733 |
+| `hud.js` | 486 | **675** | +189 |
+| `main.js` | 622 | 749 | +127 |
+| `graphics.js` | 1046 | 1211 | +165 |
+| `uiRenderer.js` | 1038 | 1218 | +180 |
+| `sounds.js` | 651 | 651 | 0 |
+
+`game.js` (3905 lines, 79 function definitions) and `gameTests.js` (2193)
+are far past the one-job bar and are the standing decomposition debt — a
+separate decomposition card (assignee `architecture`) covers them; the M6
+subtrees did not regress the boundary rules while adding to the composer.
+
+### 12.8 Non-blocking observations
+
+1. The defeat path offers REDEPLOY SECTOR / SECTOR MAP after the
+   `campaignOver` event — DESIGN's "campaign over on flagship loss" reads as
+   terminal, but play continues with the surviving fleet. The M2 acceptance
+   criterion (campaign-over endgame STATUS) is met; whether continuing is
+   sanctioned is a design question for the requester.
+2. The c1 brief says "destroy 2 hostile hulls", but the fold credits
+   `destroy` progress with the count of ALL battle dead (own losses
+   included) — the brief/rules wording should be reconciled when D2 is fixed.
+3. There is no user-facing save/load (no menu item; `localStorage` only holds
+   audio settings). The M1 criterion targets the save/restore seam, which is
+   delivered and round-trips; if in-game persistence is wanted it is new
+   scope.
+4. Map-screen END TURN canvas clicks failed to dispatch in three consecutive
+   attempts in one session segment while the identical `SD.Map.endTurn()`
+   seam committed the turn (the same click flow worked elsewhere in the run,
+   including DEPLOY_CONFIRM minutes later) — recorded for the fix card to
+   probe; not root-caused, not counted against the criteria.
+5. A stale station-modal render can show a disabled action row after state
+   changes underneath it (the row enables on the next tab click / reopen) —
+   cosmetic; worth a refresh when D3's model is touched.
