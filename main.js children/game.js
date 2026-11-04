@@ -99,6 +99,19 @@ let IndexOfReserveEntry = null;
 let MapDeployedIndices = null;
 let FreezeDeep = null;
 let DeepCopy = null;
+let StationAt = null;
+let MirrorFleetRoster = null;
+let LocationOwner = null;
+let MerchantQuote = null;
+let StationTabs = null;
+let StationWareKeys = null;
+let BuildMerchantWareRows = null;
+let BuildStationWareRows = null;
+let BuildServiceRows = null;
+let BuildMissionRows = null;
+let BuildStationHeader = null;
+let BuildMapHudExtra = null;
+let ResolveCursorStyle = null;
 // Frozen plain-data facade of the pure rule queries, handed to the AI on the
 // snapshot DTO instead of the Rules module identity (built once in load()).
 let PURE_RULES = null;
@@ -1233,40 +1246,21 @@ const _outfitDeps = {
 // Docked = the player fleet sits inside a station's gravity well on the map
 // screen with no encounter pending (the storefront only exists at stations).
 function _stationDock(){
-  const c = GetGameState().campaign;
-  const map = (c && c.map) || null;
-  if (!map || map.screen !== "map" || map.pendingEncounter) return null;
-  const locs = Array.isArray(map.locations) ? map.locations : [];
-  for (let i = 0; i < locs.length; i++){
-    if (locs[i].id === map.locationId && locs[i].kind === "station") return locs[i];
-  }
-  return null;
+  return StationAt({ campaign: GetGameState().campaign });
 }
 
 // The map fleet mirrors the post-trade roster (same shape the battle fold
 // uses): hull records carry crew/maxCrew/speed/flagship and the movement
-// rules read them directly.
+// rules read them directly. Glue: passes the frozen roster table.
 function _mirrorMapFleet(s){
-  if (!s || !s.map || !Array.isArray(s.map.fleets)) return s;
-  const ships = (Array.isArray(s.fleet) ? s.fleet : []).map(function (e){
-    const spec = SHIP_SPECS[e.hull] || {};
-    return {
-      hull: e.hull,
-      crew: (typeof e.crew === "number") ? e.crew : 0,
-      maxCrew: (typeof e.maxCrew === "number") ? e.maxCrew : ((typeof spec.crew === "number") ? spec.crew : 0),
-      speed: (typeof spec.move === "number") ? spec.move : 1,
-      flagship: Boolean(e.flagship) || (Array.isArray(spec.flags) && spec.flags.indexOf("!flagship") !== -1)
-    };
-  });
-  return Object.assign({}, s, {
-    map: Object.assign({}, s.map, {
-      fleets: s.map.fleets.map(function (f){
-        return f.faction === "player" ? Object.assign({}, f, { ships: ships }) : f;
-      })
-    })
-  });
+  return MirrorFleetRoster({ state: s, shipSpecs: SHIP_SPECS });
 }
 
+// The station storefront view model (§3 complex builder): this composer
+// gathers the campaign facts, delegates the tab list, the per-tab rows and
+// the header block to pure children, and assembles the DTO in its
+// historical key order. The outfit branch stays (it composes this file's
+// own seam children — the loadout seam and the hud outfit model).
 function _stationBundle(){
   const c = GetGameState().campaign;
   const dock = _stationDock();
@@ -1281,59 +1275,21 @@ function _stationBundle(){
   const locId = dock ? dock.id : ((c && c.map && c.map.locationId) || "");
   const wallet = (c && typeof c.wallet === "number") ? c.wallet : 0;
 
-  // The active tab is mode-scoped; fall back to each mode's first tab.
-  let tab = _stationCtx.tab;
-  if (mode === "merchant"){
-    if (tab !== "provisions" && tab !== "sell") tab = "provisions";
-  } else {
-    if (["commodities", "hulls", "weapons", "services", "outfit", "missions"].indexOf(tab) === -1) tab = "commodities";
-  }
+  const tabModel = StationTabs({ mode: mode, tab: _stationCtx.tab });
+  const tab = tabModel.tab;
 
-  const tabs = (mode === "merchant")
-    ? [
-        { id: "provisions", label: "PROVISIONS", active: tab === "provisions" },
-        { id: "sell", label: "SELL", active: tab === "sell" }
-      ]
-    : [
-        { id: "commodities", label: "GOODS", active: tab === "commodities" },
-        { id: "hulls", label: "HULLS", active: tab === "hulls" },
-        { id: "weapons", label: "WEAPONS", active: tab === "weapons" },
-        { id: "services", label: "SERVICE", active: tab === "services" },
-        { id: "outfit", label: "OUTFIT", active: tab === "outfit" },
-        { id: "missions", label: "MISSIONS", active: tab === "missions" }
-      ];
-
-  const rows = [];
+  let rows = [];
   if (merchant){
     // Merchant storefront: the player BUYS crew/fuel at the inflated price
     // and SELLS anything at the discount (M3 offer, wired for real in M4).
-    const sellKeys = Object.keys(wares).filter(function (k){
-      return tab === "sell" ? true : false;
-    });
-    const keys = (tab === "provisions") ? ["crew", "fuel"] : sellKeys;
+    const keys = StationWareKeys({ wares: wares, tab: tab, kindForTab: null });
+    const quotes = {};
     for (let i = 0; i < keys.length; i++){
       const key = keys[i];
-      const w = wares[key];
-      if (!w) continue;
-      const unit = _merchantUnit(c, key, locId, turn, merchant.offer);
-      const lot = (w.kind === "commodity") ? (lots[key] || 1) : 1;
-      let held = 0;
-      if (w.kind === "commodity") held = cargo[key] || 0;
-      else if (w.kind === "weapon") held = (cargo.weapons && cargo.weapons[w.name]) || 0;
-      else { for (let j = 0; j < fleet.length; j++){ if (fleet[j].hull === w.name) held++; } }
-      rows.push({
-        id: key,
-        kind: "ware",
-        label: String(w.name || key).toUpperCase(),
-        sub: (w.kind === "commodity") ? ("LOT " + lot) : "",
-        priceText: "BUY " + unit.buy + " / SELL " + unit.sell,
-        ownedText: "HELD " + held,
-        buyLabel: w.kind === "commodity" ? ("BUY " + lot) : "BUY",
-        sellLabel: w.kind === "commodity" ? ("SELL " + lot) : "SELL",
-        canBuy: tab === "provisions" && wallet >= unit.buy * lot,
-        canSell: tab === "sell" && held >= lot
-      });
+      if (!wares[key]) continue;
+      quotes[key] = _merchantUnit(c, key, locId, turn, merchant.offer);
     }
+    rows = BuildMerchantWareRows({ wares: wares, lots: lots, cargo: cargo, fleet: fleet, wallet: wallet, tab: tab, keys: keys, quotes: quotes });
   } else if (dock && tab === "outfit"){
     // M5(d): the outfit tab — the fleet's ships, their mounts and the spare
     // stock. Slot sizes and capacity verdicts come from the seam here; the
@@ -1371,132 +1327,44 @@ function _stationBundle(){
     const outfitRows = (outfitModel && Array.isArray(outfitModel.rows)) ? outfitModel.rows : [];
     for (let i = 0; i < outfitRows.length; i++) rows.push(outfitRows[i]);
   } else if (dock && tab === "missions"){
-    // M6(d): the mission board — the station's fixed contracts (Q9) with
-    // status, progress toward target, and the accept/complete action.
-    const board = (c && c.contracts) || {};
-    const activeIds = Array.isArray(board.active) ? board.active : [];
-    const doneIds = Array.isArray(board.done) ? board.done : [];
-    const prog = board.progress || {};
-    const all = Missions.Table();
-    for (let i = 0; i < all.length; i++){
-      const m = all[i];
-      if (!m || m.locationId !== locId) continue;
-      const isActive = activeIds.indexOf(m.id) !== -1;
-      const isDone = doneIds.indexOf(m.id) !== -1;
-      const made = prog[m.id] || {};
-      const target = m.target || {};
-      const tKeys = Object.keys(target);
-      let met = true;
-      const progParts = [];
-      for (let j = 0; j < tKeys.length; j++){
-        const k = tKeys[j];
-        const have = Number(made[k]) || 0;
-        if (have < (Number(target[k]) || 0)) met = false;
-        progParts.push(k.toUpperCase() + " " + have + "/" + target[k]);
-      }
-      rows.push({
-        id: m.id,
-        kind: "mission",
-        label: m.title,
-        sub: m.brief,
-        priceText: "PAYOUT " + m.payout + " ⒸB",
-        ownedText: isDone ? "COMPLETE" : (isActive ? ("ACTIVE // " + progParts.join(" ")) : String(m.faction || "").toUpperCase()),
-        actionId: isDone ? "" : (isActive ? ("MISSION_COMPLETE:" + m.id) : ("MISSION_ACCEPT:" + m.id)),
-        actionLabel: isDone ? "DONE" : (isActive ? "COMPLETE" : "ACCEPT"),
-        canAct: !isDone && (!isActive || met),
-        active: isActive
-      });
-    }
+    rows = BuildMissionRows({ contracts: (c && c.contracts) || {}, missions: Missions.Table(), locId: locId });
   } else if (dock && tab === "services"){
-    for (let i = 0; i < fleet.length; i++){
-      const e = fleet[i];
-      const hullRow = wares["hull:" + (e.hull || e.type)] || {};
-      const maxHp = (typeof e.maxHp === "number") ? e.maxHp : (hullRow.hp || 0);
-      const hp = (typeof e.hp === "number") ? e.hp : maxHp;
-      const missing = Math.max(0, maxHp - hp);
-      const perHp = (market && typeof market.repairPartsPerHp === "number") ? market.repairPartsPerHp : 1;
-      const repairCost = Math.round(missing * perHp);
-      const want = Array.isArray(hullRow.defaultLoadout) ? hullRow.defaultLoadout : [];
-      const have = Array.isArray(e.loadout) ? e.loadout : [];
-      const n = Math.max(want.length, have.length);
-      let swaps = 0;
-      for (let j = 0; j < n; j++){ if ((want[j] || null) !== (have[j] || null)) swaps++; }
-      const perSwap = (market && typeof market.refitPartsPerSwap === "number") ? market.refitPartsPerSwap : 1;
-      const refitCost = swaps * perSwap;
-      rows.push({
-        id: String(i),
-        kind: "service",
-        label: String(e.hull || e.type || "?"),
-        sub: "HP " + hp + "/" + maxHp + " CREW " + (e.crew || 0) + "/" + (e.maxCrew || 0),
-        priceText: "REPAIR " + repairCost + "P / REFIT " + refitCost + "P",
-        ownedText: "",
-        canRepair: missing > 0 && (cargo.parts || 0) >= repairCost,
-        canRefit: swaps > 0 && (cargo.parts || 0) >= refitCost
-      });
-    }
+    rows = BuildServiceRows({ fleet: fleet, wares: wares, market: market, cargo: cargo });
   } else if (dock){
     const kindForTab = { commodities: "commodity", hulls: "hull", weapons: "weapon" }[tab] || "commodity";
-    const keys = Object.keys(wares).filter(function (k){ return wares[k].kind === kindForTab; });
+    const keys = StationWareKeys({ wares: wares, tab: tab, kindForTab: kindForTab });
+    const quotes = {};
     for (let i = 0; i < keys.length; i++){
       const key = keys[i];
-      const w = wares[key];
-      const unit = EconomyLib.Quote(c, key, locId, turn);
-      const lot = (w.kind === "commodity") ? (lots[key] || 1) : 1;
-      let held = 0;
-      if (w.kind === "commodity") held = cargo[key] || 0;
-      else if (w.kind === "weapon") held = (cargo.weapons && cargo.weapons[w.name]) || 0;
-      else { for (let j = 0; j < fleet.length; j++){ if (fleet[j].hull === w.name) held++; } }
-      rows.push({
-        id: key,
-        kind: "ware",
-        label: String(w.name || key).toUpperCase(),
-        sub: (w.kind === "commodity") ? ("LOT " + lot) : "",
-        priceText: "BUY " + unit.buy + " / SELL " + unit.sell,
-        ownedText: "HELD " + held,
-        buyLabel: w.kind === "commodity" ? ("BUY " + lot) : "BUY",
-        sellLabel: w.kind === "commodity" ? ("SELL " + lot) : "SELL",
-        canBuy: wallet >= unit.buy * lot,
-        canSell: held >= lot
-      });
+      quotes[key] = EconomyLib.Quote(c, key, locId, turn);
     }
+    rows = BuildStationWareRows({ wares: wares, lots: lots, cargo: cargo, fleet: fleet, wallet: wallet, keys: keys, quotes: quotes });
   }
 
+  const header = BuildStationHeader({ dock: dock, merchant: merchant, wallet: wallet, cargo: cargo });
   return {
-    open: Boolean(dock) || Boolean(merchant),
-    mode: mode,
-    tab: tab,
-    tabs: tabs,
+    open: header.open,
+    mode: header.mode,
+    tab: tabModel.tab,
+    tabs: tabModel.tabs,
     rows: rows,
-    title: merchant ? "MERCHANT FLEET" : (dock ? String(dock.name || "STATION") : "STATION"),
-    subtitle: merchant
-      ? ("PROVISIONS INFLATED — SALE AT A DISCOUNT" + (merchant.reason ? " (" + String(merchant.reason).toUpperCase() + ")" : ""))
-      : (dock ? "STATION SERVICES — POSTED PRICES" : "NO STATION IN RANGE"),
-    walletText: "WALLET " + wallet + " ⒸB   PARTS " + (cargo.parts || 0) + "   FUEL " + (cargo.fuel || 0),
-    note: merchant
-      ? "The caravan provisions crew and fuel at a premium and buys anything at a discount. Rescue your fleet, then move on."
-      : "Posted prices: the trade executes at the quoted price; trading moves local prices for future quotes."
+    title: header.title,
+    subtitle: header.subtitle,
+    walletText: header.walletText,
+    note: header.note
   };
 }
 
 // M6(b): the faction that speaks for a map location (the row's `owner`),
 // else null — the trade/mission reputation counterparty.
 function _locationOwner(locId){
-  const locs = (CAMPAIGN_DATA && CAMPAIGN_DATA.campaign && CAMPAIGN_DATA.campaign.map && CAMPAIGN_DATA.campaign.map.locations) || [];
-  for (let i = 0; i < locs.length; i++){
-    if (locs[i].id === locId) return locs[i].owner || null;
-  }
-  return null;
+  return LocationOwner({ locations: (CAMPAIGN_DATA && CAMPAIGN_DATA.campaign && CAMPAIGN_DATA.campaign.map && CAMPAIGN_DATA.campaign.map.locations) || [], locId: locId });
 }
 
-// M4 merchant quoting: the M3 offer's multipliers over the same seeded mid
-// price the station quotes — buy (player purchases) inflated, sell (player
-// sells) discounted. Plain data, computed where the trade executes so the
-// posted price is the price paid.
+// M4 merchant quoting glue: the seeded mid price comes from the economy
+// seam; the offer multiplier math is the pure child's.
 function _merchantUnit(c, good, locId, turn, offer){
-  const mid = EconomyLib.PriceAt(c && c.market, good, locId, turn);
-  const buyMult = (offer && typeof offer.buyMultiplier === "number") ? offer.buyMultiplier : 1.3;
-  const sellMult = (offer && typeof offer.sellMultiplier === "number") ? offer.sellMultiplier : 0.7;
-  return { buy: Math.round(mid * buyMult), sell: Math.round(mid * sellMult) };
+  return MerchantQuote({ mid: EconomyLib.PriceAt(c && c.market, good, locId, turn), offer: offer });
 }
 
 function _stationTrade(good, sign){
@@ -1589,17 +1457,9 @@ const Hud = {
     const c = GetGameState().campaign;
     const mapSection = (c && c.map) || null;
     if (!mapSection) return;
-    const clock = (c && c.clock) || {};
     const dock = _stationDock();
     const merchant = (c && c.map && c.map.pendingMerchant) ? c.map.pendingMerchant : null;
-    _applyHudResult(HudLib.updateMapHud(_hudView, _hudInput(), mapSection, {
-      wallet: (typeof c.wallet === "number") ? c.wallet : 0,
-      month: clock.month || 1,
-      year: clock.year || 2401,
-      station: (dock || merchant)
-        ? { name: merchant ? "MERCHANT FLEET" : String(dock.name || "STATION"), merchant: Boolean(merchant) }
-        : null
-    }));
+    _applyHudResult(HudLib.updateMapHud(_hudView, _hudInput(), mapSection, BuildMapHudExtra({ campaign: c, dock: dock, merchant: merchant })));
   },
   showHailPanel(encounter){
     // M6(c): the panel carries the faction dialogue model (voice line +
@@ -1672,35 +1532,22 @@ const InputProcessor = (() => {
   }
 
   function _updateCursor(hitBtn, hitPanel){
-    if (_isMinimapDragging){
-      _cursor = "grabbing";
-      return;
+    // Evidence gathered in the historical short-circuit order (the hover
+    // queries run only when the earlier evidence does not decide); the pure
+    // child maps the evidence to the style string, this wrapper stores it.
+    let modalOpen = false;
+    let hoveredSpotted = false;
+    let hoveredHasAction = false;
+    if (!_isMinimapDragging && !hitBtn){
+      modalOpen = Hud.isModalOpen();
     }
-    if (hitBtn){
-      _cursor = hitBtn.enabled !== false ? "pointer" : "not-allowed";
-      return;
-    }
-    if (Hud.isModalOpen()){
-      _cursor = "default";
-      return;
-    }
-    if (hitPanel === "minimap" || hitPanel === "intelOverlay"){
-      _cursor = "pointer";
-      return;
-    }
-    if (hitPanel){
-      _cursor = "default";
-      return;
-    }
-    if (State.hoveredCell){
+    if (!_isMinimapDragging && !hitBtn && !modalOpen && !hitPanel && State.hoveredCell){
       const u = MathGrid.getUnitAt(State.hoveredCell.x, State.hoveredCell.y);
-      const spotted = Boolean(u && Visibility.isUnitSpottedByTeam(u, 1));
+      hoveredSpotted = Boolean(u && Visibility.isUnitSpottedByTeam(u, 1));
       const selUnit = Selection.getUnit();
-      const hasAct = Boolean(selUnit && selUnit.team === 1 && State.activeTeam === 1 && Actions.getPriorityActionAt(selUnit, State.hoveredCell.x, State.hoveredCell.y));
-      _cursor = (hasAct || spotted) ? "pointer" : "crosshair";
-      return;
+      hoveredHasAction = Boolean(selUnit && selUnit.team === 1 && State.activeTeam === 1 && Actions.getPriorityActionAt(selUnit, State.hoveredCell.x, State.hoveredCell.y));
     }
-    _cursor = "crosshair";
+    _cursor = ResolveCursorStyle({ dragging: _isMinimapDragging, hitBtn: hitBtn || null, modalOpen: modalOpen, hitPanel: hitPanel || null, hoveredSpotted: hoveredSpotted, hoveredHasAction: hoveredHasAction });
   }
 
   function refreshHoverFromCamera(){
@@ -2884,6 +2731,19 @@ const api = {
         "main.js children/game.js children/mapDeployedIndices.js",
         "main.js children/game.js children/freezeDeep.js",
         "main.js children/game.js children/deepCopy.js",
+        "main.js children/game.js children/stationAt.js",
+        "main.js children/game.js children/mirrorFleetRoster.js",
+        "main.js children/game.js children/locationOwner.js",
+        "main.js children/game.js children/merchantQuote.js",
+        "main.js children/game.js children/stationTabs.js",
+        "main.js children/game.js children/stationWareKeys.js",
+        "main.js children/game.js children/buildMerchantWareRows.js",
+        "main.js children/game.js children/buildStationWareRows.js",
+        "main.js children/game.js children/buildServiceRows.js",
+        "main.js children/game.js children/buildMissionRows.js",
+        "main.js children/game.js children/buildStationHeader.js",
+        "main.js children/game.js children/buildMapHudExtra.js",
+        "main.js children/game.js children/resolveCursorStyle.js",
       ]);
 
       // The flattened children expose one plain pure function each at script
@@ -2932,7 +2792,20 @@ const api = {
         indexOfReserveEntry: typeof indexOfReserveEntry === "function" ? indexOfReserveEntry : null,
         mapDeployedIndices: typeof mapDeployedIndices === "function" ? mapDeployedIndices : null,
         freezeDeep: typeof freezeDeep === "function" ? freezeDeep : null,
-        deepCopy: typeof deepCopy === "function" ? deepCopy : null
+        deepCopy: typeof deepCopy === "function" ? deepCopy : null,
+        stationAt: typeof stationAt === "function" ? stationAt : null,
+        mirrorFleetRoster: typeof mirrorFleetRoster === "function" ? mirrorFleetRoster : null,
+        locationOwner: typeof locationOwner === "function" ? locationOwner : null,
+        merchantQuote: typeof merchantQuote === "function" ? merchantQuote : null,
+        stationTabs: typeof stationTabs === "function" ? stationTabs : null,
+        stationWareKeys: typeof stationWareKeys === "function" ? stationWareKeys : null,
+        buildMerchantWareRows: typeof buildMerchantWareRows === "function" ? buildMerchantWareRows : null,
+        buildStationWareRows: typeof buildStationWareRows === "function" ? buildStationWareRows : null,
+        buildServiceRows: typeof buildServiceRows === "function" ? buildServiceRows : null,
+        buildMissionRows: typeof buildMissionRows === "function" ? buildMissionRows : null,
+        buildStationHeader: typeof buildStationHeader === "function" ? buildStationHeader : null,
+        buildMapHudExtra: typeof buildMapHudExtra === "function" ? buildMapHudExtra : null,
+        resolveCursorStyle: typeof resolveCursorStyle === "function" ? resolveCursorStyle : null
       };
       // DATA payloads + the two remaining registrar children (hud, ai):
       // parent-captures-child-at-load, no registrar handshake.
@@ -2992,7 +2865,20 @@ const api = {
         ["main.js children/game.js children/indexOfReserveEntry.js",                      kids.indexOfReserveEntry],
         ["main.js children/game.js children/mapDeployedIndices.js",                       kids.mapDeployedIndices],
         ["main.js children/game.js children/freezeDeep.js",                               kids.freezeDeep],
-        ["main.js children/game.js children/deepCopy.js",                                 kids.deepCopy]
+        ["main.js children/game.js children/deepCopy.js",                                 kids.deepCopy],
+        ["main.js children/game.js children/stationAt.js",                                kids.stationAt],
+        ["main.js children/game.js children/mirrorFleetRoster.js",                        kids.mirrorFleetRoster],
+        ["main.js children/game.js children/locationOwner.js",                            kids.locationOwner],
+        ["main.js children/game.js children/merchantQuote.js",                            kids.merchantQuote],
+        ["main.js children/game.js children/stationTabs.js",                              kids.stationTabs],
+        ["main.js children/game.js children/stationWareKeys.js",                          kids.stationWareKeys],
+        ["main.js children/game.js children/buildMerchantWareRows.js",                    kids.buildMerchantWareRows],
+        ["main.js children/game.js children/buildStationWareRows.js",                     kids.buildStationWareRows],
+        ["main.js children/game.js children/buildServiceRows.js",                         kids.buildServiceRows],
+        ["main.js children/game.js children/buildMissionRows.js",                         kids.buildMissionRows],
+        ["main.js children/game.js children/buildStationHeader.js",                       kids.buildStationHeader],
+        ["main.js children/game.js children/buildMapHudExtra.js",                         kids.buildMapHudExtra],
+        ["main.js children/game.js children/resolveCursorStyle.js",                       kids.resolveCursorStyle]
       ].filter(c => !c[1]).map(c => c[0]);
       if (missing.length > 0) {
         throw new Error("These scripts loaded but did not register their module (see earlier errors):\n  " + missing.join("\n  "));
@@ -3013,6 +2899,19 @@ const api = {
       MapDeployedIndices = kids.mapDeployedIndices;
       FreezeDeep = kids.freezeDeep;
       DeepCopy = kids.deepCopy;
+      StationAt = kids.stationAt;
+      MirrorFleetRoster = kids.mirrorFleetRoster;
+      LocationOwner = kids.locationOwner;
+      MerchantQuote = kids.merchantQuote;
+      StationTabs = kids.stationTabs;
+      StationWareKeys = kids.stationWareKeys;
+      BuildMerchantWareRows = kids.buildMerchantWareRows;
+      BuildStationWareRows = kids.buildStationWareRows;
+      BuildServiceRows = kids.buildServiceRows;
+      BuildMissionRows = kids.buildMissionRows;
+      BuildStationHeader = kids.buildStationHeader;
+      BuildMapHudExtra = kids.buildMapHudExtra;
+      ResolveCursorStyle = kids.resolveCursorStyle;
 
       RULES_DATA = FreezeDeep(_modules.rulesData);
       CAMPAIGN_DATA = FreezeDeep(_modules.campaignData);

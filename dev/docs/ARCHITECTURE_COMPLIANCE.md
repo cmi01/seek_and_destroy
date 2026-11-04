@@ -381,6 +381,19 @@ lands; the Surface column says how far each file is from the bar.
 | `main.js children/game.js children/mapDeployedIndices.js` | deployed roster indices | `mapDeployedIndices` | 1 fn ✓ — flatten shape |
 | `main.js children/game.js children/freezeDeep.js` | recursive data freeze | `freezeDeep` | 1 fn ✓ — flatten shape |
 | `main.js children/game.js children/deepCopy.js` | recursive plain-data copy | `deepCopy` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/stationAt.js` | docked station location lookup | `stationAt` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/mirrorFleetRoster.js` | roster → map-fleet mirror | `mirrorFleetRoster` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/locationOwner.js` | location owner faction | `locationOwner` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/merchantQuote.js` | merchant buy/sell quote math | `merchantQuote` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/stationTabs.js` | mode-scoped tab list + active tab | `stationTabs` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/stationWareKeys.js` | per-tab ware key list | `stationWareKeys` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/buildStationWareRows.js` | station goods/hulls/weapons rows | `buildStationWareRows` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/buildMerchantWareRows.js` | merchant provisions/sell rows | `buildMerchantWareRows` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/buildServiceRows.js` | per-ship repair/refit rows | `buildServiceRows` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/buildMissionRows.js` | contract-board rows | `buildMissionRows` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/buildStationHeader.js` | storefront header fields | `buildStationHeader` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/buildMapHudExtra.js` | map-HUD extra block | `buildMapHudExtra` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/resolveCursorStyle.js` | evidence → cursor string | `resolveCursorStyle` | 1 fn ✓ — flatten shape |
 | `main.js children/game.js children/gameState.js` | state-store operations | 6 fns | scheduled — pure `state → state/data` fns, one per file |
 | `main.js children/inputs.js` | hardware → input events | core | scheduled — pure translate fns; listeners → `main.js` |
 | `main.js children/game.js children/sectorGenerator.js` | sector/unit generation | 2 fns | scheduled |
