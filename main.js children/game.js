@@ -963,12 +963,15 @@ function _mapTravel(dest){
     _patchMap({ fleets: res.mapState.fleets, turn: res.mapState.turn, locationId: res.mapState.locationId });
     const moved = res.events.some(function (e){ return e && e.kind === "fleetMoved"; });
     if (moved){
+      _patchMap({ pendingMerchant: null });
       const next = _mapSection();
       const pf = (next.fleets || []).find(function (f){ return f.faction === "player"; });
       // Arrival is the fleet's ACTUAL position (travel may cap at the
       // slowest ship), not the requested destination.
       _mapArrival(next, pf ? { x: pf.x, y: pf.y } : null);
       _mapClockTick();
+    } else {
+      _mapMerchantOffer(res.events);
     }
   }
   Hud.updateAll();
@@ -986,14 +989,35 @@ function _mapJump(target){
     _patchMap({ fleets: res.mapState.fleets, turn: res.mapState.turn, locationId: res.mapState.locationId });
     const jumped = res.events.some(function (e){ return e && e.kind === "fleetJumped"; });
     if (jumped){
+      _patchMap({ pendingMerchant: null });
       const next = _mapSection();
       const pf = next.fleets.find(function (f){ return f.faction === "player"; });
       _mapArrival(next, pf ? { x: pf.x, y: pf.y } : null);
       _mapClockTick();
+    } else {
+      _mapMerchantOffer(res.events);
     }
   }
   Hud.updateAll();
   return res.events;
+}
+
+// M4 merchant flow: a rejected move (no fuel / flagship crew low) spawns
+// the merchant-fleet encounter (M3); the offer is recorded on the map and
+// its storefront opens — discounted sale, inflated provisioning (the real
+// service behind the M3 placeholder).
+function _mapMerchantOffer(events){
+  const list = Array.isArray(events) ? events : [];
+  for (let i = 0; i < list.length; i++){
+    const e = list[i];
+    if (e && e.kind === "merchantFleetEvent"){
+      _patchMap({ pendingMerchant: { reason: e.reason || null, offer: e.offer || null } });
+      Hud.updateMapHud();
+      Hud.toggleStationModal(true);
+      return e;
+    }
+  }
+  return null;
 }
 
 // Map turn commit: with an encounter open, the next turn launches the
@@ -1114,24 +1138,69 @@ function _mirrorMapFleet(s){
 function _stationBundle(){
   const c = GetGameState().campaign;
   const dock = _stationDock();
+  const merchant = (c && c.map && c.map.pendingMerchant) ? c.map.pendingMerchant : null;
+  const mode = merchant ? "merchant" : "station";
   const market = (c && c.market) || null;
   const wares = (market && market.wares) || {};
   const lots = (market && market.lots) || {};
   const cargo = (c && c.cargo) || {};
   const fleet = (c && Array.isArray(c.fleet)) ? c.fleet : [];
   const turn = (c && c.map && typeof c.map.turn === "number") ? c.map.turn : 1;
-  const locId = dock ? dock.id : "";
+  const locId = dock ? dock.id : ((c && c.map && c.map.locationId) || "");
   const wallet = (c && typeof c.wallet === "number") ? c.wallet : 0;
 
-  const tabs = [
-    { id: "commodities", label: "GOODS", active: _stationCtx.tab === "commodities" },
-    { id: "hulls", label: "HULLS", active: _stationCtx.tab === "hulls" },
-    { id: "weapons", label: "WEAPONS", active: _stationCtx.tab === "weapons" },
-    { id: "services", label: "SERVICE", active: _stationCtx.tab === "services" }
-  ];
+  // The active tab is mode-scoped; fall back to each mode's first tab.
+  let tab = _stationCtx.tab;
+  if (mode === "merchant"){
+    if (tab !== "provisions" && tab !== "sell") tab = "provisions";
+  } else {
+    if (["commodities", "hulls", "weapons", "services"].indexOf(tab) === -1) tab = "commodities";
+  }
+
+  const tabs = (mode === "merchant")
+    ? [
+        { id: "provisions", label: "PROVISIONS", active: tab === "provisions" },
+        { id: "sell", label: "SELL", active: tab === "sell" }
+      ]
+    : [
+        { id: "commodities", label: "GOODS", active: tab === "commodities" },
+        { id: "hulls", label: "HULLS", active: tab === "hulls" },
+        { id: "weapons", label: "WEAPONS", active: tab === "weapons" },
+        { id: "services", label: "SERVICE", active: tab === "services" }
+      ];
 
   const rows = [];
-  if (dock && _stationCtx.tab === "services"){
+  if (merchant){
+    // Merchant storefront: the player BUYS crew/fuel at the inflated price
+    // and SELLS anything at the discount (M3 offer, wired for real in M4).
+    const sellKeys = Object.keys(wares).filter(function (k){
+      return tab === "sell" ? true : false;
+    });
+    const keys = (tab === "provisions") ? ["crew", "fuel"] : sellKeys;
+    for (let i = 0; i < keys.length; i++){
+      const key = keys[i];
+      const w = wares[key];
+      if (!w) continue;
+      const unit = _merchantUnit(c, key, locId, turn, merchant.offer);
+      const lot = (w.kind === "commodity") ? (lots[key] || 1) : 1;
+      let held = 0;
+      if (w.kind === "commodity") held = cargo[key] || 0;
+      else if (w.kind === "weapon") held = (cargo.weapons && cargo.weapons[w.name]) || 0;
+      else { for (let j = 0; j < fleet.length; j++){ if (fleet[j].hull === w.name) held++; } }
+      rows.push({
+        id: key,
+        kind: "ware",
+        label: String(w.name || key).toUpperCase(),
+        sub: (w.kind === "commodity") ? ("LOT " + lot) : "",
+        priceText: "BUY " + unit.buy + " / SELL " + unit.sell,
+        ownedText: "HELD " + held,
+        buyLabel: w.kind === "commodity" ? ("BUY " + lot) : "BUY",
+        sellLabel: w.kind === "commodity" ? ("SELL " + lot) : "SELL",
+        canBuy: tab === "provisions" && wallet >= unit.buy * lot,
+        canSell: tab === "sell" && held >= lot
+      });
+    }
+  } else if (dock && tab === "services"){
     for (let i = 0; i < fleet.length; i++){
       const e = fleet[i];
       const hullRow = wares["hull:" + (e.hull || e.type)] || {};
@@ -1159,7 +1228,7 @@ function _stationBundle(){
       });
     }
   } else if (dock){
-    const kindForTab = { commodities: "commodity", hulls: "hull", weapons: "weapon" }[_stationCtx.tab] || "commodity";
+    const kindForTab = { commodities: "commodity", hulls: "hull", weapons: "weapon" }[tab] || "commodity";
     const keys = Object.keys(wares).filter(function (k){ return wares[k].kind === kindForTab; });
     for (let i = 0; i < keys.length; i++){
       const key = keys[i];
@@ -1186,31 +1255,53 @@ function _stationBundle(){
   }
 
   return {
-    open: Boolean(dock),
-    mode: _stationCtx.mode,
-    tab: _stationCtx.tab,
+    open: Boolean(dock) || Boolean(merchant),
+    mode: mode,
+    tab: tab,
     tabs: tabs,
     rows: rows,
-    title: dock ? String(dock.name || "STATION") : "STATION",
-    subtitle: dock ? "STATION SERVICES — POSTED PRICES" : "NO STATION IN RANGE",
+    title: merchant ? "MERCHANT FLEET" : (dock ? String(dock.name || "STATION") : "STATION"),
+    subtitle: merchant
+      ? ("PROVISIONS INFLATED — SALE AT A DISCOUNT" + (merchant.reason ? " (" + String(merchant.reason).toUpperCase() + ")" : ""))
+      : (dock ? "STATION SERVICES — POSTED PRICES" : "NO STATION IN RANGE"),
     walletText: "WALLET " + wallet + " ⒸB   PARTS " + (cargo.parts || 0) + "   FUEL " + (cargo.fuel || 0),
-    note: "Posted prices: the trade executes at the quoted price; trading moves local prices for future quotes."
+    note: merchant
+      ? "The caravan provisions crew and fuel at a premium and buys anything at a discount. Rescue your fleet, then move on."
+      : "Posted prices: the trade executes at the quoted price; trading moves local prices for future quotes."
   };
+}
+
+// M4 merchant quoting: the M3 offer's multipliers over the same seeded mid
+// price the station quotes — buy (player purchases) inflated, sell (player
+// sells) discounted. Plain data, computed where the trade executes so the
+// posted price is the price paid.
+function _merchantUnit(c, good, locId, turn, offer){
+  const mid = EconomyLib.PriceAt(c && c.market, good, locId, turn);
+  const buyMult = (offer && typeof offer.buyMultiplier === "number") ? offer.buyMultiplier : 1.3;
+  const sellMult = (offer && typeof offer.sellMultiplier === "number") ? offer.sellMultiplier : 0.7;
+  return { buy: Math.round(mid * buyMult), sell: Math.round(mid * sellMult) };
 }
 
 function _stationTrade(good, sign){
   const c = GetGameState().campaign;
   const dock = _stationDock();
-  if (!c || !dock) { GameAudio.play("ui.invalid"); return; }
+  const merchant = (c && c.map && c.map.pendingMerchant) ? c.map.pendingMerchant : null;
+  if (!c || (!dock && !merchant)) { GameAudio.play("ui.invalid"); return; }
   const market = c.market || {};
   const lots = market.lots || {};
   const wares = market.wares || {};
   const w = wares[good];
   if (!w) { GameAudio.play("ui.invalid"); return; }
+  // The merchant only PROVISIONS crew and fuel (inflated) and BUYS anything
+  // (discounted) — the M3 offer's service shape.
+  if (merchant && sign > 0 && good !== "crew" && good !== "fuel") { GameAudio.play("ui.invalid"); return; }
   const lot = (w.kind === "commodity") ? (lots[good] || 1) : 1;
   const turn = (c.map && typeof c.map.turn === "number") ? c.map.turn : 1;
-  const unit = EconomyLib.Quote(c, good, dock.id, turn);
-  const res = EconomyLib.ApplyTrade(c, good, sign * lot, dock.id, unit);
+  const locId = dock ? dock.id : ((c.map && c.map.locationId) || "");
+  const unit = merchant
+    ? _merchantUnit(c, good, locId, turn, merchant.offer)
+    : EconomyLib.Quote(c, good, locId, turn);
+  const res = EconomyLib.ApplyTrade(c, good, sign * lot, locId, unit);
   if (!res || !res.state) { GameAudio.play("ui.invalid"); return; }
   TryPatchGameState({ campaign: _mirrorMapFleet(res.state) });
   GameAudio.play("ui.select");
@@ -1272,11 +1363,14 @@ const Hud = {
     if (!mapSection) return;
     const clock = (c && c.clock) || {};
     const dock = _stationDock();
+    const merchant = (c && c.map && c.map.pendingMerchant) ? c.map.pendingMerchant : null;
     _applyHudResult(HudLib.updateMapHud(_hudView, _hudInput(), mapSection, {
       wallet: (typeof c.wallet === "number") ? c.wallet : 0,
       month: clock.month || 1,
       year: clock.year || 2401,
-      station: dock ? { name: String(dock.name || "STATION") } : null
+      station: (dock || merchant)
+        ? { name: merchant ? "MERCHANT FLEET" : String(dock.name || "STATION"), merchant: Boolean(merchant) }
+        : null
     }));
   },
   showHailPanel(encounter){ _applyHudResult(HudLib.showHailPanel(_hudView, _hudInput(), encounter)); },

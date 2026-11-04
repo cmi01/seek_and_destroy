@@ -87,11 +87,20 @@ Campaign-map subtree complete: `campaignMap.js` children `buildMapState`, `moveF
 
 | # | Criterion | Status |
 |---|-----------|--------|
-| M4.1 Seeded prices; buy-then-sell loses the spread | **unmet** |
-| M4.2 Crew casualty / 50% incapacitation / monthly wages | **unmet** as M4 | Casualty **math** exists as M2 `computeCrewLost`; no wages, no `crewStatus` gate, no station modal. |
-| M4.3 Browser: buy a hull at a station | **unmet** |
+| M4.1 Seeded prices; buy-then-sell loses the spread | **met** — v134: `economy.js` subtree (`buildMarketState`/`priceAt`/`applyTrade`) + `campaign_DATA.js` trade tables; in-page "M4 SEEDED PRICE DETERMINISM" / "M4 BUY-THEN-SELL LOSES EXACTLY THE SPREAD" (gap 43 = round(356 × 0.12); loss 215 = 5 × 43 exactly) / "M4 BUY A HULL UPDATES WALLET/CARGO/FLEET" / "M4 ILLEGAL TRADES REJECTED"; ad-hoc `/tmp/hermes-verify-t_abaf9305/verify-m4a.js` (12/12) |
+| M4.2 Crew casualty / 50% incapacitation / monthly wages | **met** — v138: `economy.js children/payWages.js` (month clock: 5 ⒸB/crew/month ceil — 87.5 → 88; month = 30 map turns (Q6); year rollover; unpaid ⇒ desertion most-expensive-hulls-first) + `actionLegality.js children/crewStatus.js` (strictly-under 50% ⇒ "incapacitated") gating every battle verdict + `planDeployment` (non-flagship; the flagship ALWAYS deploys per Q2 but cannot act) + the reserve-summon path; battle manning rides the roster crew onto spawned units so the gate sees real crew all battle. In-page "M4 CREW CASUALTY FORMULA" / "M4 CREW 50% GATE: ACT + DEPLOY" / "M4 WAGES MONTH TICK"; ad-hoc `verify-m4c.js` (10/10) |
+| M4.3 Browser: buy a hull at a station | **met** — v135: the station modal (`buildStationModel.js` + `_drawStationModal` + map-HUD opener) replaces the bridge shop as the general storefront — GOODS/HULLS/WEAPONS tabs with posted quotes, SERVICE tab (repair = proportional HP restore, refit = hull-default loadout at parts-per-swap), all consuming parts. Real-button evidence at SOL GATE STATION: wallet 25000 → 24480 (−520 = posted quote), fleet 5 → 6 (Fighter, full crew), cargo untouched; save/reload JSON-identical. Playwright `12-economy-station.spec.ts` (2 acceptance specs; suite 30/30) |
+| M4.4 Merchant-fleet flow wired (M3 placeholder → real service) | **met** — v139: `pendingMerchant` records the M3 offer on the rejected move and the storefront opens in merchant mode — PROVISIONS (crew/fuel at the inflated ×1.3) / SELL (anything at the discount ×0.7), executed at posted prices; buying fuel rescues the stranded fleet and the next move goes through (caravan dismissed). In-page "M4 MERCHANT FLOW: STRANDED FLEET RESCUED" / "M4 MERCHANT SALE: ANYTHING AT THE DISCOUNT"; Playwright merchant-rescue spec |
 
-No `economy.js`, `priceAt`, `applyTrade`, `payWages`, `buildStationModel`.
+Shipped surface: `economy.js` children `buildMarketState`, `priceAt`, `applyTrade`, `payWages`; `campaignState.js children/applyStationService.js` (repair/refit); `actionLegality.js children/crewStatus.js`; `hud.js children/buildStationModel.js`; trade tables in `campaign_DATA.js` (R9). Ad-hoc harnesses: `verify-m4a.js` (12/12), `verify-m4b.js` (5/5), `verify-m4c.js` (10/10) under `/tmp/hermes-verify-t_abaf9305/`.
+
+**Adopted decisions (M4)** — recorded here per the plan's flip-on-a-word convention:
+1. **Posted prices** (design §5.4 comment reading): the quote the storefront shows is the price the trade executes at; trading nudges the location's price multiplier for the *next* quote. This is what makes "buy-then-sell loses exactly the spread" hold as an exact identity (the round-trip at one quote loses exactly `qty × (buy − sell)`), while still honoring "buying moves the local price".
+2. **Flagship deployment exemption** (Q2): a ship under 50% crew cannot deploy — except the flagship, which ALWAYS deploys (warp locus / permadeath target) but cannot *act* while incapacitated. `planDeployment` + the deploy modal enforce this ("(LOW CREW)" rows are locked).
+3. **Refit** = restore the hull's default loadout, parts charged per swapped weapon position (M5's outfit modal owns custom swaps/slot validation). Repair = proportional HP restore (1 part/HP by table).
+4. **Weapons inventory** = `cargo.weapons` (count map) — the station's weapons tab stocks it; M5's outfitting consumes it.
+5. **The month clock lives in the wage tick** (`payWages` advances `clock.month/year`, base year 2401): one pure transform per map-turn commit, no-op until the 30-turn boundary.
+6. **Manning on battle units**: `buildUnitRecord` ships `crew/maxCrew` (full by default); the deploy/warp-in seams overlay the roster entry's actual crew, and the battle fold reads the same numbers back (M2's carry-over semantics unchanged for full-crew ships).
 
 ### M5 — Outfitting / multi-weapon
 

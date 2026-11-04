@@ -79,8 +79,10 @@ const buildMapHudModel = function (mapState, hudDeps){
     };
   }
 
-  // M4: the docked-station opener (bottom-right, standard button DTO). The
-  // station's name travels in as plain data (hudDeps.station).
+  // M4: the storefront opener (bottom-CENTER — the bottom-right corner is
+  // the END_TURN cluster and the button hit-test returns the first hit —
+  // standard button DTO). The docked station, or the merchant caravan when
+  // one has pulled alongside; name/mode travel in as plain data.
   const stationInfo = d.station || null;
   let station = null;
   if (stationInfo){
@@ -89,10 +91,11 @@ const buildMapHudModel = function (mapState, hudDeps){
     station = {
       visible: true,
       name: String(stationInfo.name || "STATION"),
+      merchant: Boolean(stationInfo.merchant),
       buttons: [{
         id: "STATION_OPEN",
-        label: "STATION",
-        x: DS - stW - px(12),
+        label: stationInfo.merchant ? "MERCHANT" : "STATION",
+        x: Math.round((DS - stW) / 2),
         y: DS - stH - px(12),
         w: stW,
         h: stH,

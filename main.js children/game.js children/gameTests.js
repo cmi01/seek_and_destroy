@@ -1226,6 +1226,89 @@ const runGameTests = function (bridge, testName) {  const suite = {
       };
     },
 
+    // ---- M4(d): merchant-fleet flow ---------------------------------
+    // T-M4d-1: a rejected move (no fuel) opens the merchant storefront
+    // (the M3 offer wired for real): provisions (crew/fuel) priced at the
+    // inflated multiplier, anything-on-sale at the discount; buying fuel
+    // rescues the stranded fleet and the next move goes through.
+    testMerchantFlowRescue() {
+      bridge.initializeCampaign();
+      const m0 = JSON.parse(JSON.stringify(bridge.mapSection()));
+      m0.fleets = m0.fleets.map(f => f.faction === "player" ? { ...f, fuel: 0 } : f);
+      bridge.mapSet(m0);
+      const evs = bridge.mapTravelLive({ x: 10, y: 30 });
+      const offered = evs.some(e => e && e.kind === "merchantFleetEvent");
+      const mapAfter = bridge.mapSection();
+      const pending = mapAfter.pendingMerchant;
+      const b = bridge.stationBundle();
+      const modal = bridge.activeModal();
+
+      const st = JSON.parse(JSON.stringify(bridge.campaign));
+      const turn = st.map.turn;
+      const midFuel = bridge.economyPrice(st.market, "fuel", st.map.locationId, turn);
+      const midCrew = bridge.economyPrice(st.market, "crew", st.map.locationId, turn);
+      const fuelRow = b.rows.find(r => r.id === "fuel");
+      const crewRow = b.rows.find(r => r.id === "crew");
+      const quotesOk = Boolean(fuelRow && crewRow &&
+        fuelRow.priceText === "BUY " + Math.round(midFuel * 1.3) + " / SELL " + Math.round(midFuel * 0.7) &&
+        crewRow.priceText === "BUY " + Math.round(midCrew * 1.3) + " / SELL " + Math.round(midCrew * 0.7));
+
+      // Provisions only: no hulls/weapons on the merchant's buy side.
+      const provisionsOnly = b.rows.every(r => r.id === "crew" || r.id === "fuel");
+
+      // Rescue: buy a fuel lot at the posted inflated price, then move.
+      const walletBefore = st.wallet;
+      bridge.stationTradeLive("fuel", 1);
+      const afterBuy = JSON.parse(JSON.stringify(bridge.campaign));
+      const tank = afterBuy.map.fleets.find(f => f.faction === "player").fuel;
+      const paid = walletBefore - afterBuy.wallet;
+      const evs2 = bridge.mapTravelLive({ x: 12, y: 30 });
+      const rescued = evs2.some(e => e && e.kind === "fleetMoved");
+      const cleared = !bridge.mapSection().pendingMerchant;
+      bridge.initializeCampaign();
+
+      const pass = Boolean(offered && pending && pending.offer &&
+        pending.offer.buyMultiplier === 1.3 && pending.offer.sellMultiplier === 0.7 &&
+        b.mode === "merchant" && modal === "station" && quotesOk && provisionsOnly &&
+        tank > 0 && paid === 50 * Math.round(midFuel * 1.3) && rescued && cleared);
+      return {
+        name: "M4 MERCHANT FLOW: STRANDED FLEET RESCUED (x1.3 provisions / x0.7 sale)",
+        pass: pass,
+        detail: "offered=" + offered + " mode=" + b.mode + " quotesOk=" + quotesOk + " provisionsOnly=" + provisionsOnly +
+          " tank=" + tank + " paid=" + paid + " rescued=" + rescued + " cleared=" + cleared
+      };
+    },
+
+    // T-M4d-2: the merchant's sale side takes anything at the discount.
+    testMerchantSaleDiscount() {
+      bridge.initializeCampaign();
+      const m0 = JSON.parse(JSON.stringify(bridge.mapSection()));
+      m0.fleets = m0.fleets.map(f => f.faction === "player" ? { ...f, fuel: 0 } : f);
+      bridge.mapSet(m0);
+      bridge.mapTravelLive({ x: 10, y: 30 });   // rejected -> merchant
+      bridge.stationSetTab("sell");
+      const b = bridge.stationBundle();
+      const st = JSON.parse(JSON.stringify(bridge.campaign));
+      st.cargo.goods = 10;
+      bridge.state.campaign.cargo.goods = 10;   // hold goods to sell
+      const midGoods = bridge.economyPrice(st.market, "goods", st.map.locationId, st.map.turn);
+      const goodsRow = b.rows.find(r => r.id === "goods");
+      // Sell 10 goods at the discount: wallet gains 10 x round(mid x 0.7).
+      const walletBefore = st.wallet;
+      bridge.stationTradeLive("goods", -1);
+      const after = JSON.parse(JSON.stringify(bridge.campaign));
+      const gained = after.wallet - walletBefore;
+      const pass = Boolean(goodsRow && goodsRow.canBuy === false &&
+        goodsRow.priceText === "BUY " + Math.round(midGoods * 1.3) + " / SELL " + Math.round(midGoods * 0.7) &&
+        gained === 10 * Math.round(midGoods * 0.7) && after.cargo.goods === 0);
+      bridge.initializeCampaign();
+      return {
+        name: "M4 MERCHANT SALE: ANYTHING AT THE DISCOUNT (x0.7)",
+        pass: pass,
+        detail: "goodsRow=" + (goodsRow ? goodsRow.priceText : "?") + " gained=" + gained + " expected=" + (10 * Math.round(midGoods * 0.7)) + " cargo=" + after.cargo.goods
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -1252,7 +1335,8 @@ const runGameTests = function (bridge, testName) {  const suite = {
         this.testStationModel(), this.testRepairRefitParts(),
         this.testStationHullBuySaveRoundTrip(),
         this.testCrewCasualtyFormula(), this.testCrewStatusGate(),
-        this.testWagesMonthTick()
+        this.testWagesMonthTick(),
+        this.testMerchantFlowRescue(), this.testMerchantSaleDiscount()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;
