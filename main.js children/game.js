@@ -27,6 +27,9 @@ let _pendingDeploy = null;
 // fires on a unit's one attack per turn. Game-owned transient UI state (like
 // _hudView): keyed by unit id so switching selection never loses a choice.
 let _pendingWeapon = { unitId: null, name: null };
+// M6(c): how many times the player has asked the open hail to talk — the
+// dialogue line cursor (Game-owned transient, like _pendingWeapon).
+let _hailTalkCount = 0;
 
 let RULES_DATA = null;
 let CAMPAIGN_DATA = null;
@@ -1021,6 +1024,7 @@ function _patchMap(mut){
 function _mapArrival(mapState, entering){
   const setup = CampaignMapLib.BattleEventAt(mapState, mapState.locationId || "", entering);
   if (setup){
+    _hailTalkCount = 0;
     _patchMap({ pendingEncounter: setup });
     Hud.showHailPanel(setup);
     GameAudio.play("ui.modal.open");
@@ -1434,11 +1438,11 @@ function _stationTrade(good, sign){
   const res = EconomyLib.ApplyTrade(c, good, sign * lot, locId, unit);
   if (!res || !res.state) { GameAudio.play("ui.invalid"); return; }
   // M6(b) trade event hook: a completed trade moves the player↔owner pair
-  // by the frozen trade rate (Q10: trade ±2) when the location row names an
-  // owner. Merchant storefront trades are excluded — the merchant fleet's
-  // faction is not part of the design yet (open item in the M6 handoff).
+  // by the frozen trade rate (Q10: trade ±2) when the counterparty is
+  // known — the location row's owner, or the merchant offer's faction (a
+  // hail trade names its fleet's faction; an unnamed caravan moves nothing).
   let nextState = res.state;
-  const party = merchant ? null : _locationOwner(locId);
+  const party = merchant ? ((merchant.offer && merchant.offer.faction) || null) : _locationOwner(locId);
   if (party && Reputation){
     nextState = Object.assign({}, nextState, {
       reputation: Reputation.ApplyEvent(nextState.reputation, "trade", "player", party)
@@ -1514,10 +1518,18 @@ const Hud = {
         : null
     }));
   },
-  showHailPanel(encounter){ _applyHudResult(HudLib.showHailPanel(_hudView, _hudInput(), encounter)); },
+  showHailPanel(encounter){
+    // M6(c): the panel carries the faction dialogue model (voice line +
+    // Q11 options) built through the faction seam.
+    const dlg = (Factions && encounter)
+      ? Factions.DialogueModel(GetGameState().campaign, encounter, _hailTalkCount)
+      : null;
+    _applyHudResult(HudLib.showHailPanel(_hudView, _hudInput(), encounter, dlg));
+  },
   hideHailPanel(){ _applyHudResult(HudLib.hideHailPanel(_hudView, _hudInput())); },
   // Pure model reads (test bridge): hail dialogue + map HUD models.
   hailModel(encounter){ return HudLib.hailModel(_hudView, _hudInput(), encounter); },
+  hailPanel(encounter, dialogue){ return HudLib.hailPanel(_hudView, _hudInput(), encounter, dialogue); },
   mapHudModel(mapState, extra = null){ return HudLib.mapHudModel(_hudView, _hudInput(), mapState, extra); },
   setTheme(theme){
     // Game owns the active theme: it resolves the key and passes it down as
@@ -1710,13 +1722,42 @@ const InputProcessor = (() => {
       } else if (State.activeTeam === 1 && !State.gameOver){
         Actions.consumeAPAndCheckTurn(false, Math.max(1, State.ap));
       }
-    } else if (btn.id === "HAIL_TALK" || btn.id === "HAIL_THREATEN"){
-      // Placeholder dialogue response (M6 fills the voice banks); the
-      // hailing shell stays open over the map.
-      GameAudio.play("ui.select");
+    } else if (btn.id === "HAIL_TALK" || btn.id === "HAIL_THREATEN" || btn.id === "HAIL_TRADE"){
+      // M6(c): the Q11 dialogue choices run through the faction outcome
+      // seam — talk advances the voice, threaten takes the fight path,
+      // trade opens the fleet storefront.
+      const map = _mapSection();
+      const enc = (map && map.pendingEncounter) || null;
+      const choice = btn.id.slice("HAIL_".length).toLowerCase();
+      const res = Factions.ApplyDialogueOutcome(GetGameState().campaign, enc, choice, RND);
+      if (res && res.state && res.state !== GetGameState().campaign){
+        TryPatchGameState({ campaign: res.state });
+      }
+      if (choice === "talk"){
+        _hailTalkCount++;
+        const dlg = Factions.DialogueModel(GetGameState().campaign, enc, _hailTalkCount);
+        _applyHudResult(HudLib.showHailPanel(_hudView, _hudInput(), enc, dlg));
+      } else if (choice === "threaten"){
+        if (enc) { _launchEncounterBattle(enc); }
+        else { GameAudio.play("ui.select"); }
+      } else if (choice === "trade"){
+        const offer = Object.assign({}, CampaignMapLib.MerchantOffer(map, "player", "hail"), {
+          faction: (enc && enc.encounterFaction) ? enc.encounterFaction : null
+        });
+        _patchMap({ pendingMerchant: { reason: "hail", offer: offer } });
+        Hud.toggleStationModal(true);
+        GameAudio.play("ui.modal.open");
+      }
     } else if (btn.id === "HAIL_LEAVE"){
-      // Declined the encounter: dismiss the shell and clear the pending
-      // battle (the map continues).
+      // M6(c): the interaction ends — dismiss the shell and re-place the
+      // moving fleet on one of the nearest open squares (DESIGN §4.4); the
+      // pending battle clears (the map continues).
+      const leaveMap = _mapSection();
+      const leaveEnc = (leaveMap && leaveMap.pendingEncounter) || null;
+      const res = Factions.ApplyDialogueOutcome(GetGameState().campaign, leaveEnc, "leave", RND);
+      if (res && res.state && res.state !== GetGameState().campaign){
+        TryPatchGameState({ campaign: res.state });
+      }
       Hud.hideHailPanel();
       _patchMap({ pendingEncounter: null });
       GameAudio.play("ui.modal.close");
@@ -2904,12 +2945,17 @@ const api = {
       // M5 loadout seam (roadmap-design §4.5): the only weapon-stat readers,
       // bound over the frozen weapon table.
       Outfitting = kids.outfitting(RULES_DATA.weapons);
-      // M6(a) faction seam: identity rows + doctrine-weighted fleet
-      // composition over the frozen faction table and the roster.
-      Factions = kids.factions(SHIP_SPECS);
       // M6(b) reputation seam: bands, stances, adjustments and the sensor
       // sharing policy over the frozen event-rate table.
       Reputation = kids.reputation(CAMPAIGN_DATA.campaign.reputation);
+      // M6(a) faction seam: identity rows + doctrine-weighted fleet
+      // composition over the frozen faction table and the roster. The
+      // pair-band reader and the open-square finder arrive as injected
+      // closures (siblings never name each other).
+      Factions = kids.factions(SHIP_SPECS, {
+        bandOf: (rep, faction) => Reputation.Band(Reputation.PairScore(rep, "player", faction)),
+        nearestOpen: (map, from, rng) => CampaignMapLib.NearestOpenSquare(map, from, rng)
+      });
       ReservePlacement = kids.reservePlacement(RULES_DATA);
       EndgameStatus = {
         checkEndgameStatus: kids.endgameStatus
@@ -3519,6 +3565,11 @@ const api = {
       repEvent(rep, kind, a, b, sign){ return Reputation.ApplyEvent(rep, kind, a, b, sign); },
       repShares(band, where){ return Reputation.SharesSensors(band, where); },
       repInit(){ return Reputation.Init(CAMPAIGN_DATA.campaign.factions, id => Factions.AlignmentOf(id)); },
+      // M6(c) dialogue seam (tests): the dialogue model, the hail panel and
+      // the choice outcomes.
+      dialogueFor(encounter, talkCount){ return Factions.DialogueModel(GetGameState().campaign, encounter, talkCount); },
+      hailPanelFor(encounter, talkCount){ return Hud.hailPanel(encounter, Factions.DialogueModel(GetGameState().campaign, encounter, talkCount)); },
+      dialogueOutcome(encounter, choice, seed){ return Factions.ApplyDialogueOutcome(GetGameState().campaign, encounter, choice, mulberry32(seed)); },
       transitionToPlayerTurn(){ return Actions.transitionToPlayerTurn(); },
       transitionToAITurn(){ return Actions.transitionToAITurn(); },
       defaultDeployChoice(){

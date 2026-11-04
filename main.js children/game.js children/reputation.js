@@ -14,8 +14,15 @@
 const reputation = function (config){
   const rates = (config && config.rates) ? config.rates : {};
 
+  function pairScoreOf(repState, a, b){
+    const rep = repState || {};
+    return (rep[a + "|" + b] !== undefined) ? rep[a + "|" + b]
+      : ((rep[b + "|" + a] !== undefined) ? rep[b + "|" + a] : 0);
+  }
+
   return {
     Band(score){ return reputationBand(score); },
+    PairScore(repState, a, b){ return pairScoreOf(repState, a, b); },
     Stance(repState, a, b){ return stanceBetween(repState, a, b, { band: reputationBand }); },
     Adjust(repState, a, b, delta){ return adjustReputation(repState, a, b, delta); },
     SharesSensors(band, where){ return sharesSensors(band, where); },

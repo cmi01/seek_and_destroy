@@ -11,7 +11,8 @@
 // receipt here (data frozen at receipt); the roster the composer prices
 // against is injected by the parent, so no child ever names a sibling.
 // ============================================================
-const factions = function (specs){
+const factions = function (specs, deps){
+  const d = deps || {};
   function freezeTree(value){
     if (value && typeof value === "object" && !Object.isFrozen(value)){
       Object.freeze(value);
@@ -21,6 +22,9 @@ const factions = function (specs){
   }
   const table = freezeTree(factionsDataPayload);
   const rows = table && table.factions ? table.factions : {};
+  // The per-faction voice banks (the dialogue child reads voices[id]).
+  const voices = {};
+  Object.keys(rows).forEach(function (id){ voices[id] = rows[id] ? rows[id].voice : null; });
 
   function row(id){ return rows[id] || null; }
 
@@ -40,6 +44,21 @@ const factions = function (specs){
     },
     ComposeFleet(id, budget, rng){
       return composeFleet(rows, id, budget, rng, { specs: specs });
+    },
+    // M6(c): the hail dialogue — the voice bank is this file's own table;
+    // the pair band and the open-square finder arrive injected.
+    DialogueModel(state, encounter, lineHint){
+      return buildDialogueModel(state, encounter, {
+        voice: voices,
+        bandOf: d.bandOf,
+        lineHint: lineHint
+      });
+    },
+    ApplyDialogueOutcome(state, encounter, choice, rng){
+      return applyDialogueOutcome(state, encounter, choice, {
+        nearestOpen: d.nearestOpen,
+        rng: rng
+      });
     }
   };
 };
