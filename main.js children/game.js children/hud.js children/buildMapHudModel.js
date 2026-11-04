@@ -79,6 +79,29 @@ const buildMapHudModel = function (mapState, hudDeps){
     };
   }
 
+  // M4: the docked-station opener (bottom-right, standard button DTO). The
+  // station's name travels in as plain data (hudDeps.station).
+  const stationInfo = d.station || null;
+  let station = null;
+  if (stationInfo){
+    const stW = px(140);
+    const stH = (ui && ui.buttonHMd) || px(28);
+    station = {
+      visible: true,
+      name: String(stationInfo.name || "STATION"),
+      buttons: [{
+        id: "STATION_OPEN",
+        label: "STATION",
+        x: DS - stW - px(12),
+        y: DS - stH - px(12),
+        w: stW,
+        h: stH,
+        enabled: true,
+        active: false
+      }]
+    };
+  }
+
   return {
     levelTag: "MAP // " + where.name,
     turn: (typeof m.turn === "number") ? m.turn : 1,
@@ -86,6 +109,7 @@ const buildMapHudModel = function (mapState, hudDeps){
     fuel: fuel,
     ships: ships,
     detection: ships,
+    station: station,
     encounter: m.pendingEncounter
       ? {
           kind: m.pendingEncounter.kind || "fleet",

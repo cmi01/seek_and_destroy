@@ -301,7 +301,8 @@ const HUD_WIDGET_SCRIPTS = [
   "main.js children/game.js children/hud.js children/hudMinimap.js",
   "main.js children/game.js children/hud.js children/hudBanner.js",
   "main.js children/game.js children/hud.js children/buildMapHudModel.js",
-  "main.js children/game.js children/hud.js children/buildHailModel.js"
+  "main.js children/game.js children/hud.js children/buildHailModel.js",
+  "main.js children/game.js children/hud.js children/buildStationModel.js"
 ];
 // The AI subtree is one function per file too, so its loading is an effect
 // that belongs here: every file below ai.js (its children, their children and
@@ -480,6 +481,7 @@ const GAME_LEAF_SCRIPTS = [
   "main.js children/game.js children/campaignState.js children/rosterOf.js",
   "main.js children/game.js children/campaignState.js children/beginBattle.js",
   "main.js children/game.js children/campaignState.js children/applyBattleResult.js",
+  "main.js children/game.js children/campaignState.js children/applyStationService.js",
   "main.js children/game.js children/campaignState.js children/buildEncounterFromLevel.js",
   "main.js children/game.js children/campaignState.js children/collectBattleResult.js",
   "main.js children/game.js children/campaignMap.js children/buildMapState.js",
@@ -533,6 +535,7 @@ async function startGame(){
       ["main.js children/game.js children/hud.js children/hudMinimap.js",            () => typeof buildMinimapModel === "function"],
       ["main.js children/game.js children/hud.js children/buildMapHudModel.js",      () => typeof buildMapHudModel === "function"],
       ["main.js children/game.js children/hud.js children/buildHailModel.js",        () => typeof buildHailModel === "function"],
+      ["main.js children/game.js children/hud.js children/buildStationModel.js",     () => typeof buildStationModel === "function"],
       ["main.js children/game.js children/hud.js children/hudBanner.js",             () => typeof buildPriorityBanner === "function"]
     ]);
 
@@ -647,6 +650,7 @@ async function startGame(){
       ["main.js children/game.js children/campaignState.js children/rosterOf.js", () => typeof rosterOf === "function"],
       ["main.js children/game.js children/campaignState.js children/beginBattle.js", () => typeof beginBattle === "function"],
       ["main.js children/game.js children/campaignState.js children/applyBattleResult.js", () => typeof applyBattleResult === "function"],
+      ["main.js children/game.js children/campaignState.js children/applyStationService.js", () => typeof applyStationService === "function"],
       ["main.js children/game.js children/campaignState.js children/buildEncounterFromLevel.js", () => typeof buildEncounterFromLevel === "function"],
       ["main.js children/game.js children/campaignState.js children/collectBattleResult.js", () => typeof collectBattleResult === "function"],
       ["main.js children/game.js children/campaignMap.js children/buildMapState.js", () => typeof buildMapState === "function"],

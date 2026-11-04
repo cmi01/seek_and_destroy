@@ -123,6 +123,18 @@ function createInitialView() {
       nodes: [],
       layout: null
     },
+    // M4: the station storefront (replaces the bridge shop as the general
+    // storefront; the bridge modal keeps the in-battle reinforcements view).
+    stationModal: {
+      title: "STATION",
+      subtitle: "",
+      walletText: "",
+      tab: null,
+      tabs: [],
+      rows: [],
+      panel: null,
+      note: ""
+    },
     deployModal: {
       title: "DEPLOYMENT",
       capText: "",
@@ -201,6 +213,22 @@ const createHud = function (deps) {
       return { view: w, buttons: [panel.closeBtn] };
     }
 
+    // M4 station storefront: rows + posted quotes arrive as plain data
+    // (input.state.station); this layer only lays them out.
+    if (w.activeModal === "station") {
+      const m = buildStationModel((input.state && input.state.station) || {}, { metrics: input.metrics });
+      w.stationModal.title = m.title;
+      w.stationModal.subtitle = m.subtitle;
+      w.stationModal.walletText = m.walletText;
+      w.stationModal.tab = m.tab;
+      w.stationModal.tabs = m.tabs;
+      w.stationModal.rows = m.rows;
+      w.stationModal.panel = m.panel;
+      w.stationModal.note = m.note;
+      w.panelRects = { topBar: null, minimap: null, selectedCard: null, hoveredCard: null, intelOverlay: null, menu: null };
+      return { view: w, buttons: m.buttons };
+    }
+
     const mm = buildMinimapModel(input);
     const mmRect = mm.rect;
 
@@ -250,6 +278,9 @@ const createHud = function (deps) {
     if (r.view.mapHud && r.view.mapHud.hail && Array.isArray(r.view.mapHud.hail.buttons)) {
       r.buttons = (r.buttons || []).concat(r.view.mapHud.hail.buttons);
     }
+    if (r.view.mapHud && r.view.mapHud.station && Array.isArray(r.view.mapHud.station.buttons)) {
+      r.buttons = (r.buttons || []).concat(r.view.mapHud.station.buttons);
+    }
     return _finalize(r);
   }
 
@@ -293,6 +324,32 @@ const createHud = function (deps) {
       w.intelOverlay.visible = false;
       if (w.panelRects) w.panelRects.intelOverlay = null;
       return _syncLayout(w, input);
+    }
+    return { view: w };
+  }
+
+  function _toggleStationModal(view, input, forceState) {
+    const w = _clone(view);
+    const isOpen = w.activeModal === "station";
+    const nextState = forceState !== null ? Boolean(forceState) : !isOpen;
+    if (nextState) {
+      if (!(input.state && input.state.station && input.state.station.open)) {
+        return { view: w, sounds: [{ kind: "ui.invalid", payload: {} }] };
+      }
+      w.activeModal = "station";
+      return _compose({
+        view: w,
+        sounds: isOpen ? [] : [{ kind: "ui.modal.open", payload: {} }],
+        flags: { clearInteraction: true }
+      }, _syncLayout(w, input));
+    }
+    if (isOpen) {
+      w.activeModal = null;
+      return _compose({
+        view: w,
+        sounds: [{ kind: "ui.modal.close", payload: {} }],
+        flags: { clearInteraction: true }
+      }, _syncLayout(w, input));
     }
     return { view: w };
   }
@@ -539,6 +596,15 @@ const createHud = function (deps) {
     },
     toggleDeployModal(view, input, forceState = null) {
       return _finalize(_toggleDeployModal(view, input, forceState));
+    },
+
+    // M4: the station storefront modal (opened from the map HUD when the
+    // fleet is docked at a station).
+    toggleStationModal(view, input, forceState = null) {
+      return _finalize(_toggleStationModal(view, input, forceState));
+    },
+    stationModel(view, input) {
+      return buildStationModel((input.state && input.state.station) || {}, { metrics: input.metrics });
     },
 
     // M3: map HUD + hailing shell. The encounter is plain data in, the shell

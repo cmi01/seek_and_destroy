@@ -684,26 +684,16 @@ const Actions = {
         const folded=CampaignLib.ApplyBattleResult(State.campaign, packed, SHIP_SPECS, CombatMath.crewLostFromDamage);
         if (folded && folded.state){
           // M3: the result folds back onto the map — the map screen returns,
-          // the freeze lifts, and the map fleet mirrors the post-battle roster.
-          const s = folded.state;
+          // the freeze lifts, and the map fleet mirrors the post-battle
+          // roster (the shared mirror helper).
+          let s = _mirrorMapFleet(folded.state);
           if (s.map){
-            const ships = (Array.isArray(s.fleet) ? s.fleet : []).map(function (e){
-              const spec = SHIP_SPECS[e.hull] || {};
-              return {
-                hull: e.hull,
-                crew: (typeof e.crew === "number") ? e.crew : 0,
-                maxCrew: (typeof spec.crew === "number") ? spec.crew : 0,
-                speed: (typeof spec.move === "number") ? spec.move : 1,
-                flagship: Boolean(e.flagship) || (Array.isArray(spec.flags) && spec.flags.indexOf("!flagship") !== -1)
-              };
-            });
-            s.map = Object.assign({}, s.map, {
-              screen: "map",
-              battleActive: false,
-              pendingEncounter: null,
-              fleets: Array.isArray(s.map.fleets)
-                ? s.map.fleets.map(function (f){ return f.faction === "player" ? Object.assign({}, f, { ships: ships }) : f; })
-                : s.map.fleets
+            s = Object.assign({}, s, {
+              map: Object.assign({}, s.map, {
+                screen: "map",
+                battleActive: false,
+                pendingEncounter: null
+              })
             });
           }
           TryPatchGameState({ campaign: s });
@@ -856,7 +846,8 @@ function _hudInput(){
       completedLevels: State.completedLevels ? Array.from(State.completedLevels) : [],
       battleReserve: Array.isArray(State.battleReserve) ? State.battleReserve : [],
       wallet: (State.campaign && typeof State.campaign.wallet === "number") ? State.campaign.wallet : 0,
-      deployment: _pendingDeploy
+      deployment: _pendingDeploy,
+      station: _stationBundle()
     },
     metrics: {
       displaySize: DS,
@@ -1049,6 +1040,167 @@ function _mapClick(px, py, ds){
   }
 }
 
+// ======================== M4 STATION STOREFRONT ORCHESTRATION ========================
+// The station modal's data bundle: posted quotes from the economy seam,
+// fleet/cargo stock and per-ship service costs — plain data for the HUD
+// child (it lays rows out; the prices were computed here). The effects
+// (trades, repair/refit, state patches) are applied here too.
+let _stationCtx = { tab: "commodities", mode: "station" };
+
+// Docked = the player fleet sits inside a station's gravity well on the map
+// screen with no encounter pending (the storefront only exists at stations).
+function _stationDock(){
+  const c = GetGameState().campaign;
+  const map = (c && c.map) || null;
+  if (!map || map.screen !== "map" || map.pendingEncounter) return null;
+  const locs = Array.isArray(map.locations) ? map.locations : [];
+  for (let i = 0; i < locs.length; i++){
+    if (locs[i].id === map.locationId && locs[i].kind === "station") return locs[i];
+  }
+  return null;
+}
+
+// The map fleet mirrors the post-trade roster (same shape the battle fold
+// uses): hull records carry crew/maxCrew/speed/flagship and the movement
+// rules read them directly.
+function _mirrorMapFleet(s){
+  if (!s || !s.map || !Array.isArray(s.map.fleets)) return s;
+  const ships = (Array.isArray(s.fleet) ? s.fleet : []).map(function (e){
+    const spec = SHIP_SPECS[e.hull] || {};
+    return {
+      hull: e.hull,
+      crew: (typeof e.crew === "number") ? e.crew : 0,
+      maxCrew: (typeof e.maxCrew === "number") ? e.maxCrew : ((typeof spec.crew === "number") ? spec.crew : 0),
+      speed: (typeof spec.move === "number") ? spec.move : 1,
+      flagship: Boolean(e.flagship) || (Array.isArray(spec.flags) && spec.flags.indexOf("!flagship") !== -1)
+    };
+  });
+  return Object.assign({}, s, {
+    map: Object.assign({}, s.map, {
+      fleets: s.map.fleets.map(function (f){
+        return f.faction === "player" ? Object.assign({}, f, { ships: ships }) : f;
+      })
+    })
+  });
+}
+
+function _stationBundle(){
+  const c = GetGameState().campaign;
+  const dock = _stationDock();
+  const market = (c && c.market) || null;
+  const wares = (market && market.wares) || {};
+  const lots = (market && market.lots) || {};
+  const cargo = (c && c.cargo) || {};
+  const fleet = (c && Array.isArray(c.fleet)) ? c.fleet : [];
+  const turn = (c && c.map && typeof c.map.turn === "number") ? c.map.turn : 1;
+  const locId = dock ? dock.id : "";
+  const wallet = (c && typeof c.wallet === "number") ? c.wallet : 0;
+
+  const tabs = [
+    { id: "commodities", label: "GOODS", active: _stationCtx.tab === "commodities" },
+    { id: "hulls", label: "HULLS", active: _stationCtx.tab === "hulls" },
+    { id: "weapons", label: "WEAPONS", active: _stationCtx.tab === "weapons" },
+    { id: "services", label: "SERVICE", active: _stationCtx.tab === "services" }
+  ];
+
+  const rows = [];
+  if (dock && _stationCtx.tab === "services"){
+    for (let i = 0; i < fleet.length; i++){
+      const e = fleet[i];
+      const hullRow = wares["hull:" + (e.hull || e.type)] || {};
+      const maxHp = (typeof e.maxHp === "number") ? e.maxHp : (hullRow.hp || 0);
+      const hp = (typeof e.hp === "number") ? e.hp : maxHp;
+      const missing = Math.max(0, maxHp - hp);
+      const perHp = (market && typeof market.repairPartsPerHp === "number") ? market.repairPartsPerHp : 1;
+      const repairCost = Math.round(missing * perHp);
+      const want = Array.isArray(hullRow.defaultLoadout) ? hullRow.defaultLoadout : [];
+      const have = Array.isArray(e.loadout) ? e.loadout : [];
+      const n = Math.max(want.length, have.length);
+      let swaps = 0;
+      for (let j = 0; j < n; j++){ if ((want[j] || null) !== (have[j] || null)) swaps++; }
+      const perSwap = (market && typeof market.refitPartsPerSwap === "number") ? market.refitPartsPerSwap : 1;
+      const refitCost = swaps * perSwap;
+      rows.push({
+        id: String(i),
+        kind: "service",
+        label: String(e.hull || e.type || "?"),
+        sub: "HP " + hp + "/" + maxHp + " CREW " + (e.crew || 0) + "/" + (e.maxCrew || 0),
+        priceText: "REPAIR " + repairCost + "P / REFIT " + refitCost + "P",
+        ownedText: "",
+        canRepair: missing > 0 && (cargo.parts || 0) >= repairCost,
+        canRefit: swaps > 0 && (cargo.parts || 0) >= refitCost
+      });
+    }
+  } else if (dock){
+    const kindForTab = { commodities: "commodity", hulls: "hull", weapons: "weapon" }[_stationCtx.tab] || "commodity";
+    const keys = Object.keys(wares).filter(function (k){ return wares[k].kind === kindForTab; });
+    for (let i = 0; i < keys.length; i++){
+      const key = keys[i];
+      const w = wares[key];
+      const unit = EconomyLib.Quote(c, key, locId, turn);
+      const lot = (w.kind === "commodity") ? (lots[key] || 1) : 1;
+      let held = 0;
+      if (w.kind === "commodity") held = cargo[key] || 0;
+      else if (w.kind === "weapon") held = (cargo.weapons && cargo.weapons[w.name]) || 0;
+      else { for (let j = 0; j < fleet.length; j++){ if (fleet[j].hull === w.name) held++; } }
+      rows.push({
+        id: key,
+        kind: "ware",
+        label: String(w.name || key).toUpperCase(),
+        sub: (w.kind === "commodity") ? ("LOT " + lot) : "",
+        priceText: "BUY " + unit.buy + " / SELL " + unit.sell,
+        ownedText: "HELD " + held,
+        buyLabel: w.kind === "commodity" ? ("BUY " + lot) : "BUY",
+        sellLabel: w.kind === "commodity" ? ("SELL " + lot) : "SELL",
+        canBuy: wallet >= unit.buy * lot,
+        canSell: held >= lot
+      });
+    }
+  }
+
+  return {
+    open: Boolean(dock),
+    mode: _stationCtx.mode,
+    tab: _stationCtx.tab,
+    tabs: tabs,
+    rows: rows,
+    title: dock ? String(dock.name || "STATION") : "STATION",
+    subtitle: dock ? "STATION SERVICES — POSTED PRICES" : "NO STATION IN RANGE",
+    walletText: "WALLET " + wallet + " ⒸB   PARTS " + (cargo.parts || 0) + "   FUEL " + (cargo.fuel || 0),
+    note: "Posted prices: the trade executes at the quoted price; trading moves local prices for future quotes."
+  };
+}
+
+function _stationTrade(good, sign){
+  const c = GetGameState().campaign;
+  const dock = _stationDock();
+  if (!c || !dock) { GameAudio.play("ui.invalid"); return; }
+  const market = c.market || {};
+  const lots = market.lots || {};
+  const wares = market.wares || {};
+  const w = wares[good];
+  if (!w) { GameAudio.play("ui.invalid"); return; }
+  const lot = (w.kind === "commodity") ? (lots[good] || 1) : 1;
+  const turn = (c.map && typeof c.map.turn === "number") ? c.map.turn : 1;
+  const unit = EconomyLib.Quote(c, good, dock.id, turn);
+  const res = EconomyLib.ApplyTrade(c, good, sign * lot, dock.id, unit);
+  if (!res || !res.state) { GameAudio.play("ui.invalid"); return; }
+  TryPatchGameState({ campaign: _mirrorMapFleet(res.state) });
+  GameAudio.play("ui.select");
+  Hud.updateMapHud();
+  Hud.toggleStationModal(true);
+}
+
+function _stationService(kind, idx){
+  const c = GetGameState().campaign;
+  if (!c) { GameAudio.play("ui.invalid"); return; }
+  const res = CampaignLib.ApplyStationService(c, { kind: kind, ship: idx });
+  if (!res || !res.state) { GameAudio.play("ui.invalid"); return; }
+  TryPatchGameState({ campaign: _mirrorMapFleet(res.state) });
+  GameAudio.play("ui.select");
+  Hud.toggleStationModal(true);
+}
+
 const Hud = {
   // Pure reads over the game-owned view.
   isModalOpen(){ return HudLib.isModalOpen(_hudView); },
@@ -1075,6 +1227,7 @@ const Hud = {
   toggleCampaignModal(forceState = null){ _applyHudResult(HudLib.toggleCampaignModal(_hudView, _hudInput(), forceState)); },
   renderCampaignCards(silent = false){ _applyHudResult(HudLib.renderCampaignCards(_hudView, _hudInput(), silent)); },
   toggleDeployModal(forceState = null){ _applyHudResult(HudLib.toggleDeployModal(_hudView, _hudInput(), forceState)); },
+  toggleStationModal(forceState = null){ _applyHudResult(HudLib.toggleStationModal(_hudView, _hudInput(), forceState)); },
   showEndgameModal(isVictory){ _applyHudResult(HudLib.showEndgameModal(_hudView, _hudInput(), isVictory)); },
   hideEndgameModal(){ _applyHudResult(HudLib.hideEndgameModal(_hudView, _hudInput())); },
   toggleMenu(forceState = null){ _applyHudResult(HudLib.toggleMenu(_hudView, _hudInput(), forceState)); },
@@ -1091,10 +1244,12 @@ const Hud = {
     const mapSection = (c && c.map) || null;
     if (!mapSection) return;
     const clock = (c && c.clock) || {};
+    const dock = _stationDock();
     _applyHudResult(HudLib.updateMapHud(_hudView, _hudInput(), mapSection, {
       wallet: (typeof c.wallet === "number") ? c.wallet : 0,
       month: clock.month || 1,
-      year: clock.year || 2401
+      year: clock.year || 2401,
+      station: dock ? { name: String(dock.name || "STATION") } : null
     }));
   },
   showHailPanel(encounter){ _applyHudResult(HudLib.showHailPanel(_hudView, _hudInput(), encounter)); },
@@ -1303,6 +1458,22 @@ const InputProcessor = (() => {
       Hud.hideHailPanel();
       _patchMap({ pendingEncounter: null });
       GameAudio.play("ui.modal.close");
+    } else if (btn.id === "STATION_OPEN"){
+      Hud.toggleStationModal(true);
+    } else if (btn.id === "STATION_CLOSE"){
+      Hud.toggleStationModal(false);
+    } else if (typeof btn.id === "string" && btn.id.indexOf("STATION_TAB:") === 0){
+      _stationCtx.tab = btn.id.slice("STATION_TAB:".length);
+      Hud.toggleStationModal(true);
+      GameAudio.play("ui.select");
+    } else if (typeof btn.id === "string" && btn.id.indexOf("STATION_BUY:") === 0){
+      _stationTrade(btn.id.slice("STATION_BUY:".length), 1);
+    } else if (typeof btn.id === "string" && btn.id.indexOf("STATION_SELL:") === 0){
+      _stationTrade(btn.id.slice("STATION_SELL:".length), -1);
+    } else if (typeof btn.id === "string" && btn.id.indexOf("STATION_REPAIR:") === 0){
+      _stationService("repair", Number(btn.id.slice("STATION_REPAIR:".length)));
+    } else if (typeof btn.id === "string" && btn.id.indexOf("STATION_REFIT:") === 0){
+      _stationService("refit", Number(btn.id.slice("STATION_REFIT:".length)));
     } else if (btn.id === "CLOSE_MODAL"){
       if (_pendingDeploy){
         const lvlId = _pendingDeploy.levelId;
@@ -1314,6 +1485,7 @@ const InputProcessor = (() => {
         Hud.toggleBridgeModal(false);
         Hud.toggleCampaignModal(false);
         Hud.toggleHelpModal(false);
+        Hud.toggleStationModal(false);
       }
     } else if (typeof btn.id === "string" && btn.id.indexOf("RESERVE_SUMMON:") === 0){
       const shipName = btn.id.slice("RESERVE_SUMMON:".length);
@@ -2783,6 +2955,16 @@ const api = {
       economyPrice(market, good, loc, time){ return EconomyLib.PriceAt(market, good, loc, time); },
       economyQuote(state, good, loc, time){ return EconomyLib.Quote(state, good, loc, time); },
       economyTrade(state, good, qty, loc, unit){ return EconomyLib.ApplyTrade(state, good, qty, loc, unit); },
+      // M4 station seam: the live storefront ops (effects applied) + the
+      // plain bundle the HUD child lays out.
+      stationDock(){ return _stationDock(); },
+      stationBundle(){ return _stationBundle(); },
+      stationSetTab(tab){ _stationCtx.tab = tab; Hud.toggleStationModal(true); return _stationBundle(); },
+      stationOpen(){ Hud.toggleStationModal(true); return Hud.getActiveModal(); },
+      stationClose(){ Hud.toggleStationModal(false); return Hud.getActiveModal(); },
+      stationTradeLive(good, sign){ _stationTrade(good, sign); return GetGameState().campaign; },
+      stationServiceLive(kind, idx){ _stationService(kind, idx); return GetGameState().campaign; },
+      stationService(state, service){ return CampaignLib.ApplyStationService(state, service); },
       // M3(c) live-map seam (tests drive the orchestrator, not just the
       // pure children): set the map section, travel/jump the player through
       // the arrival check, commit a map turn (encounter → battle launch).
@@ -2899,6 +3081,15 @@ const api = {
       },
       clearSeed(){ State.rng = null; State.rngSeed = null; },
       getRawState(){ return GetGameState(); },
+      // M4 station storefront facade (browser evidence / probes).
+      Station: {
+        docked(){ return Boolean(_stationDock()); },
+        bundle(){ return _stationBundle(); },
+        trade(good, sign){ _stationTrade(good, sign); return _stationBundle(); },
+        service(kind, idx){ _stationService(kind, idx); return _stationBundle(); },
+        open(){ Hud.toggleStationModal(true); return Hud.getActiveModal(); },
+        close(){ Hud.toggleStationModal(false); return Hud.getActiveModal(); }
+      },
       Map: {
         state(){ return (GetGameState().campaign && GetGameState().campaign.map) || null; },
         travel(fleetId, dest){

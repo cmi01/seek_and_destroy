@@ -568,6 +568,75 @@
     return v - Math.floor(v);
   }
 
+  // M4 station storefront: the modal model's rows (wares with posted
+  // quotes, services with parts costs) drawn over a dimmed board; the
+  // tab/action buttons come through the standard button list.
+  function _drawStationModal(ctx, state, uiHud, bp, DS, US, F, C) {
+    const modal = (uiHud && uiHud.stationModal) ? uiHud.stationModal : { title: "STATION", rows: [] };
+    const panel = modal.panel || null;
+    const mw = panel ? panel.w : Math.min(DS - Math.round(36 * US), Math.round(560 * US));
+    const mh = panel ? panel.h : Math.round(420 * US);
+    const mx = panel ? panel.x : Math.round((DS - mw) * 0.5);
+    const my = panel ? panel.y : Math.round((DS - mh) * 0.5);
+
+    ctx.save();
+    ctx.fillStyle = C["rgba(3, 5, 10, 0.86)"];
+    ctx.fillRect(0, 0, DS, DS);
+
+    _drawChamferedRect(ctx, mx, my, mw, mh, Math.round(10 * US));
+    ctx.fillStyle = C["#060911"];
+    ctx.strokeStyle = bp.accent;
+    ctx.lineWidth = _stroke.heavy;
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = F["bold"];
+    ctx.fillStyle = bp.accent;
+    ctx.fillText(_fitTextToWidth(ctx, String(modal.title || "STATION"), mw - Math.round(24 * US)), mx + Math.round(14 * US), my + Math.round(12 * US));
+    ctx.font = F["regular"];
+    ctx.fillStyle = C["#cbd5e1"];
+    ctx.fillText(_fitTextToWidth(ctx, String(modal.subtitle || ""), mw - Math.round(24 * US)), mx + Math.round(14 * US), my + Math.round(32 * US));
+    ctx.fillStyle = bp.gold;
+    ctx.fillText(_fitTextToWidth(ctx, String(modal.walletText || ""), mw - Math.round(24 * US)), mx + Math.round(14 * US), my + Math.round(50 * US));
+
+    const rows = Array.isArray(modal.rows) ? modal.rows : [];
+    ctx.font = F["regular"];
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r) continue;
+      if (i % 2 === 0) {
+        ctx.fillStyle = C["rgba(255, 255, 255, 0.03)"];
+        ctx.fillRect(mx + Math.round(10 * US), r.y, mw - Math.round(20 * US), r.h);
+      }
+      ctx.fillStyle = C["#e2e8f0"];
+      ctx.fillText(_fitTextToWidth(ctx, r.label, mw * 0.34), mx + Math.round(16 * US), r.y + Math.round(5 * US));
+      ctx.fillStyle = C["#94a3b8"];
+      ctx.fillText(_fitTextToWidth(ctx, r.sub, mw * 0.22), mx + Math.round(16 * US) + mw * 0.30, r.y + Math.round(5 * US));
+      ctx.fillStyle = bp.gold;
+      ctx.textAlign = "right";
+      ctx.fillText(_fitTextToWidth(ctx, r.priceText, mw * 0.18), mx + mw - Math.round(190 * US), r.y + Math.round(5 * US));
+      ctx.fillStyle = C["#94a3b8"];
+      ctx.fillText(_fitTextToWidth(ctx, r.ownedText, mw * 0.12), mx + mw - Math.round(118 * US), r.y + Math.round(5 * US));
+      ctx.textAlign = "left";
+    }
+
+    if (modal.note) {
+      ctx.fillStyle = C["#64748b"];
+      ctx.font = F["regular"];
+      ctx.fillText(_fitTextToWidth(ctx, String(modal.note), mw - Math.round(28 * US)), mx + Math.round(14 * US), my + mh - Math.round(34 * US));
+    }
+
+    const btns = Array.isArray(state.canvasButtons) ? state.canvasButtons : [];
+    for (let i = 0; i < btns.length; i++) {
+      const b = btns[i];
+      if (!b) continue;
+      _drawButtonWidget(ctx, b, state.buttonHovered, state.buttonPressed, bp, US, F, C);
+    }
+    ctx.restore();
+  }
+
   // Campaign STARMAP — replaces the old 2-column level-select card grid.
   // One node per campaign level, connected in campaign order like a star
   // chart. Node geometry comes from the HUD snapshot (uiHud.campaignModal.nodes
@@ -1014,6 +1083,10 @@
     }
     if (uiHud && uiHud.activeModal === "deploy") {
       _drawDeployModal(ctx, state, uiHud, bp, DS, US, F, C);
+      return;
+    }
+    if (uiHud && uiHud.activeModal === "station") {
+      _drawStationModal(ctx, state, uiHud, bp, DS, US, F, C);
       return;
     }
     if (uiHud && uiHud.activeModal === "help") {

@@ -1057,6 +1057,84 @@ const runGameTests = function (bridge, testName) {  const suite = {
       };
     },
 
+    // ---- M4(b): the station storefront -------------------------------
+    // T-M4b-1: the station model lays out posted quotes (rows carry the
+    // same buy/sell numbers the economy seam quotes) and the map HUD offers
+    // the STATION opener when docked.
+    testStationModel() {
+      bridge.initializeCampaign();
+      const dock = bridge.stationDock();
+      const st = JSON.parse(JSON.stringify(bridge.campaign));
+      const bundle = bridge.stationBundle();
+      const model = bridge.mapHudModel(st.map, { wallet: st.wallet, station: dock ? { name: dock.name } : null });
+      const b = bridge.stationBundle();
+      const tab = bridge.stationSetTab("hulls");
+      const hullRows = tab.rows.filter(r => r.kind === "ware");
+      const row = hullRows.find(r => r.id === "hull:Fighter");
+      const unit = bridge.economyQuote(st, "hull:Fighter", dock ? dock.id : "", st.map.turn);
+      const open = bridge.stationOpen();
+      const btnOk = Boolean(model.station && model.station.buttons.some(x => x.id === "STATION_OPEN"));
+      bridge.stationClose();
+      const pass = Boolean(dock && b.open && row && row.priceText === "BUY " + unit.buy + " / SELL " + unit.sell &&
+        btnOk && open === "station" && hullRows.length > 0);
+      return {
+        name: "M4 STATION MODEL + POSTED QUOTES + MAP OPENER",
+        pass: pass,
+        detail: "dock=" + (dock ? dock.id : "none") + " hullRows=" + hullRows.length + " fighter=" + (row ? row.priceText : "?") + " openerBtn=" + btnOk + " modal=" + open
+      };
+    },
+
+    // T-M4b-2: repair/refit consume parts at the market rates (proportional
+    // HP restore; per swapped weapon).
+    testRepairRefitParts() {
+      bridge.initializeCampaign();
+      const st = JSON.parse(JSON.stringify(bridge.campaign));
+      st.fleet[1].hp = 1;                      // Fighter at 1/2 HP
+      st.cargo.parts = 10;
+      const perHp = st.market.repairPartsPerHp;
+      const repair = bridge.stationService(st, { kind: "repair", ship: 1 });
+      const rep = repair.state;
+      const cost = Math.round((st.fleet[1].maxHp - 1) * perHp);
+      // Refit: give the Fighter a non-default loadout, then refit it home.
+      const dirty = JSON.parse(JSON.stringify(st));
+      dirty.fleet[1].loadout = ["Light Cannon"];
+      const want = st.market.wares["hull:Fighter"].defaultLoadout;
+      const swaps = want.filter((w, i) => dirty.fleet[1].loadout[i] !== w).length + Math.max(0, dirty.fleet[1].loadout.length - want.length);
+      const refit = bridge.stationService(dirty, { kind: "refit", ship: 1 });
+      const refCost = swaps * st.market.refitPartsPerSwap;
+      const none = bridge.stationService(st, { kind: "refit", ship: 1 });   // already default
+      const pass = Boolean(rep && rep.fleet[1].hp === st.fleet[1].maxHp && rep.cargo.parts === 10 - cost &&
+        refit && refit.state && JSON.stringify(refit.state.fleet[1].loadout) === JSON.stringify(want) &&
+        refit.state.cargo.parts === 10 - refCost && none.state === null);
+      return {
+        name: "M4 REPAIR/REFIT CONSUME PARTS",
+        pass: pass,
+        detail: "repairCost=" + cost + " parts=" + (rep ? rep.cargo.parts : "?") + " refitCost=" + refCost + " refitParts=" + (refit && refit.state ? refit.state.cargo.parts : "?") + " noopRejected=" + (none.state === null)
+      };
+    },
+
+    // T-M4b-3: the browser acceptance in pure-live form — at a station buy
+    // a hull and observe wallet/cargo/fleet update consistently, and the
+    // save round-trip preserves it exactly.
+    testStationHullBuySaveRoundTrip() {
+      bridge.initializeCampaign();
+      const before = JSON.parse(JSON.stringify(bridge.campaign));
+      const live = bridge.stationTradeLive("hull:Fighter", 1);
+      const walletOk = live.wallet < before.wallet && live.fleet.length === before.fleet.length + 1;
+      const saved = bridge.saveState();
+      bridge.stationTradeLive("hull:Fighter", 1);      // drift the live state
+      const restored = bridge.loadState(saved) && JSON.parse(JSON.stringify(bridge.campaign));
+      const roundTrip = Boolean(restored && restored.wallet === live.wallet && restored.fleet.length === live.fleet.length &&
+        JSON.stringify(restored.market.prices) === JSON.stringify(live.market.prices));
+      bridge.initializeCampaign();
+      const pass = Boolean(walletOk && roundTrip);
+      return {
+        name: "M4 STATION HULL BUY: WALLET/FLEET + SAVE ROUND-TRIP",
+        pass: pass,
+        detail: "wallet " + before.wallet + " -> " + live.wallet + " fleet " + before.fleet.length + " -> " + live.fleet.length + " roundTrip=" + roundTrip
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -1079,7 +1157,9 @@ const runGameTests = function (bridge, testName) {  const suite = {
         this.testMapEncounterOpensOnEntry(), this.testMapJoinNextTurnQ4(),
         this.testMapEncounterNextTurnLaunch(), this.testMapHudAndHailModels(),
         this.testMarketPriceDeterminism(), this.testSpreadRoundTrip(),
-        this.testTradeHullConsistency(), this.testTradeRejections()
+        this.testTradeHullConsistency(), this.testTradeRejections(),
+        this.testStationModel(), this.testRepairRefitParts(),
+        this.testStationHullBuySaveRoundTrip()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;
