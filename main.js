@@ -519,7 +519,14 @@ const GAME_LEAF_SCRIPTS = [
   "main.js children/game.js children/campaignMap.js children/nearestOpenSquare.js",
   "main.js children/game.js children/campaignMap.js children/mapAi.js",
   "main.js children/game.js children/campaignMap.js children/applyMapOrder.js",
-  "main.js children/game.js children/actionLegality.js children/crewStatus.js"
+  "main.js children/game.js children/actionLegality.js children/crewStatus.js",
+  "main.js children/game.js children/gameTests.js children/campaignSuite.js",
+  "main.js children/game.js children/gameTests.js children/battleSuite.js",
+  "main.js children/game.js children/gameTests.js children/mapSuite.js",
+  "main.js children/game.js children/gameTests.js children/economySuite.js",
+  "main.js children/game.js children/gameTests.js children/outfittingSuite.js",
+  "main.js children/game.js children/gameTests.js children/factionSuite.js",
+  "main.js children/game.js children/gameTests.js children/missionSuite.js"
 ];
 
 async function startGame(){
@@ -705,7 +712,14 @@ async function startGame(){
       ["main.js children/game.js children/campaignMap.js children/nearestOpenSquare.js", () => typeof nearestOpenSquare === "function"],
       ["main.js children/game.js children/campaignMap.js children/mapAi.js", () => typeof mapAi === "function"],
       ["main.js children/game.js children/campaignMap.js children/applyMapOrder.js", () => typeof applyMapOrder === "function"],
-      ["main.js children/game.js children/actionLegality.js children/crewStatus.js", () => typeof crewStatus === "function"]
+      ["main.js children/game.js children/actionLegality.js children/crewStatus.js", () => typeof crewStatus === "function"],
+      ["main.js children/game.js children/gameTests.js children/campaignSuite.js", () => typeof campaignSuite === "function"],
+      ["main.js children/game.js children/gameTests.js children/battleSuite.js", () => typeof battleSuite === "function"],
+      ["main.js children/game.js children/gameTests.js children/mapSuite.js", () => typeof mapSuite === "function"],
+      ["main.js children/game.js children/gameTests.js children/economySuite.js", () => typeof economySuite === "function"],
+      ["main.js children/game.js children/gameTests.js children/outfittingSuite.js", () => typeof outfittingSuite === "function"],
+      ["main.js children/game.js children/gameTests.js children/factionSuite.js", () => typeof factionSuite === "function"],
+      ["main.js children/game.js children/gameTests.js children/missionSuite.js", () => typeof missionSuite === "function"]
     ]);
 
     await Game.load();

@@ -426,7 +426,14 @@ lands; the Surface column says how far each file is from the bar.
 | `main.js children/game.js children/campaign_DATA.js` | campaign/level table | table | scheduled — wrap |
 | `main.js children/game.js children/themes_DATA.js` | theme tables | table | scheduled — wrap |
 | `main.js children/sounds.js children/audio_DATA.js` | audio clip table | table | scheduled — wrap |
-| `main.js children/game.js children/gameTests.js` | game self-tests | bridge mutation | scheduled — pure `state → results` fns; bridge retired |
+| `main.js children/game.js children/gameTests.js` | self-test dispatch composer | `runGameTests` | 1 fn ✓ — flatten shape; per-domain suites split out (v160); the test bridge retires with the sweep |
+| `main.js children/game.js children/gameTests.js children/campaignSuite.js` | campaign-state self-tests (3) | `campaignSuite` | 1 fn ✓ — flatten shape; bridge retired with the sweep |
+| `main.js children/game.js children/gameTests.js children/battleSuite.js` | battle-behaviour self-tests (21: M2 semantics, AI doctrine, zoom contract, shield rule) | `battleSuite` | 1 fn ✓ — flatten shape; bridge retired with the sweep |
+| `main.js children/game.js children/gameTests.js children/mapSuite.js` | campaign-map self-tests (16) | `mapSuite` | 1 fn ✓ — flatten shape; bridge retired with the sweep |
+| `main.js children/game.js children/gameTests.js children/economySuite.js` | station-economy self-tests (12) | `economySuite` | 1 fn ✓ — flatten shape; bridge retired with the sweep |
+| `main.js children/game.js children/gameTests.js children/outfittingSuite.js` | outfitting self-tests (14) | `outfittingSuite` | 1 fn ✓ — flatten shape; bridge retired with the sweep |
+| `main.js children/game.js children/gameTests.js children/factionSuite.js` | faction-reputation self-tests (6) | `factionSuite` | 1 fn ✓ — flatten shape; bridge retired with the sweep |
+| `main.js children/game.js children/gameTests.js children/missionSuite.js` | missions-dialogue self-tests (8) | `missionSuite` | 1 fn ✓ — flatten shape; bridge retired with the sweep |
 | `main.js children/graphics.js children/graphicsTests.js` | graphics self-tests | bridge mutation | scheduled — pure fns; bridge retired |
 
 ### Standing decisions
