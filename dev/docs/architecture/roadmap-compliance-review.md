@@ -73,8 +73,8 @@ Status: **met** / **partial** / **unmet**. Evidence is the M2 worktree unless no
 
 ### M3 — Campaign map
 
-| # | Criterion | Status |
-|---|-----------|--------|
+| Criterion | Status |
+|---|--------|
 | M3.1 Fuel formula / unfuelled merchant event / detection radius = ship count | **met** — exact formula + rejections + merchant offer (v126); detection radius = ship count (`mapVisibility.js`, v130). In-page "M3 FUEL FORMULA …" / "M3 DETECTION RADIUS …"; ad-hoc `/tmp/hermes-verify-t_ab74f8de/verify-m3.js` + `verify-m3c.js` |
 | M3.2 Browser traverse system → hyperspace → system | **met** — v129: live traverse with fuel 500 → 485 → 273.85 → 129.35; red gravity-well-only render screenshots at 1200/768 px (card evidence/) |
 | M3.3 Encounter entry → battle next turn via the M2 seam; result folds back to the map (Q4) | **met** — v130: `battleEventAt.js` + orchestrator; live chain (encounter → hail shell → next turn → deployment → battle → victory fold) + Playwright 11-campaign-map.spec.ts |
@@ -85,8 +85,8 @@ Campaign-map subtree complete: `campaignMap.js` children `buildMapState`, `moveF
 
 ### M4 — Economy, stations, crew
 
-| # | Criterion | Status |
-|---|-----------|--------|
+| Criterion | Status |
+|---|--------|
 | M4.1 Seeded prices; buy-then-sell loses the spread | **met** — v134: `economy.js` subtree (`buildMarketState`/`priceAt`/`applyTrade`) + `campaign_DATA.js` trade tables; in-page "M4 SEEDED PRICE DETERMINISM" / "M4 BUY-THEN-SELL LOSES EXACTLY THE SPREAD" (gap 43 = round(356 × 0.12); loss 215 = 5 × 43 exactly) / "M4 BUY A HULL UPDATES WALLET/CARGO/FLEET" / "M4 ILLEGAL TRADES REJECTED"; ad-hoc `/tmp/hermes-verify-t_abaf9305/verify-m4a.js` (12/12) |
 | M4.2 Crew casualty / 50% incapacitation / monthly wages | **met** — v138: `economy.js children/payWages.js` (month clock: 5 ⒸB/crew/month ceil — 87.5 → 88; month = 30 map turns (Q6); year rollover; unpaid ⇒ desertion most-expensive-hulls-first) + `actionLegality.js children/crewStatus.js` (strictly-under 50% ⇒ "incapacitated") gating every battle verdict + `planDeployment` (non-flagship; the flagship ALWAYS deploys per Q2 but cannot act) + the reserve-summon path; battle manning rides the roster crew onto spawned units so the gate sees real crew all battle. In-page "M4 CREW CASUALTY FORMULA" / "M4 CREW 50% GATE: ACT + DEPLOY" / "M4 WAGES MONTH TICK"; ad-hoc `verify-m4c.js` (10/10) |
 | M4.3 Browser: buy a hull at a station | **met** — v135: the station modal (`buildStationModel.js` + `_drawStationModal` + map-HUD opener) replaces the bridge shop as the general storefront — GOODS/HULLS/WEAPONS tabs with posted quotes, SERVICE tab (repair = proportional HP restore, refit = hull-default loadout at parts-per-swap), all consuming parts. Real-button evidence at SOL GATE STATION: wallet 25000 → 24480 (−520 = posted quote), fleet 5 → 6 (Fighter, full crew), cargo untouched; save/reload JSON-identical. Playwright `12-economy-station.spec.ts` (2 acceptance specs; suite 30/30) |
@@ -104,8 +104,8 @@ Shipped surface: `economy.js` children `buildMarketState`, `priceAt`, `applyTrad
 
 ### M5 — Outfitting / multi-weapon
 
-| # | Criterion | Status |
-|---|-----------|--------|
+| Criterion | Status |
+|---|--------|
 | M5.1 Slot-sum validation; two weapons fire with own dmg/range | **unmet** |
 | M5.2 Red numbers show the chosen weapon | **unmet** |
 
@@ -113,8 +113,8 @@ No `outfitting.js`. Battle units still use `wType` / `firepower` / `range`. Dual
 
 ### M6 — Factions, reputation, missions, world life
 
-| # | Criterion | Status |
-|---|-----------|--------|
+| Criterion | Status |
+|---|--------|
 | M6.1 Reputation quintile boundaries | **unmet** |
 | M6.2 Seeded NPC fleet interaction without player input | **unmet** |
 | M6.3 Doctrine-weighted fleet generation (≥90% Armoury capital) | **unmet** |
@@ -468,3 +468,110 @@ the M3 traverse re-driven end-to-end through the real map ops (`SD.Map.travel/ju
 endTurn`, canvas-button deploy click, `SD.Actions.checkEndgame`) with fuel numbers
 measured from live state, not quoted; Playwright suite re-run (`npx playwright test`,
 28/28); dirty `v105` main checkout left untouched.
+
+## 10. Gate review — M4 economy, stations, crew (2026-11-04)
+
+**Verdict: MET.** M4 (implementation `t_abaf9305`, releases v134/v135/v138/v139)
+is fully delivered on `origin/main` @ `03a5ceb`. Every roadmap §4 M4 deliverable
+and acceptance criterion re-verified independently by the reviewer — not from
+the implementer's report. M5 is released to start (its only other open edge,
+`t_39002303`, has its sprite items resolved upstream — see §10.6).
+
+### 10.1 Standing gates re-run (detached review worktree @ 03a5ceb = origin/main = v139)
+
+| Gate | Result |
+|---|---|
+| `node --check` (all 173 non-test `.js`) | clean |
+| `structure_audit.py` | 0 violations / 19 warnings; one-function check 0 |
+| `reference_audit.py` | legacy 6 / child-names 0 / doc-window 27 / import-direction 2 — **= baseline** |
+| in-page `?test`, fresh port 8471 (my worktree build) | 57/57 game + 5/5 audio, zero page errors |
+| live `https://…/v139/?test&bust=gatem4a` | 57/57 + 5/5 |
+| Playwright (`npx playwright test`) | 30 passed (1.6 m) |
+| ad-hoc harness (mine, real frozen tables) | 22/22 — `/tmp/hermes-verify-t_d7139481/verify-gate-m4.js` |
+
+### 10.2 M4 flows re-run independently (real canvas clicks, live state read back)
+
+- **Station hull buy (M4.3 browser criterion).** Real clicks: `STATION_OPEN`
+  (bottom-center) → `STATION_TAB:hulls` → `STATION_BUY:hull:Fighter`. Wallet
+  25000 → **24480** (−520 = the posted quote), fleet 5 → **6** (Fighter hp 2/2,
+  crew 5/5), cargo untouched; `SD.saveState`/`loadState` round-trip
+  JSON-identical. Independently reproduces the implementer's numbers exactly.
+- **Merchant rescue (M4.4).** Scenario setup: player tank set to 0 (stranded).
+  Real map-click move → rejected (`merchantFleetEvent`, reason `no-fuel`) →
+  `MERCHANT FLEET` storefront auto-opens with “PROVISIONS INFLATED — SALE AT A
+  DISCOUNT (NO-FUEL)”, fuel posted **BUY 7 / SELL 4** = round(5 × 1.3) /
+  round(5 × 0.7) — the ×1.3/×0.7 offer over the seeded mid price. Real-click
+  `BUY 50`: wallet 25000 → **24650** (−350 = 50 × 7), tank 0 → **50**. Repeat
+  the same move: the fleet **travels** (8,30 → 9.72,33.61 — capped at the
+  slowest ship), fuel 50 → 30, turn 1 → 2, `pendingMerchant` cleared. The full
+  “tank 50 at ×1.3 posted price, next move through” cycle holds.
+
+### 10.3 Roadmap §4 M4 deliverables / acceptance — verdicts
+
+| # | Criterion | Verdict | Evidence (mine) |
+|---|---|---|---|
+| M4.1 | Seeded prices; round-trip loses exactly the spread | **met** | harness A/B: same seed → identical table (8 wares × 3 locs × 3 times), seed+1 differs; buy-then-sell 5 × 43 = **215** loss exactly, gap = round(356 × 0.12) = 43; buying moves the next quote (356 → 359); illegal trades → `{state: null}` |
+| M4.2 | Casualty formula / 50% gate / monthly wages | **met** | `computeCrewLost` (M2 seam) intact; crewStatus strictly-under-half (4/8 ok, 3/8 incapacitated, unknown maxCrew ok); wages ceil(5 × 17.5) = 88 on the 30-turn tick; year rollover 2401/12 → 2402/1; unpaid 50 → 10 crew desert, Battleship (priciest) first |
+| M4.3 | Browser: buy a hull at a station | **met** | §10.2 real-click evidence; GOODS/HULLS/WEAPONS/SERVICE tabs with posted quotes; repair/refit parts costs exercised by in-page tests + Playwright `12-economy-station.spec.ts` |
+| M4.4 | Merchant-fleet flow wired | **met** | §10.2 rescue cycle; merchant = provisions crew/fuel ×1.3, buys anything ×0.7 at posted prices |
+
+### 10.4 Design §4.4 / §5.4 contracts
+
+- **File table:** `economy.js` stem + `priceAt`/`applyTrade`/`payWages`/
+  `buildStationModel`, `crewStatus`, `applyStationService` — all present with
+  the §5.4 spellings. Declared deviations accepted: (a) `buildMarketState` as
+  economy's 4th child (init/restore needs a market builder; siblings cannot
+  build each other — same injection shape as M3's `buildMapFn`); (b)
+  `applyTrade`'s optional injected `deps.unit` is internal — the stem's
+  `ApplyTrade(state, good, qty, location)` honors the documented 4-arg
+  interface by computing the quote itself (verified live).
+- **Crew gate on all three surfaces** (review requirement): *action* —
+  `actionLegality.able` wraps canMove/canShoot/canCapture/canShield and the
+  priority picker; *deployment* — `planDeployment.crewBlocked` (non-flagship)
+  + the reserve-summon gate, flagship exempt per adopted decision 2 (Q2);
+  *movement* — `moveFleet.js` rejects a map move on `flagship-crew-low`
+  (verified in code and covered by the rescue flow).
+- **R9 boundary:** prices/rates live only in `campaign_DATA.js`'s frozen trade
+  tables and reach the pure children as data; the wage tick is a pure
+  transform, the clock/storage effects stay in `main.js`. Seeded purity: the
+  four economy children contain no `Math.random`/`Date.now`/I/O (grep clean).
+- **Adopted decisions 1–6** (implementer's M4 block above) reviewed and
+  accepted as recorded.
+
+### 10.5 M1–M3 non-regression and release discipline
+
+- 57/57 in-page includes the M1 (roster conformance, state round-trip,
+  migration), M2 (battle/summon/deploy/credits-frozen, T-1…T-9) and M3
+  (map/fuel/hyperspace/visibility) suites; Playwright 30/30 spans boot, battle,
+  map and the new economy specs. Audits at baseline — no drift in M1–M3
+  surfaces.
+- v134/v135/v138/v139 (and collision lanes v132/v133, v136/v137): every tag +
+  branch + `main` on origin with matching SHAs (`git ls-remote`); `main` tip =
+  `v139` = `03a5ceb`; root 302 → `/v139/`, public `/v139/` 200. Three release
+  collisions handled per the runbook (fetch → rebase → next free vNN) —
+  recorded, not blocking.
+- **×100 economy sanity (spot-check):** real start package wallet 25000;
+  real start-fleet crews 88+5+5+10+5 = 113 → **565 ⒸB/month** wages; one
+  hyperspace jump ≈ 145 fuel units = **725 ⒸB** at base 5, 1740 ⒸB at the
+  table max 12. Worst-case jump + a month of wages = 2305 ⒸB ≈ 9% of the
+  starting wallet — comfortably affordable, and a full 500-unit tank tops out
+  at 6000 ⒸB. The ×100 scale is sane at the start; long-run balance remains
+  the roadmap's stated open risk.
+
+### 10.6 Non-blocking observations (for the next lanes)
+
+1. Two pre-M4 `Math.random` fallbacks remain in children: `game.js` `RND()`
+   (v96-era) and `buildSectorData.js` (M3) — the shipped flow always runs on
+   `State.rng`'s seeded stream, so nothing non-deterministic fires in play;
+   harden in the one-function sweep lane.
+2. T-9 BUDGET-AWARE PLANNING full-suite-context flake (pre-existing since
+   v133, 4/4 isolated) is the only open item on fix card `t_39002303` — its
+   sprite items 1–2 were resolved upstream by v136 (re-verified green here at
+   v139). The card is actively running (run 277) despite its
+   “do not dispatch” comment; its completion frees the M5 edge.
+3. Probe hygiene note: a synthetic strand (direct `map.fleets[].fuel` poke)
+   desyncs cargo.fuel from the map tank (they are two fields mirrored by
+   `_mirrorMapFleet` in real play — the +50 landed in both). Don't misread it
+   as a defect in future probes.
+4. Carry-over from §9.6: `game.js`, `hud.js`, `campaign_DATA.js`, `main.js`
+   remain shared-file hotspots for M5/M6 — keep updates small and rebased.
