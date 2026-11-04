@@ -24,7 +24,13 @@
 // pre-M5 payloads carry no mount list — backfill the hull's default loadout
 // through the injected reader (the loadout is the weapon truth). Entries
 // that already carry one pass through untouched (JSON-identity round trip).
-const restoreStateSave = function (DATA, stateBox, data, buildMapFn, buildMarketFn, loadoutFn){
+// M6 faction/missions migration: campaign sections from pre-M6 payloads
+// carry no player|faction reputation pairs (the pair table predates default
+// alignment) and no contracts section (missions postdate the save). Missing
+// player pairs seed at the injected pair-table builder's defaults — saved
+// scores always win — and the empty contract progress shape joins the
+// section. Saves already carrying both pass through untouched.
+const restoreStateSave = function (DATA, stateBox, data, buildMapFn, buildMarketFn, loadoutFn, buildRepFn){
   const PRE_M1_VERSION = "V58-1.0";
   const allowedKeys = new Set(Object.keys(DATA.initialState));
 
@@ -126,6 +132,23 @@ const restoreStateSave = function (DATA, stateBox, data, buildMapFn, buildMarket
     backfill(st.units);
     backfill(st.battleReserve);
     if (c && Array.isArray(c.fleet)) backfill(c.fleet);
+  }
+  // M6 faction/missions migration (see header): seed the missing
+  // player|faction reputation pairs at their defaults (saved scores always
+  // win) and add the empty contract progress shape. Pre-M6 saves are the
+  // only ones missing either; current saves pass through unchanged.
+  if (c) {
+    if (!c["reputation"] || typeof c["reputation"] !== "object") c["reputation"] = {};
+    if (typeof buildRepFn === "function") {
+      const seeded = buildRepFn() || {};
+      const keys = Object.keys(seeded);
+      for (let i = 0; i < keys.length; i++) {
+        if (c["reputation"][keys[i]] === undefined) c["reputation"][keys[i]] = seeded[keys[i]];
+      }
+    }
+    if (!c.contracts || typeof c.contracts !== "object") {
+      c.contracts = { active: [], done: [], progress: {}, campaignComplete: false };
+    }
   }
   return stateBox.current;
 };

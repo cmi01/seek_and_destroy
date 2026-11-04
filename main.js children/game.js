@@ -2989,7 +2989,8 @@ const api = {
       // M5: the loadout-migration reader bound over the seam + roster (a
       // hull name in, its default mount list out).
       const hullLoadout = hull => Outfitting.DefaultLoadout(SHIP_SPECS[hull] || null);
-      DeserializeGameState = data => stateLib.DeserializeGameState(_stateBox, data, buildMapSection, buildMarketSection, hullLoadout);
+      DeserializeGameState = data => stateLib.DeserializeGameState(_stateBox, data, buildMapSection, buildMarketSection, hullLoadout,
+        () => Reputation.Init(CAMPAIGN_DATA.campaign.factions, id => Factions.AlignmentOf(id)));
 
       // M1 campaign state: pure children over the campaign section only.
       // initializeCampaign() rebuilds State.campaign from the frozen

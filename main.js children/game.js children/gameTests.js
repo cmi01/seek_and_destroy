@@ -2037,6 +2037,49 @@ const runGameTests = function (bridge, testName) {
       };
     },
 
+    // T-M6f (M6): M5-era saves migrate — missing player|faction
+    // reputation pairs seed at their defaults (saved scores always win)
+    // and the contract progress shape joins the section; the version
+    // stamps M6-1.0 and a current save round-trips untouched.
+    testSaveMigration() {
+      const bad = [];
+      const m5 = {
+        version: "M5-1.0",
+        schema: "seek-and-destroy.beginning-game-state",
+        state: {
+          campaign: {
+            fleet: [],
+            wallet: 1234,
+            cargo: { goods: 1, fuel: 2, crew: 3, parts: 4, weapons: {} },
+            reputation: { "player|Syndicate": -55, "Syndicate|Capital": 7 },
+            clock: { month: 2, year: 2401 },
+            map: { locationId: "sol-gate", turn: 3 }
+          }
+        }
+      };
+      if (!bridge.loadState(m5)) bad.push("load-rejected");
+      const c = bridge.campaign;
+      const rep = c["reputation"] || {};
+      if (rep["player|Syndicate"] !== -55) bad.push("saved-score-lost=" + rep["player|Syndicate"]);
+      if (rep["player|Capital"] !== 20) bad.push("capital-seed=" + rep["player|Capital"]);
+      if (rep["Syndicate|Capital"] !== 7) bad.push("pair-kept=" + rep["Syndicate|Capital"]);
+      const contracts = c.contracts || {};
+      if (!Array.isArray(contracts.active) || !Array.isArray(contracts.done) || contracts.campaignComplete !== false) bad.push("contracts-shape");
+      const snap = bridge.saveState();
+      if (snap.version !== "M6-1.0") bad.push("version=" + snap.version);
+      if (c.wallet !== 1234) bad.push("wallet=" + c.wallet);
+      // A current save round-trips untouched (JSON identity).
+      const once = JSON.stringify(snap);
+      if (!bridge.loadState(snap)) bad.push("reload-rejected");
+      const twice = JSON.stringify(bridge.saveState());
+      if (once !== twice) bad.push("round-trip-differs");
+      return {
+        name: "M6f SAVE MIGRATION (M5-era -> M6-1.0)",
+        pass: bad.length === 0,
+        detail: "seeded=" + rep["player|Capital"] + " kept=" + rep["player|Syndicate"] + " version=" + snap.version + " issues=[" + bad.join("; ") + "]"
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -2073,7 +2116,8 @@ const runGameTests = function (bridge, testName) {
         this.testFactionFleetRolls(), this.testFactionDoctrineStats(), this.testFactionTableComplete(),
         this.testReputationBands(), this.testStanceAndSharing(), this.testReputationEvents(),
         this.testDialogueModel(), this.testDialogueOutcome(), this.testHailPanel(),
-        this.testMissionBoard(), this.testMissionPayout(), this.testMissionChainComplete()
+        this.testMissionBoard(), this.testMissionPayout(), this.testMissionChainComplete(),
+        this.testSaveMigration()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;
