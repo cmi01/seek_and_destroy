@@ -1322,6 +1322,114 @@ const runGameTests = function (bridge, testName) {
       };
     },
 
+    // ---- M5(a): the loadout seam (slot math, validation, readers) -----
+    // T-M5a-1: every frozen weapon row's slot field equals the formula
+    // (damage x range, x1.5 railguns, rounded) and known values pin it.
+    testOutfitSlotFormula() {
+      const ws = bridge.weapons;
+      const names = Object.keys(ws);
+      let bad = "";
+      for (const name of names) {
+        const got = bridge.loadoutSlots(ws[name]);
+        if (got !== ws[name].slots) bad += name + " " + got + "!=" + ws[name].slots + "; ";
+      }
+      const lightRail = bridge.loadoutSlots(ws["Light Railgun"]);
+      const heavyRail = bridge.loadoutSlots(ws["Heavy Railgun"]);
+      return {
+        name: "M5a-1 SLOT FORMULA PINS THE TABLE (15 rows)",
+        pass: bad === "" && lightRail === 14 && heavyRail === 23,
+        detail: "rows=" + names.length + " mismatches=[" + bad + "] lightRail=" + lightRail + " heavyRail=" + heavyRail
+      };
+    },
+
+    // T-M5a-2: validation accepts within capacity, rejects over capacity
+    // and unknown mounts.
+    testOutfitValidationCapacity() {
+      const specs = bridge.shipSpecs;
+      const fighter = specs["Fighter"];        // capacity 4
+      const probe = specs["Probe"];            // capacity 0, unarmed
+      const within = bridge.loadoutCheck(["Light Cannon", "Light Cannon"], fighter);   // 2 <= 4
+      const exact = bridge.loadoutCheck(["Dual Light Assault Cannon"], fighter);       // 4 <= 4
+      const over = bridge.loadoutCheck(["Dual Light Cannons"], fighter);               // 6 > 4
+      const unknown = bridge.loadoutCheck(["Nonexistent Blaster"], fighter);
+      const unarmedEmpty = bridge.loadoutCheck([], probe);
+      const unarmedOver = bridge.loadoutCheck(["Light Cannon"], probe);                // 1 > 0
+      const pass = Boolean(within.ok && exact.ok && !over.ok && over.reason &&
+        !unknown.ok && unknown.reason && unarmedEmpty.ok && !unarmedOver.ok &&
+        within.usedSlots === 2 && exact.usedSlots === 4 && over.usedSlots === 6 && over.capacity === 4);
+      return {
+        name: "M5a-2 LOADOUT VALIDATION: CAPACITY BOUNDARY (<= ok, > reject)",
+        pass: pass,
+        detail: "within=" + within.ok + " exact=" + exact.ok + " over=" + over.ok + "(" + over.reason + ")" +
+          " unknown=" + unknown.ok + " empty=" + unarmedEmpty.ok + " unarmedOver=" + unarmedOver.ok
+      };
+    },
+
+    // T-M5a-3: every hull's default loadout fills its capacity EXACTLY
+    // (DESIGN 3.3: capacity equals the slot total of the default loadout).
+    testOutfitDefaultsFit() {
+      const specs = bridge.shipSpecs;
+      const names = Object.keys(specs);
+      let bad = "";
+      for (const name of names) {
+        const spec = specs[name];
+        const load = bridge.loadoutDefault(spec);
+        const v = bridge.loadoutCheck(load, spec);
+        if (!v.ok || v.usedSlots !== spec.capacity) {
+          bad += name + " " + v.usedSlots + "/" + spec.capacity + "; ";
+        }
+      }
+      return {
+        name: "M5a-3 DEFAULT LOADOUTS FILL CAPACITY EXACTLY (22 hulls)",
+        pass: bad === "",
+        detail: "hulls=" + names.length + " mismatches=[" + bad + "]"
+      };
+    },
+
+    // T-M5a-4: the readers agree with the legacy single-weapon values and
+    // sum multi-weapon loadouts per weapon.
+    testOutfitReaderParity() {
+      const specs = bridge.shipSpecs;
+      let bad = "";
+      for (const name of Object.keys(specs)) {
+        const spec = specs[name];
+        const u = { loadout: bridge.loadoutDefault(spec) };
+        if (bridge.unitFp(u) !== spec.firepower) bad += name + " fp " + bridge.unitFp(u) + "!=" + spec.firepower + "; ";
+        if (bridge.unitRng(u) !== spec.range) bad += name + " rng " + bridge.unitRng(u) + "!=" + spec.range + "; ";
+      }
+      // Two different weapons on one hull: each keeps its own stats.
+      const mixed = { loadout: ["Light Missile Battery", "Unguided Torpedo"] };   // 8 + 7 = 15 slots
+      const v = bridge.loadoutCheck(mixed.loadout, specs["Missile Destroyer"]);   // capacity 16
+      const fp = bridge.unitFp(mixed);        // 1 + 7
+      const rng = bridge.unitRng(mixed);      // max(8, 1)
+      const arms = bridge.unitArsenal(mixed);
+      const mixedOk = Boolean(v.ok && fp === 8 && rng === 8 && arms.length === 2 &&
+        arms[0].name === "Light Missile Battery" && arms[0].class === "missile" && arms[0].dmg === 1 && arms[0].range === 8 &&
+        arms[1].name === "Unguided Torpedo" && arms[1].class === "missile" && arms[1].dmg === 7 && arms[1].range === 1);
+      return {
+        name: "M5a-4 READER PARITY + MULTI-WEAPON SUMS",
+        pass: bad === "" && mixedOk,
+        detail: "legacyParity=[" + bad + "] mixedFp=" + fp + " mixedRng=" + rng + " mixedOk=" + mixedOk
+      };
+    },
+
+    // T-M5a-5: readers hand out copies (no aliasing into the unit) and an
+    // unmigrated record reads as unarmed.
+    testOutfitReaderCopies() {
+      const u = { loadout: ["Light Cannon"] };
+      const a = bridge.unitLoadout(u);
+      a.push("Ultra Railgun");
+      const untouched = u.loadout.length === 1 && bridge.unitLoadout(u)[0] === "Light Cannon";
+      const bare = {};
+      const emptyOk = bridge.unitLoadout(bare).length === 0 && bridge.unitFp(bare) === 0 &&
+        bridge.unitRng(bare) === 0 && bridge.unitArsenal(bare).length === 0;
+      return {
+        name: "M5a-5 READERS COPY; UNMIGRATED RECORD READS UNARMED",
+        pass: untouched && emptyOk,
+        detail: "untouched=" + untouched + " emptyOk=" + emptyOk
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -1349,7 +1457,9 @@ const runGameTests = function (bridge, testName) {
         this.testStationHullBuySaveRoundTrip(),
         this.testCrewCasualtyFormula(), this.testCrewStatusGate(),
         this.testWagesMonthTick(),
-        this.testMerchantFlowRescue(), this.testMerchantSaleDiscount()
+        this.testMerchantFlowRescue(), this.testMerchantSaleDiscount(),
+        this.testOutfitSlotFormula(), this.testOutfitValidationCapacity(),
+        this.testOutfitDefaultsFit(), this.testOutfitReaderParity(), this.testOutfitReaderCopies()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;

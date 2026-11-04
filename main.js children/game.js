@@ -51,6 +51,7 @@ let LineOfSight = null;
 let VisionQueries = null;
 let ActionLegality = null;
 let CombatMath = null;
+let Outfitting = null;
 let ReservePlacement = null;
 let EndgameStatus = null;
 // The pure game.js children (single job each, registered below at load time).
@@ -2510,6 +2511,7 @@ const api = {
         "main.js children/game.js children/visionQueries.js",
         "main.js children/game.js children/actionLegality.js",
         "main.js children/game.js children/combatMath.js",
+        "main.js children/game.js children/outfitting.js",
         "main.js children/game.js children/reservePlacement.js",
         "main.js children/game.js children/endgameStatus.js",
         "main.js children/game.js children/materializeMirages.js",
@@ -2545,6 +2547,7 @@ const api = {
         themes:           typeof themes === "function" ? themes : null,
         rulesConfig:      typeof rulesConfig === "function" ? rulesConfig : null,
         combatMath:       typeof combatMath === "function" ? combatMath : null,
+        outfitting:       typeof outfitting === "function" ? outfitting : null,
         cameraMath:       typeof cameraMath === "function" ? cameraMath : null,
         selectionQueries: typeof selectionQueries === "function" ? selectionQueries : null,
         sectorGenerator:  typeof sectorGenerator === "function" ? sectorGenerator : null,
@@ -2583,6 +2586,7 @@ const api = {
         ["main.js children/game.js children/visionQueries.js",           kids.visionQueries],
         ["main.js children/game.js children/actionLegality.js",          kids.actionLegality],
         ["main.js children/game.js children/combatMath.js",              kids.combatMath],
+        ["main.js children/game.js children/outfitting.js",              kids.outfitting],
         ["main.js children/game.js children/reservePlacement.js",        kids.reservePlacement],
         ["main.js children/game.js children/endgameStatus.js",           kids.endgameStatus],
         ["main.js children/game.js children/materializeMirages.js",      kids.materializeMirages],
@@ -2671,6 +2675,9 @@ const api = {
       VisionQueries = kids.visionQueries(RULES_DATA);
       ActionLegality = kids.actionLegality();
       CombatMath = kids.combatMath(RULES_DATA);
+      // M5 loadout seam (roadmap-design §4.5): the only weapon-stat readers,
+      // bound over the frozen weapon table.
+      Outfitting = kids.outfitting(RULES_DATA.weapons);
       ReservePlacement = kids.reservePlacement(RULES_DATA);
       EndgameStatus = {
         checkEndgameStatus: kids.endgameStatus
@@ -3123,6 +3130,15 @@ const api = {
       deployPlan(fleet, cap, choice){ return ReservePlacement.splitOverflow(fleet, cap, choice); },
       wageTick(state){ return EconomyLib.PayWages(state); },
       clockTick(){ return _mapClockTick(); },
+      // M5(a) loadout seam: the slot math, validation and weapon readers
+      // (members renamed off the raw child stems — the audit counts raw text).
+      loadoutSlots(weapon){ return Outfitting.SlotSize(weapon); },
+      loadoutCheck(loadout, hull){ return Outfitting.Validate(loadout, hull); },
+      loadoutDefault(hull){ return Outfitting.DefaultLoadout(hull); },
+      unitLoadout(unit){ return Outfitting.LoadoutOf(unit); },
+      unitFp(unit){ return Outfitting.UnitFirepower(unit); },
+      unitRng(unit){ return Outfitting.UnitRange(unit); },
+      unitArsenal(unit){ return Outfitting.UnitWeapons(unit); },
       // M3(c) live-map seam (tests drive the orchestrator, not just the
       // pure children): set the map section, travel/jump the player through
       // the arrival check, commit a map turn (encounter → battle launch).
