@@ -1,0 +1,883 @@
+{
+  "method": {
+    "scene": "seeded sector (seed 1234), camera left-top (2,13), CSS 1024x768, canvas 758x758, viewSpan 5 (GS-12 close zoom) and 16 (design point), dpr 1 vs 2; new atlas = v132 (256px tiles), old atlas = v131 (106px tiles)",
+    "blit_size": "sprite draw size = ceil(displaySize / viewSpan * 2.2) CSS px (SPRITE_OVERDRAW_CELLS), x dpr for the device size",
+    "metrics": "edge_px = mean sub-pixel 10-90% transition width over the strongest 60 edges (relative gradient threshold, no bias against soft edges); min_edge_px = sharpest edge (the magnification floor); sharp_frac_le_2px = share of detected edges <= 2 device px; lap_var/lap_rms and grad_mean are supporting fine-structure measures"
+  },
+  "tile_source": {
+    "Fighter r1c0": {
+      "old_106_native": {
+        "size": [
+          106,
+          106
+        ],
+        "lap_var": 133.19251698184405,
+        "grad_mean": 1.1777272002997152,
+        "edge_px": 2.2356520736152117,
+        "min_edge_px": 1.1033750033134009,
+        "sharp_frac_le_2px": 0.3181818181818182,
+        "edge_samples": 44
+      },
+      "old_106_bilinear_to_256": {
+        "size": [
+          256,
+          256
+        ],
+        "lap_var": 4.403167417572022,
+        "grad_mean": 0.5174576958374957,
+        "edge_px": 3.564002136267264,
+        "min_edge_px": 2.5913572337907604,
+        "sharp_frac_le_2px": 0.0,
+        "edge_samples": 60
+      },
+      "new_256_native": {
+        "size": [
+          256,
+          256
+        ],
+        "lap_var": 169.16244366915896,
+        "grad_mean": 1.1960630422726395,
+        "edge_px": 1.6214836555386927,
+        "min_edge_px": 0.7999999999999998,
+        "sharp_frac_le_2px": 0.7666666666666667,
+        "edge_samples": 60
+      }
+    },
+    "Fighter r1c5": {
+      "old_106_native": {
+        "size": [
+          106,
+          106
+        ],
+        "lap_var": 75.7109970195799,
+        "grad_mean": 0.8927712859720517,
+        "edge_px": 2.2126635948055773,
+        "min_edge_px": 1.0824293052839906,
+        "sharp_frac_le_2px": 0.32558139534883723,
+        "edge_samples": 43
+      },
+      "old_106_bilinear_to_256": {
+        "size": [
+          256,
+          256
+        ],
+        "lap_var": 2.480562767425537,
+        "grad_mean": 0.39266251009538566,
+        "edge_px": 3.6307623816911936,
+        "min_edge_px": 2.626314652341303,
+        "sharp_frac_le_2px": 0.0,
+        "edge_samples": 60
+      },
+      "new_256_native": {
+        "size": [
+          256,
+          256
+        ],
+        "lap_var": 123.6500995701904,
+        "grad_mean": 0.9814486459308308,
+        "edge_px": 1.1438791369199461,
+        "min_edge_px": 0.7999999999999998,
+        "sharp_frac_le_2px": 1.0,
+        "edge_samples": 60
+      }
+    },
+    "Boarding APC r4c0": {
+      "old_106_native": {
+        "size": [
+          106,
+          106
+        ],
+        "lap_var": 239.87043940761833,
+        "grad_mean": 1.8217655807870041,
+        "edge_px": 2.239047335393569,
+        "min_edge_px": 0.8433123440144679,
+        "sharp_frac_le_2px": 0.32727272727272727,
+        "edge_samples": 55
+      },
+      "old_106_bilinear_to_256": {
+        "size": [
+          256,
+          256
+        ],
+        "lap_var": 9.505974908294679,
+        "grad_mean": 0.8052878760398692,
+        "edge_px": 3.354143912998038,
+        "min_edge_px": 2.3240962053512764,
+        "sharp_frac_le_2px": 0.0,
+        "edge_samples": 60
+      },
+      "new_256_native": {
+        "size": [
+          256,
+          256
+        ],
+        "lap_var": 258.43707499621587,
+        "grad_mean": 1.7864246969428987,
+        "edge_px": 1.2017935598047766,
+        "min_edge_px": 0.7999999999999998,
+        "sharp_frac_le_2px": 1.0,
+        "edge_samples": 60
+      }
+    },
+    "Battlecruiser r14c0": {
+      "old_106_native": {
+        "size": [
+          106,
+          106
+        ],
+        "lap_var": 369.5055005468137,
+        "grad_mean": 2.493487844995951,
+        "edge_px": 2.5543684350743,
+        "min_edge_px": 1.456735479530662,
+        "sharp_frac_le_2px": 0.26666666666666666,
+        "edge_samples": 60
+      },
+      "old_106_bilinear_to_256": {
+        "size": [
+          256,
+          256
+        ],
+        "lap_var": 13.880516781890867,
+        "grad_mean": 1.1521958686699918,
+        "edge_px": 3.1427817435046106,
+        "min_edge_px": 1.6605743044134216,
+        "sharp_frac_le_2px": 0.016666666666666666,
+        "edge_samples": 60
+      },
+      "new_256_native": {
+        "size": [
+          256,
+          256
+        ],
+        "lap_var": 365.91635548669433,
+        "grad_mean": 1.9506181188046203,
+        "edge_px": 0.8050046038056557,
+        "min_edge_px": 0.7999999999999998,
+        "sharp_frac_le_2px": 1.0,
+        "edge_samples": 60
+      }
+    },
+    "Flagship Battlecruiser r17c0": {
+      "old_106_native": {
+        "size": [
+          106,
+          106
+        ],
+        "lap_var": 766.6785513536846,
+        "grad_mean": 2.986483351697706,
+        "edge_px": 2.500770757264251,
+        "min_edge_px": 1.100123781054692,
+        "sharp_frac_le_2px": 0.31666666666666665,
+        "edge_samples": 60
+      },
+      "old_106_bilinear_to_256": {
+        "size": [
+          256,
+          256
+        ],
+        "lap_var": 24.922518614074704,
+        "grad_mean": 1.413937195073961,
+        "edge_px": 2.922201532677868,
+        "min_edge_px": 2.0315406937097893,
+        "sharp_frac_le_2px": 0.0,
+        "edge_samples": 60
+      },
+      "new_256_native": {
+        "size": [
+          256,
+          256
+        ],
+        "lap_var": 426.87693952154535,
+        "grad_mean": 2.408152643562216,
+        "edge_px": 0.8050046038056557,
+        "min_edge_px": 0.7999999999999998,
+        "sharp_frac_le_2px": 1.0,
+        "edge_samples": 60
+      }
+    }
+  },
+  "blit": {
+    "span5_dpr1": {
+      "blit_device_px": 334,
+      "old_source_px": 106,
+      "new_source_px": 256,
+      "old_device_px_per_source_px": 3.150943396226415,
+      "new_device_px_per_source_px": 1.3046875,
+      "Fighter r1c0": {
+        "old_bilinear_blit": {
+          "size": [
+            334,
+            334
+          ],
+          "lap_var": 2.0750672014235,
+          "grad_mean": 0.4048856234605849,
+          "edge_px": 3.7303880172181505,
+          "min_edge_px": 2.7172919945770726,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        },
+        "new_bilinear_blit": {
+          "size": [
+            334,
+            334
+          ],
+          "lap_var": 42.134138479938315,
+          "grad_mean": 0.9136063167044737,
+          "edge_px": 1.8931460513758671,
+          "min_edge_px": 1.4590200017141033,
+          "sharp_frac_le_2px": 0.4,
+          "edge_samples": 60
+        }
+      },
+      "Fighter r1c5": {
+        "old_bilinear_blit": {
+          "size": [
+            334,
+            334
+          ],
+          "lap_var": 1.1675491557603355,
+          "grad_mean": 0.30739772523131553,
+          "edge_px": 3.8018941021784274,
+          "min_edge_px": 2.6965528065082722,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        },
+        "new_bilinear_blit": {
+          "size": [
+            334,
+            334
+          ],
+          "lap_var": 31.832851232439307,
+          "grad_mean": 0.7479053206193685,
+          "edge_px": 1.8845580171833334,
+          "min_edge_px": 1.46942141254423,
+          "sharp_frac_le_2px": 0.4,
+          "edge_samples": 60
+        }
+      },
+      "Boarding APC r4c0": {
+        "old_bilinear_blit": {
+          "size": [
+            334,
+            334
+          ],
+          "lap_var": 4.253242310337409,
+          "grad_mean": 0.6323765767803564,
+          "edge_px": 3.304574653294389,
+          "min_edge_px": 2.793703884539772,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        },
+        "new_bilinear_blit": {
+          "size": [
+            334,
+            334
+          ],
+          "lap_var": 65.94581083052456,
+          "grad_mean": 1.3694895103721767,
+          "edge_px": 2.0361030419873734,
+          "min_edge_px": 1.3505154102454586,
+          "sharp_frac_le_2px": 0.23333333333333334,
+          "edge_samples": 60
+        }
+      },
+      "Battlecruiser r14c0": {
+        "old_bilinear_blit": {
+          "size": [
+            334,
+            334
+          ],
+          "lap_var": 6.349466938416579,
+          "grad_mean": 0.9068302111630878,
+          "edge_px": 3.344866778389617,
+          "min_edge_px": 2.8103029653710827,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        },
+        "new_bilinear_blit": {
+          "size": [
+            334,
+            334
+          ],
+          "lap_var": 93.7354235496253,
+          "grad_mean": 1.4922494757757483,
+          "edge_px": 1.5537945910396427,
+          "min_edge_px": 1.5537945910396425,
+          "sharp_frac_le_2px": 1.0,
+          "edge_samples": 60
+        }
+      },
+      "Flagship Battlecruiser r17c0": {
+        "old_bilinear_blit": {
+          "size": [
+            334,
+            334
+          ],
+          "lap_var": 10.924818248431281,
+          "grad_mean": 1.1196521086396656,
+          "edge_px": 3.3369890756087717,
+          "min_edge_px": 2.3004355557733462,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        },
+        "new_bilinear_blit": {
+          "size": [
+            334,
+            334
+          ],
+          "lap_var": 111.40020674371615,
+          "grad_mean": 1.8320200812008915,
+          "edge_px": 1.5106149522551935,
+          "min_edge_px": 1.4337483952484074,
+          "sharp_frac_le_2px": 1.0,
+          "edge_samples": 60
+        }
+      }
+    },
+    "span5_dpr2": {
+      "blit_device_px": 668,
+      "old_source_px": 106,
+      "new_source_px": 256,
+      "old_device_px_per_source_px": 6.30188679245283,
+      "new_device_px_per_source_px": 2.609375,
+      "Fighter r1c0": {
+        "old_bilinear_blit": {
+          "size": [
+            668,
+            668
+          ],
+          "lap_var": 0.27014213301391227,
+          "grad_mean": 0.20817732707267583,
+          "edge_px": 4.226923686813193,
+          "min_edge_px": 3.436546995105962,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        },
+        "new_bilinear_blit": {
+          "size": [
+            668,
+            668
+          ],
+          "lap_var": 5.3558369861145945,
+          "grad_mean": 0.46676789667805546,
+          "edge_px": 2.9975696643486947,
+          "min_edge_px": 2.341718377671227,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        }
+      },
+      "Fighter r1c5": {
+        "old_bilinear_blit": {
+          "size": [
+            668,
+            668
+          ],
+          "lap_var": 0.16223777016924237,
+          "grad_mean": 0.15808595646535745,
+          "edge_px": 4.262506848821924,
+          "min_edge_px": 3.4338152130260076,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 40
+        },
+        "new_bilinear_blit": {
+          "size": [
+            668,
+            668
+          ],
+          "lap_var": 3.9792913110366093,
+          "grad_mean": 0.3823980814970295,
+          "edge_px": 2.9763314757304338,
+          "min_edge_px": 2.3447049557593354,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        }
+      },
+      "Boarding APC r4c0": {
+        "old_bilinear_blit": {
+          "size": [
+            668,
+            668
+          ],
+          "lap_var": 0.5381599508632436,
+          "grad_mean": 0.32455481992806967,
+          "edge_px": 3.7156470896206453,
+          "min_edge_px": 3.4206854716408857,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        },
+        "new_bilinear_blit": {
+          "size": [
+            668,
+            668
+          ],
+          "lap_var": 8.846617338740181,
+          "grad_mean": 0.6919575202454094,
+          "edge_px": 2.8327499550477353,
+          "min_edge_px": 2.3344898252615405,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        }
+      },
+      "Battlecruiser r14c0": {
+        "old_bilinear_blit": {
+          "size": [
+            668,
+            668
+          ],
+          "lap_var": 0.8020423981005056,
+          "grad_mean": 0.4719116890364176,
+          "edge_px": 3.9437019673083147,
+          "min_edge_px": 3.2314000877276006,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        },
+        "new_bilinear_blit": {
+          "size": [
+            668,
+            668
+          ],
+          "lap_var": 11.915805246929793,
+          "grad_mean": 0.7665313276528083,
+          "edge_px": 2.2774912244060954,
+          "min_edge_px": 2.2774912244060945,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        }
+      },
+      "Flagship Battlecruiser r17c0": {
+        "old_bilinear_blit": {
+          "size": [
+            668,
+            668
+          ],
+          "lap_var": 1.3219478270106497,
+          "grad_mean": 0.5889761812349148,
+          "edge_px": 3.9982316393576514,
+          "min_edge_px": 3.1976066149218685,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        },
+        "new_bilinear_blit": {
+          "size": [
+            668,
+            668
+          ],
+          "lap_var": 14.393336043090468,
+          "grad_mean": 0.9370062804024728,
+          "edge_px": 2.3222533195712716,
+          "min_edge_px": 2.311586930435948,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        }
+      }
+    },
+    "span16_dpr1": {
+      "blit_device_px": 105,
+      "old_source_px": 106,
+      "new_source_px": 256,
+      "old_device_px_per_source_px": 0.9905660377358491,
+      "new_device_px_per_source_px": 0.41015625,
+      "Fighter r1c0": {
+        "old_bilinear_blit": {
+          "size": [
+            105,
+            105
+          ],
+          "lap_var": 43.79702349297052,
+          "grad_mean": 1.1082726399300127,
+          "edge_px": 2.4468271473996164,
+          "min_edge_px": 1.7041468584184858,
+          "sharp_frac_le_2px": 0.1388888888888889,
+          "edge_samples": 36
+        },
+        "new_bilinear_blit": {
+          "size": [
+            105,
+            105
+          ],
+          "lap_var": 197.4748519042177,
+          "grad_mean": 2.5505561326834565,
+          "edge_px": 2.0579556175683367,
+          "min_edge_px": 1.2642953825857517,
+          "sharp_frac_le_2px": 0.6166666666666667,
+          "edge_samples": 60
+        }
+      },
+      "Fighter r1c5": {
+        "old_bilinear_blit": {
+          "size": [
+            105,
+            105
+          ],
+          "lap_var": 24.599535508208614,
+          "grad_mean": 0.8407131793318419,
+          "edge_px": 2.4681442126432973,
+          "min_edge_px": 1.6858288304664693,
+          "sharp_frac_le_2px": 0.13513513513513514,
+          "edge_samples": 37
+        },
+        "new_bilinear_blit": {
+          "size": [
+            105,
+            105
+          ],
+          "lap_var": 141.68325320761903,
+          "grad_mean": 2.072732871563447,
+          "edge_px": 2.0429001545145704,
+          "min_edge_px": 1.2726270469122927,
+          "sharp_frac_le_2px": 0.6333333333333333,
+          "edge_samples": 60
+        }
+      },
+      "Boarding APC r4c0": {
+        "old_bilinear_blit": {
+          "size": [
+            105,
+            105
+          ],
+          "lap_var": 92.53660711256236,
+          "grad_mean": 1.6860634979566282,
+          "edge_px": 2.7489746037301823,
+          "min_edge_px": 1.5901454135387203,
+          "sharp_frac_le_2px": 0.13043478260869565,
+          "edge_samples": 46
+        },
+        "new_bilinear_blit": {
+          "size": [
+            105,
+            105
+          ],
+          "lap_var": 261.4079127798639,
+          "grad_mean": 3.8843057950019797,
+          "edge_px": 1.8288451109743054,
+          "min_edge_px": 1.4628144306324593,
+          "sharp_frac_le_2px": 0.8833333333333333,
+          "edge_samples": 60
+        }
+      },
+      "Battlecruiser r14c0": {
+        "old_bilinear_blit": {
+          "size": [
+            105,
+            105
+          ],
+          "lap_var": 119.29756474612243,
+          "grad_mean": 2.288630827186157,
+          "edge_px": 2.637227762975898,
+          "min_edge_px": 1.5999544183176004,
+          "sharp_frac_le_2px": 0.13333333333333333,
+          "edge_samples": 60
+        },
+        "new_bilinear_blit": {
+          "size": [
+            105,
+            105
+          ],
+          "lap_var": 390.7551524848979,
+          "grad_mean": 4.039749874090247,
+          "edge_px": 1.5893767229722007,
+          "min_edge_px": 1.3226042058954515,
+          "sharp_frac_le_2px": 0.9333333333333333,
+          "edge_samples": 60
+        }
+      },
+      "Flagship Battlecruiser r17c0": {
+        "old_bilinear_blit": {
+          "size": [
+            105,
+            105
+          ],
+          "lap_var": 203.6384207321542,
+          "grad_mean": 2.666832497427613,
+          "edge_px": 2.4641046243649987,
+          "min_edge_px": 1.5078639898022779,
+          "sharp_frac_le_2px": 0.3333333333333333,
+          "edge_samples": 60
+        },
+        "new_bilinear_blit": {
+          "size": [
+            105,
+            105
+          ],
+          "lap_var": 409.1489931381406,
+          "grad_mean": 5.09329101957514,
+          "edge_px": 1.8193908958310543,
+          "min_edge_px": 1.5730778144311315,
+          "sharp_frac_le_2px": 0.9666666666666667,
+          "edge_samples": 60
+        }
+      }
+    },
+    "span16_dpr2": {
+      "blit_device_px": 210,
+      "old_source_px": 106,
+      "new_source_px": 256,
+      "old_device_px_per_source_px": 1.9811320754716981,
+      "new_device_px_per_source_px": 0.8203125,
+      "Fighter r1c0": {
+        "old_bilinear_blit": {
+          "size": [
+            210,
+            210
+          ],
+          "lap_var": 6.650949588480724,
+          "grad_mean": 0.6167610264289011,
+          "edge_px": 3.4091627151286263,
+          "min_edge_px": 2.05694798372748,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        },
+        "new_bilinear_blit": {
+          "size": [
+            210,
+            210
+          ],
+          "lap_var": 93.23290393496595,
+          "grad_mean": 1.4153633241968993,
+          "edge_px": 2.094291678681681,
+          "min_edge_px": 1.5413764296438797,
+          "sharp_frac_le_2px": 0.43333333333333335,
+          "edge_samples": 60
+        }
+      },
+      "Fighter r1c5": {
+        "old_bilinear_blit": {
+          "size": [
+            210,
+            210
+          ],
+          "lap_var": 3.706857332607709,
+          "grad_mean": 0.46805204241256837,
+          "edge_px": 3.4838573390337855,
+          "min_edge_px": 2.2349820856311187,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 59
+        },
+        "new_bilinear_blit": {
+          "size": [
+            210,
+            210
+          ],
+          "lap_var": 71.65930425582765,
+          "grad_mean": 1.157785237928339,
+          "edge_px": 1.3379866343244269,
+          "min_edge_px": 1.0703061855951415,
+          "sharp_frac_le_2px": 1.0,
+          "edge_samples": 60
+        }
+      },
+      "Boarding APC r4c0": {
+        "old_bilinear_blit": {
+          "size": [
+            210,
+            210
+          ],
+          "lap_var": 15.164049222040816,
+          "grad_mean": 0.9612362301338268,
+          "edge_px": 3.364006008581756,
+          "min_edge_px": 2.1293878165185585,
+          "sharp_frac_le_2px": 0.0,
+          "edge_samples": 60
+        },
+        "new_bilinear_blit": {
+          "size": [
+            210,
+            210
+          ],
+          "lap_var": 119.97080364956915,
+          "grad_mean": 2.1421511306032004,
+          "edge_px": 1.9735508260546297,
+          "min_edge_px": 1.042770431723652,
+          "sharp_frac_le_2px": 0.5,
+          "edge_samples": 60
+        }
+      },
+      "Battlecruiser r14c0": {
+        "old_bilinear_blit": {
+          "size": [
+            210,
+            210
+          ],
+          "lap_var": 21.836898542267573,
+          "grad_mean": 1.3526182186782478,
+          "edge_px": 3.0418469753882964,
+          "min_edge_px": 1.694344143349694,
+          "sharp_frac_le_2px": 0.016666666666666666,
+          "edge_samples": 60
+        },
+        "new_bilinear_blit": {
+          "size": [
+            210,
+            210
+          ],
+          "lap_var": 206.96891159709745,
+          "grad_mean": 2.2723774753494914,
+          "edge_px": 1.2031394555788684,
+          "min_edge_px": 1.1161253968325404,
+          "sharp_frac_le_2px": 1.0,
+          "edge_samples": 60
+        }
+      },
+      "Flagship Battlecruiser r17c0": {
+        "old_bilinear_blit": {
+          "size": [
+            210,
+            210
+          ],
+          "lap_var": 38.99875345623583,
+          "grad_mean": 1.6443445535088663,
+          "edge_px": 2.819320121304836,
+          "min_edge_px": 1.6177752994965182,
+          "sharp_frac_le_2px": 0.06666666666666667,
+          "edge_samples": 60
+        },
+        "new_bilinear_blit": {
+          "size": [
+            210,
+            210
+          ],
+          "lap_var": 178.1566557882086,
+          "grad_mean": 2.799788322050565,
+          "edge_px": 1.4548743656400045,
+          "min_edge_px": 1.009318372191951,
+          "sharp_frac_le_2px": 0.8333333333333334,
+          "edge_samples": 60
+        }
+      }
+    }
+  },
+  "scene_masked": {
+    "span5": {
+      "viewSpan": 5,
+      "flagship_cell": [
+        4,
+        15
+      ],
+      "view_origin_cell": [
+        2,
+        13
+      ],
+      "new_v132_dpr1": {
+        "mask_px": 21522,
+        "lap_rms": 15.172890871706095,
+        "grad_mean": 3.882716861223454,
+        "edge_px": 2.3401512578713297,
+        "min_edge_px": 1.271403241939113,
+        "sharp_frac_le_2px": 0.4166666666666667,
+        "edge_samples": 60
+      },
+      "new_v132_dpr2": {
+        "mask_px": 90497,
+        "lap_rms": 10.660504688936452,
+        "grad_mean": 2.540505686307279,
+        "edge_px": 1.7171810433302341,
+        "min_edge_px": 0.856946446648724,
+        "sharp_frac_le_2px": 0.8,
+        "edge_samples": 60
+      },
+      "old_v131_dpr1": {
+        "mask_px": 6299,
+        "lap_rms": 34.54576327452096,
+        "grad_mean": 11.954310710970335,
+        "edge_px": 2.718086276665482,
+        "min_edge_px": 0.8292930423629397,
+        "sharp_frac_le_2px": 0.18181818181818182,
+        "edge_samples": 33
+      },
+      "old_v131_dpr2": {
+        "mask_px": 43527,
+        "lap_rms": 22.356970373853333,
+        "grad_mean": 6.810589704418658,
+        "edge_px": 3.385707131921287,
+        "min_edge_px": 1.3068199574230444,
+        "sharp_frac_le_2px": 0.07017543859649122,
+        "edge_samples": 57
+      },
+      "new_v132_dpr1_x2_bilinear": {
+        "mask_px": 86088,
+        "lap_rms": 3.662182272265474,
+        "grad_mean": 2.057215087283411,
+        "edge_px": 3.1166649643668296,
+        "min_edge_px": 1.6305443735682412,
+        "sharp_frac_le_2px": 0.05,
+        "edge_samples": 60
+      },
+      "old_v131_dpr1_x2_bilinear": {
+        "mask_px": 25196,
+        "lap_rms": 8.088814895952282,
+        "grad_mean": 6.1607950570364585,
+        "edge_px": 3.6817354758775513,
+        "min_edge_px": 2.166308067321957,
+        "sharp_frac_le_2px": 0.0,
+        "edge_samples": 60
+      },
+      "downsample_match_mean_abs_rgb": 4.352865825217034
+    },
+    "span16": {
+      "viewSpan": 16,
+      "flagship_cell": [
+        4,
+        15
+      ],
+      "view_origin_cell": [
+        2,
+        13
+      ],
+      "new_v132_dpr1": {
+        "mask_px": 1469,
+        "lap_rms": 36.19534428409421,
+        "grad_mean": 10.49036245244791,
+        "edge_px": 1.802354890144565,
+        "min_edge_px": 0.8020276640342767,
+        "sharp_frac_le_2px": 0.6666666666666666,
+        "edge_samples": 21
+      },
+      "new_v132_dpr2": {
+        "mask_px": 7669,
+        "lap_rms": 35.97938899725586,
+        "grad_mean": 11.25270929040526,
+        "edge_px": 1.6847189908895965,
+        "min_edge_px": 1.0792637303170052,
+        "sharp_frac_le_2px": 0.85,
+        "edge_samples": 60
+      },
+      "old_v131_dpr1": {
+        "mask_px": 679,
+        "lap_rms": 63.78972451346441,
+        "grad_mean": 20.433288101420157,
+        "edge_px": NaN,
+        "min_edge_px": NaN,
+        "sharp_frac_le_2px": 0.0,
+        "edge_samples": 0
+      },
+      "old_v131_dpr2": {
+        "mask_px": 4098,
+        "lap_rms": 36.6207878201217,
+        "grad_mean": 14.382540164149491,
+        "edge_px": 2.494781830362695,
+        "min_edge_px": 2.0928980336091505,
+        "sharp_frac_le_2px": 0.0,
+        "edge_samples": 15
+      },
+      "new_v132_dpr1_x2_bilinear": {
+        "mask_px": 5876,
+        "lap_rms": 8.087543228221152,
+        "grad_mean": 5.521527159666295,
+        "edge_px": 3.264144050920381,
+        "min_edge_px": 1.0332542247469978,
+        "sharp_frac_le_2px": 0.058823529411764705,
+        "edge_samples": 51
+      },
+      "old_v131_dpr1_x2_bilinear": {
+        "mask_px": 2716,
+        "lap_rms": 13.898646486624589,
+        "grad_mean": 10.852718882370212,
+        "edge_px": 2.7351362266045536,
+        "min_edge_px": 2.2167576974516745,
+        "sharp_frac_le_2px": 0.0,
+        "edge_samples": 13
+      },
+      "downsample_match_mean_abs_rgb": 0.7547195206568227
+    }
+  }
+}

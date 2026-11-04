@@ -281,7 +281,7 @@ offsetWidth is displaySize+2 (1px border outside the content box).
 | GS-09 | pass | pass | pass | pass | pass at DS 200 | `v108/win200-endgame.png` | `v105/win200-endgame.png` | verified |
 | GS-10 | pass | pass | pass | pass | pass at 250% and DS 200 | `v108/win200-bridge.png` | `v105/win200-bridge.png` | verified |
 | GS-11 | pass | pass | pass | pass | pass at DS 200 | `v108/win200-campaign.png` | `v105/win200-campaign.png` | verified |
-| GS-12 | — | — | — | — | terrain fixed in v111 (atlas still deferred) | `v105/dpr1-span5.png`, `v105/dpr2-span5.png` | same | terrain: see Verification (v111) |
+| GS-12 | — | — | — | — | terrain fixed in v111; sprite atlas 256px since v132, dpr-2 detail comparison verified | `v133/gs12-sprite-comparison/gs12-scene-sidebyside-span5.png` | `v105/dpr1-span5.png`, `v105/dpr2-span5.png` | verified — terrain see Verification (v111), sprites see Verification (v133) |
 | GS-13 | pass | pass | pass | pass | hairline follows `max(1/rs, 1×uiScale)` in the layout check | `v108/win200-base.png` | `v105/win200-base.png` | verified |
 
 Visual read of `v108/os100-campaign.png`: subtitle ends with a period (`…secure it.`), button is `CLOSE [ESC]`. `v105/os100-campaign.png` still shows `CLOSE [...]` and an ellipsized subtitle. `v108/os125-endgame.png`: `REDEPLOY SECTOR` and `SECTOR MAP` complete, body above the buttons. `v108/win200-help.png`: panel and `CLOSE` on the canvas.
@@ -292,9 +292,13 @@ Ad-hoc, not "the suite is green": `node --check` on the new script; `structure_a
 
 ### Follow-ups
 
-GS-12 terrain is fixed in v111 (tile cache). Remaining:
+GS-12 terrain is fixed in v111 (tile cache); the sprite atlas was
+regenerated at 256px tiles in v132 and the dpr-1 vs dpr-2 detail comparison
+is verified in v133 (see its Verification section). Remaining:
 
-- https://github.com/cmi01/seek_and_destroy/issues/3 — higher-resolution sprite atlas (no art source)
+- https://github.com/cmi01/seek_and_destroy/issues/3 — higher-resolution
+  sprite atlas: content landed (v132) and verified (v133); closing the
+  issue is tracked by the wrap-up card.
 
 The optional `Math.max` floor checker is still not in `structure_audit.py`.
 
@@ -346,3 +350,56 @@ behaviour is unchanged until the new atlas lands. `structure_audit` 0
 violations / 17 warnings (18 before — objectRenderer.js is now under 300
 lines); `reference_policy_check` 0; `reference_audit` 0 child-names / 27
 doc-window / 2 import-direction = baseline.
+
+## Verification (v133)
+
+GS-12 sprite half: the dpr-1 vs dpr-2 comparison of the atlas regenerated at
+256px tiles in v132. Artefacts (renders, side-by-side panels, measurements):
+`dev/docs/gui-scaling-audit-screenshots/v133/gs12-sprite-comparison/` — the
+report in that directory's `README.md` carries the full tables; summary
+below.
+
+Method: the same scene (seeded sector 1234, camera over the player
+formation, CSS 1024x768, 758x758 canvas) rendered at dpr 1 and dpr 2 at
+viewSpan 5 (the GS-12 close zoom) and viewSpan 16 (the atlas design point),
+on the v132 tree (256px atlas) and the v131 tree (106px atlas — the
+pre-change baseline; the trees differ only in the atlas and
+`SPRITE_ATLAS_TILE_PX`). Sharpness is measured on sprite-layer pixels only
+(masked by a sprite-off re-render) as mean sub-pixel 10-90% edge transition
+width over the strongest 60 edges, plus the share of edges <= 2 device px.
+
+Result — the dpr-2 render carries genuine added detail, not a smoother
+upscale of the old tiles:
+
+- At viewSpan 5 / dpr 2 the sprite draws 668 device px (the old 106px tile
+  is magnified 6.30x, the new 256px tile 2.61x). Masked sprite edges in the
+  dpr-2 render measure **1.72px mean, 80% <= 2px** vs **3.39px / 7%** for the
+  old-atlas dpr-2 render (which is the old tiles bilinear-upscaled at the
+  same on-screen size) and **3.12px / 5%** for a bilinear 2x upscale of the
+  new atlas's own dpr-1 capture (the "smoother upscale" control).
+- At viewSpan 16 / dpr 2 (210 device px) the same ordering holds:
+  **1.68px / 85%** vs 2.49px / 0% (old atlas) and 3.26px / 5.9% (dpr-1 x2
+  control).
+- Blit-level (tile bilinear-scaled to the exact on-screen device size,
+  5 sprite slots x 2 spans x 2 dprs): the new atlas is sharper in every
+  combination — e.g. span 5 / dpr 2 mean edge 2.28-3.00px vs 3.72-4.26px,
+  sharpest edge <= 2.34px vs >= 3.20px.
+- The new atlas is not a resample of the old one: bilinearly upscaling the
+  old 106px tiles to 256px gives 2.92-3.63px mean edges (interpolation blur)
+  where the new tiles measure 0.81-1.62px native, and the art differs
+  entirely (`gs12-tile-sidebyside.png`).
+- The harness GS-12 statistic (dpr-2 capture BOX-downsampled 2x vs the dpr-1
+  capture, centre crop) measures **4.35** at viewSpan 5 and **0.75** at
+  viewSpan 16 — both far above the v105 no-information baseline of 0.05.
+
+Visuals: `gs12-scene-sidebyside-span5.png` /
+`gs12-scene-sidebyside-span16.png` (old atlas dpr 2 | new atlas dpr 1 x2 |
+new atlas dpr 2) and `gs12-detail-zoom-span5.png` (hull detail: panel
+lines, engine blocks and sensor shapes resolve in the new dpr-2 render and
+smear in the old).
+
+Checks with this change: `gui_scale_layout_check.js` ALL PASS (100-250% +
+DS 200/400/768/1440), `gui_scale_browser_check.py` ALL PASS (12 rows, shots
+in `v133/`), `structure_audit.py` 0 violations, `reference_policy_check.py`
+0 violations, `node --check` clean (no game code changed in v133; the atlas
+and `SPRITE_ATLAS_TILE_PX` change itself is v132's).
