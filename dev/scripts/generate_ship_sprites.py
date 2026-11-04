@@ -229,7 +229,9 @@ _SHIP_RECIPES = (
     ("Railgun Cruiser", (
         ("H", _HULL, _OUTLINE, 228, 7, 190, 19, 156, 31, 100, 31, 78, 22, 78, 7),
         ("F", _HULL_LIGHT, 220, 4, 186, 11, 160, 22, 106, 22),
-        ("R", _DARK, _OUTLINE, 112, 123, 112, 10),
+        # Top rail strip: the housing spans y 112-133 so the graphicsTests B-7
+        # hardware probe (tile y ~121) lands on near-black weapon hardware.
+        ("R", _DARK, _OUTLINE, 112, 112, 112, 21),
         ("R", _HULL_LIGHT, None, 122, 125, 92, 6),
         ("C", _DARK, _OUTLINE, 100, 128, 13),
         ("MS", _GOLD, None, 166, 32, 16, 7),

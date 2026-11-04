@@ -37,7 +37,15 @@ team 1 (cols 0–3) is the base duotoned into the team-1 hull ramp; team 2
 `-moved` scales luminance ×0.82 and `-attacked` ×0.90 (compound) so spent ships
 read dimmer. Gold/red/orange accents (hue 12–70°/≥335°, saturated) and near-white
 / near-black details pass through unremapped — their gameplay meaning is
-constant across themes.
+constant across themes. The near-black band covers the recipe palette's
+hardware colours (`#14171c` guns/windows, value 0.110) and the `#2b313a`
+hardware outlines (within a small tolerance), so weapon hardware is
+faction-neutral gunmetal in both team frames (`graphicsTests` B-7).
+`-moved` frames (cols 2/3/6/7) additionally carry the classic spent outline:
+a `#aab4bd` rim on the silhouette edge, matching the pre-regeneration atlas
+(`graphicsTests` B-8) — the rim is what makes the exhausted state read at a
+glance, especially on short theme ramps where the ×0.82 mean-luminance drop
+alone compresses below 2%.
 
 **Provenance (documented deviation):** the base sprites are procedurally
 rendered vector art (`generate_ship_sprites.py`), not image-model output. Every

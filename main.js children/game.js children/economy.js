@@ -5,9 +5,10 @@
 // per-operation children (market build / seeded price / trade / wages).
 // Owner: game.js. Holds no state unless it is a core.
 //
-// M4 boundary (roadmap-design §4.4/§5.4): prices and rates live in
-// campaign_DATA.js only (R9) and reach these children as the frozen trade
-// table / seeded market state. Sibling functions never reference each
+// M4 boundary (roadmap-design §4.4/§5.4): prices and rates live in the
+// campaign data module's frozen table only (R9) and reach these children
+// as the frozen trade table / seeded market state. Sibling functions never
+// reference each
 // other — the composer injects the child price into the trade applier the
 // same way the map composer injects its cost function. Transforms return
 // NEW state; game.js applies it.

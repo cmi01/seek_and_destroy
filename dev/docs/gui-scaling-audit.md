@@ -403,3 +403,40 @@ DS 200/400/768/1440), `gui_scale_browser_check.py` ALL PASS (12 rows, shots
 in `v133/`), `structure_audit.py` 0 violations, `reference_policy_check.py`
 0 violations, `node --check` clean (no game code changed in v133; the atlas
 and `SPRITE_ATLAS_TILE_PX` change itself is v132's).
+
+## Verification (v136)
+
+GS-12a wrap-up (issue #3): the complete test battery is green on the 256px
+atlas. The wrap-up's first full-suite run found that the v132 atlas
+regeneration had broken two pre-existing sprite-art contracts in
+`graphicsTests.js` (unchanged since v106) — 43/45 in-page at v133 vs 45/45 at
+v131 on the same probe — both fixed here:
+
+- **B-7 weapon faction neutral.** The derivation team-tinted every non-accent
+  pixel, so weapon hardware was warm/cool per team (ΔRGB 132 vs the ≤ 18
+  contract). The near-black pass-through band now covers the recipe palette's
+  hardware colours (`#14171c`; `#2b313a` outlines within tolerance), and the
+  Railgun Cruiser top rail housing spans tile y 112–133 so the B-7 hardware
+  probe lands on it.
+- **B-8 exhausted state distinct.** The `-moved` frames had lost the classic
+  `#aab4bd` spent outline (the pre-regeneration atlas baked it on cols
+  2/3/6/7). The derivation now paints a `#aab4bd` silhouette rim on every
+  `-moved` frame, both teams, all three themes.
+
+All three atlases were regenerated and re-embedded in `assets/graphics.pak`
+(byte round-trip verified). Two comment mentions of `campaign_DATA.js` left
+by the v134/v135 economy work were reworded per the reference-policy
+checker's approved remedy (the gate was red at the merged tip; 0 now).
+
+Checks at the merged tip: `npm test` (Playwright) 28/28; in-page suites
+52/52 game + 5/5 audio, zero page errors; `gui_scale_layout_check.js` ALL
+PASS (100–250% + DS 200/400/768/1440); `gui_scale_browser_check.py` ALL PASS
+(12 rows, shots in `v136/`); atlas verification ALL PASS (manifest = 168
+cells × 3 themes, body dim + rim on every `-moved` row, B-7 probe neutral in
+all themes); `structure_audit.py` 0 violations (19 warnings), one-function 0;
+`reference_policy_check.py` 0.
+
+The GS-12 / issue #3 verdict itself is unchanged from Verification (v133):
+the dpr-2 render carries genuine added detail. This release's art delta is
+one ship's rail band plus the `-moved` rim — tile size and content scale are
+unchanged, so the v133 measurements still characterize the atlas.

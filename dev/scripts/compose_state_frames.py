@@ -17,7 +17,13 @@ sprite per row (rows 0-20; rows 18-20 are the "marines sent" variants):
   - gameplay-constant accent colours pass through unrotated in hue: gold /
     red / orange (hue 12-70 or >= 335 deg, saturated), plus near-white and
     near-black details — per sprite_design.md these are deliberately not
-    theme-remapped.
+    theme-remapped. The near-black band covers the recipe palette's hardware
+    colours (#14171c guns/windows at value 0.110, #2b313a hardware outlines at
+    value 0.227 within _OUTLINE_TOL), so weapon hardware is faction-neutral
+    gunmetal in both team frames (graphicsTests B-7).
+  - frames with -moved (cols 2/3/6/7) additionally carry the classic spent
+    outline: a _SPENT_OUTLINE (#aab4bd) rim on the silhouette edge, matching
+    the pre-regeneration atlas (graphicsTests B-8).
 
 The result feeds generate_atlas.py (state tiles named "<base>.<col>"):
 
@@ -33,15 +39,25 @@ decoded RGBA tiles out). The _main shell owns argv/paths and every effect.
 import os
 import sys
 
+from collections import deque
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_atlas as _ga
 
 _DIM_MOVED = 0.82
 _DIM_ATTACKED = 0.90
 _WHITE_KEEP = 0.92
-_BLACK_KEEP = 0.10
+_BLACK_KEEP = 0.12
 _ACCENT_SAT = 0.35
 _ACCENT_VAL = 0.30
+# Hardware outline of the recipe palette (generate_ship_sprites.py _OUTLINE
+# "#2b313a"): kept unremapped like the near-black band so weapon hardware is
+# faction-neutral. Tolerance absorbs rasterizer blends with the near-black.
+_OUTLINE_RGB = (43, 49, 58)
+_OUTLINE_TOL = 24.0
+# The classic spent outline the pre-regeneration atlas baked on -moved frames.
+_SPENT_OUTLINE_RGB = (170, 180, 189)
+_SPENT_OUTLINE_RIM = 3
 
 
 def composeStateFrames(bases, team1Ramp, team2Ramp):
@@ -68,6 +84,8 @@ def composeStateFrames(bases, team1Ramp, team2Ramp):
                 dim *= _DIM_ATTACKED
             pixels = _duotone(rotated if team2 else base["pixels"], size,
                               team2Ramp if team2 else team1Ramp, dim)
+            if col & 2:
+                pixels = _spentOutline(pixels, size)
             tiles.append({"name": "%s.%d" % (base["name"], col),
                           "pixels": pixels, "width": size, "height": size})
     return tiles
@@ -91,8 +109,9 @@ def _duotone(pixels, size, ramp, dim):
         r, g, b, a = pixels[base:base + 4]
         if a == 0:
             continue
+        keep = _keepOriginal(r, g, b)
         r, g, b = r * dim, g * dim, b * dim
-        if _keepOriginal(r, g, b):
+        if keep:
             out[base] = min(255, int(r + 0.5))
             out[base + 1] = min(255, int(g + 0.5))
             out[base + 2] = min(255, int(b + 0.5))
@@ -110,6 +129,9 @@ def _luminance(r, g, b):
 
 
 def _keepOriginal(r, g, b):
+    if ((r - _OUTLINE_RGB[0]) ** 2 + (g - _OUTLINE_RGB[1]) ** 2
+            + (b - _OUTLINE_RGB[2]) ** 2) <= _OUTLINE_TOL ** 2:
+        return True
     high = max(r, g, b)
     low = min(r, g, b)
     value = high / 255.0
@@ -127,6 +149,45 @@ def _keepOriginal(r, g, b):
             hue = 60.0 * ((r - g) / float(high - low)) + 240.0
         return hue <= 70.0 or hue >= 335.0
     return False
+
+
+def _spentOutline(pixels, size):
+    """Paint a _SPENT_OUTLINE rim on the silhouette edge of one frame.
+
+    Edge = an opaque pixel within _SPENT_OUTLINE_RIM (Chebyshev) of a
+    transparent pixel or the tile border. Alpha is preserved. Pure.
+    """
+    limit = _SPENT_OUTLINE_RIM
+    dist = [limit + 1] * (size * size)
+    queue = deque()
+    for y in range(size):
+        for x in range(size):
+            i = y * size + x
+            if pixels[i * 4 + 3] < 128 or (x < limit or y < limit
+                                           or x >= size - limit or y >= size - limit):
+                dist[i] = 0
+                queue.append(i)
+    while queue:
+        i = queue.popleft()
+        d = dist[i]
+        if d >= limit:
+            continue
+        y, x = divmod(i, size)
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < size and 0 <= ny < size:
+                    j = ny * size + nx
+                    if dist[j] > d + 1:
+                        dist[j] = d + 1
+                        queue.append(j)
+    out = bytearray(pixels)
+    for i in range(size * size):
+        if 0 < dist[i] <= limit and out[i * 4 + 3] >= 128:
+            out[i * 4] = _SPENT_OUTLINE_RGB[0]
+            out[i * 4 + 1] = _SPENT_OUTLINE_RGB[1]
+            out[i * 4 + 2] = _SPENT_OUTLINE_RGB[2]
+    return bytes(out)
 
 
 # ---------------------------------------------------------------------------

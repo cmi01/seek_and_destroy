@@ -13,8 +13,9 @@
 //     (market.refitPartsPerSwap parts per swap).
 // applyStationService(state, service) → { state } | { state: null }.
 // `state` is the whole campaign section (fleet, cargo carry the parts);
-// the rates travel inside state.market (built from campaign_DATA's frozen
-// trade table — R9, rates never live in verb bodies). Illegal services
+// the rates travel inside state.market (built from the frozen trade table
+// the campaign data module ships — R9, rates never live in verb bodies).
+// Illegal services
 // (no damage, nothing to refit, not enough parts, bad index) yield
 // { state: null } and the caller keeps the previous state.
 // ============================================================
