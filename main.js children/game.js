@@ -56,6 +56,7 @@ let VisionQueries = null;
 let ActionLegality = null;
 let CombatMath = null;
 let Outfitting = null;
+let Factions = null;
 let ReservePlacement = null;
 let EndgameStatus = null;
 // The pure game.js children (single job each, registered below at load time).
@@ -1730,9 +1731,10 @@ const InputProcessor = (() => {
       if (_pendingDeploy){
         const lvlId = _pendingDeploy.levelId;
         const choice = (_pendingDeploy.selected || []).slice();
+        const enc = _pendingDeploy.encounter || null;
         _pendingDeploy = null;
         Hud.toggleDeployModal(false);
-        SectorGenerator.generate(lvlId, { choice: choice });
+        SectorGenerator.generate(lvlId, { choice: choice, encounter: enc });
       } else {
         Hud.toggleBridgeModal(false);
         Hud.toggleCampaignModal(false);
@@ -1785,9 +1787,10 @@ const InputProcessor = (() => {
       if (_pendingDeploy){
         const lvlId = _pendingDeploy.levelId;
         const choice = (_pendingDeploy.selected || []).slice();
+        const enc = _pendingDeploy.encounter || null;
         _pendingDeploy = null;
         Hud.toggleDeployModal(false);
-        SectorGenerator.generate(lvlId, { choice: choice });
+        SectorGenerator.generate(lvlId, { choice: choice, encounter: enc });
       }
     } else if (typeof btn.id === "string" && btn.id.indexOf("LEVEL_SELECT:") === 0){
       // M3: RETIRED — the level ladder is no longer the encounter source.
@@ -2219,6 +2222,10 @@ const AI = {
       difficultyTable: DIFFICULTY_TABLE,
       shipSpecs: SHIP_SPECS,
       aiDoctrine: State.aiDoctrine,
+      // M6(a): the battle's faction identity and its scorer multipliers,
+      // delivered as plain data (the scorer folds them over the profile).
+      aiFaction: State.faction || null,
+      aiFactionWeights: (State.faction && Factions) ? Factions.ScorerWeights(State.faction) : null,
       turnNumber: State.turnNumber,
       activeTeam: State.activeTeam,
       ap: State.ap,
@@ -2393,6 +2400,22 @@ const SectorGenerator = {
 
     const section = GetGameState().campaign;
     const spec = CAMPAIGN_LEVELS.find(l => l.id === levelId) || CAMPAIGN_LEVELS[0];
+    // M6(a) faction identity: the encounter's faction (foreign map fleets
+    // carry one) wins, the level row is the ladder fallback. Doctrine: a
+    // foreign fleet's battle fights with its faction's profile; a
+    // location/ladder battle keeps the level row's tuned doctrine.
+    const enc = (opts && opts.encounter) || null;
+    const encFaction = (enc && typeof enc.encounterFaction === "string") ? enc.encounterFaction : null;
+    const levelFaction = (spec && typeof spec.faction === "string") ? spec.faction : null;
+    const factionId = (Factions && Factions.Row(encFaction)) ? encFaction
+      : ((Factions && Factions.Row(levelFaction)) ? levelFaction : null);
+    State.faction = factionId;
+    if (factionId && enc && (enc.kind === "fleet" || enc.kind === "join")){
+      const profile = Factions.DoctrineProfile(factionId);
+      if (profile) State.aiDoctrine = profile;
+    } else if (spec && spec.aiDoctrine){
+      State.aiDoctrine = spec.aiDoctrine;
+    }
     const cap = (typeof opts.capacity === "number") ? opts.capacity : ((CAMPAIGN_DATA && CAMPAIGN_DATA.campaign && CAMPAIGN_DATA.campaign.start &&
       CAMPAIGN_DATA.campaign.start.battle && CAMPAIGN_DATA.campaign.start.battle.cornerCapacity) || 4);
     let encSeed = (typeof opts.seed === "number") ? opts.seed : ((spec && spec.id) ? spec.id * 997 : 1);
@@ -2405,7 +2428,8 @@ const SectorGenerator = {
       capacity: cap,
       seed: encSeed,
       choice: opts.choice,
-      rnd: encRnd
+      rnd: encRnd,
+      opponentFaction: factionId || undefined
     });
     const setup = CampaignLib.BeginBattle(section, encounter, ReservePlacement.splitOverflow);
     _battleSnapshot = {
@@ -2598,6 +2622,28 @@ function freshCopy(src){
 
 let _gameLoadPromise = null;
 
+// M6(a): per-team hull identity for the frame — plain data; the renderer
+// paints the faction stripe band and the minimap ramp from it. Team 1 keeps
+// the active theme's hull ramp; team 2 wears the battle faction's theme
+// (the battle stays team 1/2-keyed). Missing entries fall through to the
+// theme palette inside the renderer.
+function _hullThemesNow(factionOverride){
+  const fid = (factionOverride !== undefined) ? factionOverride : State.faction;
+  const base = (THEME_DATA && THEME_DATA.palettes && THEME_DATA.palettes[State.theme || "default"]) || null;
+  const baseHull = (base && base.hull) || {};
+  const out = {
+    1: baseHull[1] ? Object.assign({}, baseHull[1]) : null,
+    2: baseHull[2] ? Object.assign({}, baseHull[2]) : null
+  };
+  const fkey = (fid && Factions) ? Factions.ThemeOf(fid) : null;
+  const ft = (fkey && THEME_DATA && THEME_DATA.factionThemes && THEME_DATA.factionThemes[fkey]) || null;
+  if (ft){
+    out[2] = Object.assign({}, out[2] || {}, ft.hull || {},
+      (typeof ft.stripe === "string") ? { stripe: ft.stripe } : {});
+  }
+  return out;
+}
+
 // A fresh plain copy of the live layout metrics per publish. The channel's
 // clone memo keys on object identity and the shared metrics singleton mutates
 // on every resize — handing it straight to the channel would freeze the
@@ -2641,6 +2687,7 @@ const api = {
         "main.js children/game.js children/campaignState.js",
         "main.js children/game.js children/campaignMap.js",
         "main.js children/game.js children/economy.js",
+        "main.js children/game.js children/factions.js",
         "main.js children/game.js children/themes.js",
         "main.js children/game.js children/rulesConfig.js",
         "main.js children/game.js children/boardQueries.js",
@@ -2692,6 +2739,7 @@ const api = {
         campaignState:    typeof campaignState === "function" ? campaignState : null,
         campaignMap:      typeof campaignMap === "function" ? campaignMap : null,
         economy:          typeof economy === "function" ? economy : null,
+        factions:         typeof factions === "function" ? factions : null,
         boardQueries:     typeof boardQueries === "function" ? boardQueries : null,
         visionQueries:    typeof visionQueries === "function" ? visionQueries : null,
         actionLegality:   typeof actionLegality === "function" ? actionLegality : null
@@ -2716,6 +2764,7 @@ const api = {
         ["main.js children/game.js children/campaignState.js",           kids.campaignState],
         ["main.js children/game.js children/campaignMap.js",             kids.campaignMap],
         ["main.js children/game.js children/economy.js",                  kids.economy],
+        ["main.js children/game.js children/factions.js",                 kids.factions],
         ["main.js children/game.js children/themes.js",                  kids.themes],
         ["main.js children/game.js children/rulesConfig.js",             kids.rulesConfig],
         ["main.js children/game.js children/boardQueries.js",            kids.boardQueries],
@@ -2818,6 +2867,9 @@ const api = {
       // M5 loadout seam (roadmap-design §4.5): the only weapon-stat readers,
       // bound over the frozen weapon table.
       Outfitting = kids.outfitting(RULES_DATA.weapons);
+      // M6(a) faction seam: identity rows + doctrine-weighted fleet
+      // composition over the frozen faction table and the roster.
+      Factions = kids.factions(SHIP_SPECS);
       ReservePlacement = kids.reservePlacement(RULES_DATA);
       EndgameStatus = {
         checkEndgameStatus: kids.endgameStatus
@@ -3037,7 +3089,7 @@ const api = {
     for (let i = 0; i < fleet.length; i++){
       if (split.deployed.indexOf(fleet[i]) !== -1) selected.push(i);
     }
-    _pendingDeploy = { levelId: levelId, fleet: fleet, capacity: cap, selected: selected };
+    _pendingDeploy = { levelId: levelId, fleet: fleet, capacity: cap, selected: selected, encounter: (opts && opts.encounter) || null };
     Hud.toggleDeployModal(true);
   },
 
@@ -3194,6 +3246,7 @@ const api = {
     const stateDTO = {
       ...status,
       theme: cursor.theme,
+      hullThemes: _hullThemesNow(),
       viewX: board.viewX,
       viewY: board.viewY,
       viewSpan: board.viewSpan,
@@ -3412,6 +3465,12 @@ const api = {
         });
       },
       checkEndgame(){ return Actions.checkEndgame(); },
+      // M6(a) faction seam (tests): identity rows, doctrine-weighted fleet
+      // rolls and the per-team hull themes the battle frame would carry.
+      factionIds(){ return Factions ? Factions.Ids() : []; },
+      factionRow(id){ return Factions ? Factions.Row(id) : null; },
+      rollFleet(id, budget, seed){ return Factions ? Factions.ComposeFleet(id, budget, mulberry32(seed)) : []; },
+      hullThemesFor(id){ return _hullThemesNow(id); },
       transitionToPlayerTurn(){ return Actions.transitionToPlayerTurn(); },
       transitionToAITurn(){ return Actions.transitionToAITurn(); },
       defaultDeployChoice(){
@@ -3461,6 +3520,14 @@ const api = {
       },
       clearSeed(){ State.rng = null; State.rngSeed = null; },
       getRawState(){ return GetGameState(); },
+      // M6(a) faction seam (browser evidence / test helpers): identity rows
+      // and seeded doctrine-weighted fleet rolls.
+      Factions: {
+        ids(){ return Factions ? Factions.Ids() : []; },
+        row(id){ return Factions ? Factions.Row(id) : null; },
+        rollFleet(id, budget, seed){ return Factions ? Factions.ComposeFleet(id, budget, mulberry32(seed)) : []; },
+        hullThemesFor(id){ return _hullThemesNow(id); }
+      },
       // M5 loadout seam facade (browser evidence / test helpers): weapon
       // stats read through the loadout readers, never off unit fields.
       Outfitting: {

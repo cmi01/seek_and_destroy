@@ -1674,6 +1674,107 @@ const runGameTests = function (bridge, testName) {
       };
     },
 
+    // T-M6a-1 (M6): doctrine-weighted composition is seeded and legal —
+    // the same seed reproduces the same fleet, every fleet fields exactly
+    // one flagship first in the list, every hull is on the roster and the
+    // fleet's total cost stays within budget.
+    testFactionFleetRolls() {
+      const specs = bridge.shipSpecs;
+      const ids = bridge.factionIds();
+      const bad = [];
+      if (ids.length !== 5) bad.push("factions=" + ids.length);
+      for (const id of ids) {
+        const a = bridge.rollFleet(id, 60000, 1234);
+        const b = bridge.rollFleet(id, 60000, 1234);
+        if (a.join(",") !== b.join(",")) bad.push(id + ":nondeterministic");
+        if (!a.length) { bad.push(id + ":empty"); continue; }
+        const flagCount = a.filter(h => specs[h] && specs[h].flags.indexOf("!flagship") !== -1).length;
+        if (flagCount !== 1) bad.push(id + ":flagships=" + flagCount);
+        if (!specs[a[0]] || specs[a[0]].flags.indexOf("!flagship") === -1) bad.push(id + ":lead-not-flagship");
+        let cost = 0;
+        for (const h of a) {
+          if (!specs[h]) { bad.push(id + ":unknown-hull " + h); continue; }
+          cost += specs[h].cost;
+        }
+        if (cost > 60000) bad.push(id + ":over-budget " + cost);
+      }
+      return {
+        name: "M6a-1 DOCTRINE FLEETS SEEDED + LEGAL (5 factions)",
+        pass: bad.length === 0,
+        detail: "ids=[" + ids.join(",") + "] issues=[" + bad.join("; ") + "]"
+      };
+    },
+
+    // T-M6a-2 (M6): the doctrine weights reproduce the DESIGN §4.7
+    // statistics over seeded rolls — Armoury fields a capital ship in
+    // ≥90% of fleets (its flagship pool is capital-hulled), Fringe almost
+    // never does (≤20%), Freehold draws mostly missile hulls (≥55%) and
+    // Capital rarely fields fighters or bombers (≤10%).
+    testFactionDoctrineStats() {
+      const specs = bridge.shipSpecs;
+      const ROLLS = 100;
+      const isCapital = h => specs[h] && specs[h].flags.indexOf("#capital ship") !== -1;
+      const collect = (id) => {
+        let fleetsWithCapital = 0, draws = 0, missile = 0, fighterBomber = 0;
+        for (let s = 1; s <= ROLLS; s++) {
+          const fleet = bridge.rollFleet(id, 60000, 1000 + s);
+          if (fleet.some(isCapital)) fleetsWithCapital++;
+          for (const h of fleet) {
+            draws++;
+            if (specs[h] && specs[h].wType === "missile") missile++;
+            if (h === "Fighter" || h === "Bomber") fighterBomber++;
+          }
+        }
+        return { capShare: fleetsWithCapital / ROLLS, missileShare: missile / draws, fbShare: fighterBomber / draws, draws: draws };
+      };
+      const armoury = collect("Armoury");
+      const fringe = collect("Fringe");
+      const freehold = collect("Freehold");
+      const capital = collect("Capital");
+      const bad = [];
+      if (armoury.capShare < 0.9) bad.push("armoury capital " + armoury.capShare.toFixed(2));
+      if (fringe.capShare > 0.2) bad.push("fringe capital " + fringe.capShare.toFixed(2));
+      if (freehold.missileShare < 0.55) bad.push("freehold missile " + freehold.missileShare.toFixed(2));
+      if (capital.fbShare > 0.1) bad.push("capital fighters/bombers " + capital.fbShare.toFixed(2));
+      return {
+        name: "M6a-2 DOCTRINE WEIGHT STATISTICS (100 seeded rolls each)",
+        pass: bad.length === 0,
+        detail: "armoury-capital=" + armoury.capShare.toFixed(2) + " fringe-capital=" + fringe.capShare.toFixed(2) +
+          " freehold-missile=" + freehold.missileShare.toFixed(2) + " capital-fb=" + capital.fbShare.toFixed(2) +
+          " issues=[" + bad.join("; ") + "]"
+      };
+    },
+
+    // T-M6a-3 (M6): the faction table is complete — the five DESIGN §4.7
+    // factions, each with doctrine rows — and each faction's battle-side
+    // hull themes carry a lit ramp and a hull-stripe colour.
+    testFactionTableComplete() {
+      const expect = ["Syndicate", "Capital", "Freehold", "Armoury", "Fringe"];
+      const ids = bridge.factionIds().slice().sort();
+      const bad = [];
+      if (ids.join(",") !== expect.slice().sort().join(",")) bad.push("ids=[" + ids.join(",") + "]");
+      for (const id of expect) {
+        const row = bridge.factionRow(id);
+        if (!row) { bad.push(id + ":missing"); continue; }
+        const d = row.doctrine || {};
+        if (typeof row.defaultAlignment !== "number") bad.push(id + ":alignment");
+        if (!row.theme) bad.push(id + ":theme");
+        if (!d.tactic || !d.profile) bad.push(id + ":doctrine");
+        const comp = d.composition || {};
+        if (!(comp.common && comp.common.length) || !(comp.uncommon && comp.uncommon.length) || !(comp.rare && comp.rare.length)) bad.push(id + ":composition");
+        const ht = bridge.hullThemesFor(id);
+        const side = ht ? ht[2] : null;
+        if (!side || typeof side.lit !== "string" || typeof side.stripe !== "string" || !side.stripe) bad.push(id + ":hull-stripe");
+      }
+      const syn = bridge.factionRow("Syndicate");
+      if (!syn || syn.defaultAlignment !== -20) bad.push("syndicate alignment");
+      return {
+        name: "M6a-3 FACTION TABLE + HULL STRIPES COMPLETE (DESIGN 4.7)",
+        pass: bad.length === 0,
+        detail: "factions=" + ids.length + " issues=[" + bad.join("; ") + "]"
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -1706,7 +1807,8 @@ const runGameTests = function (bridge, testName) {
         this.testOutfitDefaultsFit(), this.testOutfitReaderParity(), this.testOutfitReaderCopies(),
         this.testBattleUnitLoadoutTruth(), this.testWeaponClassShieldBreak(), this.testSaveLoadoutMigration(),
         this.testMultiWeaponFire(), this.testRedNumbersChosenWeapon(), this.testRedNumbersShieldedTarget(),
-        this.testOutfitStationFlow(), this.testGeneratorLegalLoadoutSweep(), this.testOutfitModelRows()
+        this.testOutfitStationFlow(), this.testGeneratorLegalLoadoutSweep(), this.testOutfitModelRows(),
+        this.testFactionFleetRolls(), this.testFactionDoctrineStats(), this.testFactionTableComplete()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;

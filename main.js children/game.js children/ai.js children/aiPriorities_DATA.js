@@ -73,6 +73,22 @@ const aiPrioritiesTable = {
         "screen": 1.5,
         "standoff": 1.0,
         "summary": "Balanced dreadnought advance combining heavy escort screening with decisive spinal railgun pressure."
+      },
+      "OPTIMAL_LINE": {
+        "leash": null,
+        "unboundedLeash": true,
+        "aggression": 1.0,
+        "screen": 1.25,
+        "standoff": 1.15,
+        "summary": "Disciplined law-enforcement line: measured advance behind strong screening, no reckless chasing, fire from the strongest formation."
+      },
+      "SWARM_PRESS": {
+        "leash": null,
+        "unboundedLeash": true,
+        "aggression": 1.25,
+        "screen": 0.7,
+        "standoff": 0.55,
+        "summary": "Cheap-hull swarm pressure: close in numbers and keep shooting; little screening discipline and no stand-off patience."
       }
     },
     "purchaseOrders": {
@@ -97,6 +113,18 @@ const aiPrioritiesTable = {
         "Heavy Cruiser",
         "Battleship",
         "Battlecruiser"
+      ],
+      "OPTIMAL_LINE": [
+        "Railgun Destroyer",
+        "Light Cruiser",
+        "Railgun Cruiser",
+        "Heavy Cruiser"
+      ],
+      "SWARM_PRESS": [
+        "Fighter",
+        "Attack Frigate",
+        "Missile Frigate",
+        "Attack Destroyer"
       ]
     }
   },

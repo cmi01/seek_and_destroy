@@ -72,8 +72,8 @@ const themesDataPayload = (() => ({
       accent: "#38bdf8", hostile: "#f43f5e", gold: "#facc15",
       mmRockOuter: "#334155", mmRockInner: "#475569",
       hull: {
-        1: { lit: "#c2c9d0", dark: "#3a4149" },
-        2: { lit: "#c9924f", dark: "#42290f" }
+        1: { lit: "#c2c9d0", dark: "#3a4149", stripe: "#8b939c" },
+        2: { lit: "#c9924f", dark: "#42290f", stripe: "#8a6234" }
       },
       plume: {
         1: { outer: "rgba(176,192,208,0.85)", mid: "rgba(214,224,234,0.70)", inner: "rgba(255,255,255,0.75)", core: "#ffffff" },
@@ -115,8 +115,8 @@ const themesDataPayload = (() => ({
       accent: "#4ade80", hostile: "#f472b6", gold: "#fde047",
       mmRockOuter: "#064e3b", mmRockInner: "#4ade80",
       hull: {
-        1: { lit: "#4ade80", dark: "#064e3b" },
-        2: { lit: "#f472b6", dark: "#831843" }
+        1: { lit: "#4ade80", dark: "#064e3b", stripe: "#16a34a" },
+        2: { lit: "#f472b6", dark: "#831843", stripe: "#be185d" }
       },
       plume: {
         1: { outer: "rgba(74,222,128,0.90)", mid: "rgba(134,239,172,0.80)", inner: "rgba(220,252,231,0.92)", core: "#ffffff" },
@@ -158,8 +158,8 @@ const themesDataPayload = (() => ({
       accent: "#2dd4bf", hostile: "#c084fc", gold: "#a3e635",
       mmRockOuter: "#3b0764", mmRockInner: "#a855f7",
       hull: {
-        1: { lit: "#2dd4bf", dark: "#134e4a" },
-        2: { lit: "#c084fc", dark: "#3b0764" }
+        1: { lit: "#2dd4bf", dark: "#134e4a", stripe: "#0d9488" },
+        2: { lit: "#c084fc", dark: "#3b0764", stripe: "#9333ea" }
       },
       plume: {
         1: { outer: "rgba(45,212,191,0.88)", mid: "rgba(163,230,53,0.76)", inner: "rgba(217,249,157,0.86)", core: "#ecfccb" },
@@ -184,6 +184,37 @@ const themesDataPayload = (() => ({
         strokeColor: "rgba(94, 234, 212, 0.78)", lineWidth: 1.4, nodeColor: "#d9f99d", nodeSize: 2.2
       },
       hpBadge: { bgColor: "rgba(9, 4, 18, 0.88)", damagedColor: "#e879f9", healthyColor: "#99f6e4" }
+    }
+  },
+
+  // ---- faction themes (M6, DESIGN §4.7) ------------------------------------
+  // Per-faction hull identity, keyed by the theme key each faction row
+  // carries. Battle frames deliver these as the per-team hull themes (the
+  // battle stays team 1/2-keyed; the enemy side wears its faction's ramp).
+  // Stripes are the faction's hull-stripe colour per DESIGN §4.7 (Syndicate
+  // red, Freehold yellow, Fringe purple; Capital "shiny silver" and Armoury
+  // "brutalist heavy-industry" name no stripe, so both carry a tone-on-tone
+  // darker stripe over their own hull tone).
+  factionThemes: {
+    syndicate: {
+      hull: { lit: "#6b4a3a", dark: "#2b1610" },
+      stripe: "#c0392b"
+    },
+    capital: {
+      hull: { lit: "#c7d2da", dark: "#4b5563" },
+      stripe: "#7f8b96"
+    },
+    freehold: {
+      hull: { lit: "#c9924f", dark: "#42290f" },
+      stripe: "#eab308"
+    },
+    armoury: {
+      hull: { lit: "#8d959e", dark: "#2b3138" },
+      stripe: "#59616a"
+    },
+    fringe: {
+      hull: { lit: "#9aa3ad", dark: "#3a4046" },
+      stripe: "#a855f7"
     }
   },
 

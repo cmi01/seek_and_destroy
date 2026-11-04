@@ -227,7 +227,17 @@ function aiThreatScorer(){
     }
 
     function scoreMove(env, ctx, u, dest){
-      const tn = env.tuning(ctx), W = env.doctrineWeights(ctx && ctx.aiDoctrine);
+      // M6(a) faction doctrine overlay: the battle's faction multiplies the
+      // doctrine profile's weights by its own scorer multipliers, which
+      // arrive as plain data in the snapshot (no faction branches in code).
+      const tn = env.tuning(ctx);
+      const _w0 = env.doctrineWeights(ctx && ctx.aiDoctrine);
+      const _fw = (ctx && ctx.aiFactionWeights) || null;
+      const W = _fw ? Object.assign({}, _w0, {
+        aggression: (typeof _fw.aggression === "number" ? _fw.aggression : 1) * _w0.aggression,
+        screen: (typeof _fw.screen === "number" ? _fw.screen : 1) * _w0.screen,
+        standoff: (typeof _fw.standoff === "number" ? _fw.standoff : 1) * _w0.standoff
+      }) : _w0;
       const mp = (env.priorities(ctx) && env.priorities(ctx).movementPriorities) || {};
       const kb = mp.killBand || {}, apCfg = mp.approach || {}, aeCfg = mp.activeEscort || {};
       const trCfg = mp.tieredRetreat || {}, sbCfg = mp.standoffBand || {}, nbCfg = mp.nebulaSearchAndCover || {};

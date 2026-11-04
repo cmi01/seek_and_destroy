@@ -397,7 +397,7 @@ const Graphics = (() => {
 
   // Parent-owned shared ship renderer (moved out of objectRenderer so no
   // layer ever executes another layer's code).
-  function _drawUnitDynamic(ctx, cx, cy, cellPx, unit, now, bp, shipSpecs, lodCellPx, rawTC) {
+  function _drawUnitDynamic(ctx, cx, cy, cellPx, unit, now, bp, shipSpecs, lodCellPx, rawTC, hullThemes) {
     const TC = typeof rawTC === "function" ? rawTC : (c => c);
     const spec = (shipSpecs && unit) ? shipSpecs[unit.type] : null;
     if (!spec || !bp) return;
@@ -410,6 +410,16 @@ const Graphics = (() => {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(rot);
+
+    // D0 (M6): faction hull stripe — a painted band across the hull. The
+    // colour arrives as plain per-team frame data (Game decides the enemy
+    // side's faction identity); sprite colours are baked per theme, so the
+    // stripe band is the faction's hull marking at any zoom.
+    const hullC = (hullThemes && (hullThemes[unit.team === 1 ? 1 : 2])) || null;
+    if (hullC && hullC.stripe) {
+      ctx.fillStyle = TC(hullC.stripe);
+      ctx.fillRect(-R * 0.62, -R * 0.13, R * 1.24, R * 0.26);
+    }
 
     // D1: Engine plumes
     if (!isMoved && spec.plumes && spec.plumes.length > 0) {
@@ -565,7 +575,7 @@ const Graphics = (() => {
       const cy = (u.y + 0.5) * CP;
       const sprite = _sliceMaterial(u);
       if (sprite) _blitSprite(ctx, sprite, cx, cy, CP);
-      _drawUnitDynamic(ctx, cx, cy, CP, u, now, _boardPalette(), shipSpecs, lodCellPx, _themeColor);
+      _drawUnitDynamic(ctx, cx, cy, CP, u, now, _boardPalette(), shipSpecs, lodCellPx, _themeColor, state.hullThemes);
     });
   }
 
@@ -583,7 +593,7 @@ const Graphics = (() => {
     const sprite = _sliceMaterial(u);
     if (sprite) _blitSprite(ctx, sprite, gx, gy, CP);
     const shipSpecs = (_graphicsBridge && _graphicsBridge.SHIP_SPECS) ? _graphicsBridge.SHIP_SPECS : null;
-    _drawUnitDynamic(ctx, gx, gy, CP, u, now, _boardPalette(), shipSpecs, CP, _themeColor);
+    _drawUnitDynamic(ctx, gx, gy, CP, u, now, _boardPalette(), shipSpecs, CP, _themeColor, state.hullThemes);
   }
 
   // Ship-icon sprite material (sheet + src rect) for the bridge shop cards.

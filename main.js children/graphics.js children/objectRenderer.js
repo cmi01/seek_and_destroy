@@ -256,7 +256,7 @@
       if (!_spottedBy(u, 1)) return;
       const px = u.x * cellPx + cellPx / 2;
       const py = u.y * cellPx + cellPx / 2;
-      const hull = bp.hull[u.team === 1 ? 1 : 2];
+      const hull = (state.hullThemes && state.hullThemes[u.team === 1 ? 1 : 2]) || bp.hull[u.team === 1 ? 1 : 2];
       if (_hasFlag(u, "!flagship")) {
         const rf = Math.max(2.6, cellPx * 0.52);
         ctx.fillStyle = hull.lit;
@@ -276,7 +276,7 @@
         ctx.beginPath();
         ctx.arc(px, py, r, 0, TAU);
         ctx.fill();
-        ctx.strokeStyle = hull.dark;
+        ctx.strokeStyle = hull.stripe || hull.dark;
         ctx.lineWidth = 0.8;
         ctx.stroke();
       }
