@@ -188,6 +188,8 @@ PARENT_OF = {
     "main.js children/game.js children/factions.js children/buildDialogueModel.js": "main.js children/game.js children/factions.js",
     "main.js children/game.js children/factions.js children/applyDialogueOutcome.js": "main.js children/game.js children/factions.js",
     "main.js children/game.js children/campaignMap.js children/nearestOpenSquare.js": "main.js children/game.js children/campaignMap.js",
+    "main.js children/game.js children/campaignMap.js children/mapAi.js": "main.js children/game.js children/campaignMap.js",
+    "main.js children/game.js children/campaignMap.js children/applyMapOrder.js": "main.js children/game.js children/campaignMap.js",
     "main.js children/game.js children/hud.js children/buildHailPanel.js": "main.js children/game.js children/hud.js",
     "main.js children/game.js children/reputation.js": "main.js children/game.js",
     "main.js children/game.js children/reputation.js children/reputationBand.js": "main.js children/game.js children/reputation.js",

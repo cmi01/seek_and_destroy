@@ -517,6 +517,8 @@ const GAME_LEAF_SCRIPTS = [
   "main.js children/game.js children/factions.js children/buildDialogueModel.js",
   "main.js children/game.js children/factions.js children/applyDialogueOutcome.js",
   "main.js children/game.js children/campaignMap.js children/nearestOpenSquare.js",
+  "main.js children/game.js children/campaignMap.js children/mapAi.js",
+  "main.js children/game.js children/campaignMap.js children/applyMapOrder.js",
   "main.js children/game.js children/actionLegality.js children/crewStatus.js"
 ];
 
@@ -701,6 +703,8 @@ async function startGame(){
       ["main.js children/game.js children/factions.js children/buildDialogueModel.js", () => typeof buildDialogueModel === "function"],
       ["main.js children/game.js children/factions.js children/applyDialogueOutcome.js", () => typeof applyDialogueOutcome === "function"],
       ["main.js children/game.js children/campaignMap.js children/nearestOpenSquare.js", () => typeof nearestOpenSquare === "function"],
+      ["main.js children/game.js children/campaignMap.js children/mapAi.js", () => typeof mapAi === "function"],
+      ["main.js children/game.js children/campaignMap.js children/applyMapOrder.js", () => typeof applyMapOrder === "function"],
       ["main.js children/game.js children/actionLegality.js children/crewStatus.js", () => typeof crewStatus === "function"]
     ]);
 

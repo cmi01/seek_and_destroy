@@ -40,6 +40,12 @@ const campaignMap = function (){
     },
     MapVisibility(mapState, observerFaction){ return mapVisibility(mapState, observerFaction); },
     BattleEventAt(mapState, locationId, entering){ return battleEventAt(mapState, locationId, entering); },
+    // M6(e) world life: the NPC turn — decisions per faction, applied through
+    // the shared mover (injected here; siblings never name each other).
+    MapAi(mapState, factionId, rng){ return mapAi(mapState, factionId, rng); },
+    ApplyMapOrder(mapState, order, rng){
+      return applyMapOrder(mapState, order, rng, { move: moveFleet, moveOpts: costOpts({}) });
+    },
     NearestOpenSquare(mapState, from, rng){ return nearestOpenSquare(mapState, from, rng); },
     MapFrame(mapState, view){
       // The render sees only what the observer detects (map visibility:

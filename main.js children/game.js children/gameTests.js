@@ -2080,6 +2080,49 @@ const runGameTests = function (bridge, testName) {
       };
     },
 
+    // T-M6e (M6 acceptance): a seeded simulation — two NPC fleets resolve
+    // an interaction (battle outcome AND trade outcome) on the map with
+    // NO player input: only the pure map decisions and the order resolver
+    // run. World life is deterministic under a seeded clock.
+    testNpcMapInteraction() {
+      const bad = [];
+      // Fixture A: two hostile NPC fleets within reach (no player fleet).
+      const fixture = {
+        turn: 1, screen: "map",
+        locations: [{ id: "relay-9", x: 10, y: 10 }],
+        fleets: [
+          { id: "s1", faction: "Syndicate", x: 10, y: 12, fuel: 9, ships: [{}, {}, {}] },
+          { id: "f1", faction: "Freehold", x: 11, y: 12, fuel: 9, ships: [{}, {}] }
+        ]
+      };
+      const orders = bridge.npcOrdersFor(fixture, "Syndicate", 7);
+      const fight = orders.filter(o => o.kind === "fight")[0] || null;
+      if (!fight) bad.push("no-fight-order");
+      const res = fight ? bridge.npcResolve(fixture, fight, 7) : { mapState: fixture, events: [] };
+      const kinds = res.events.map(e => e.kind);
+      if (kinds.indexOf("npcBattle") === -1) bad.push("no-battle-event");
+      if (kinds.indexOf("npcBattleOutcome") === -1) bad.push("no-outcome-event");
+      const left = (res.mapState.fleets || []).filter(f => f.id === "f1" || f.id === "s1");
+      if (left.length !== 1) bad.push("survivors=" + left.length);
+      if (left[0] && left[0].id !== "s1") bad.push("weaker-won");
+      // Fixture B: a lone NPC fleet at a station trades without input.
+      const station = {
+        turn: 1, screen: "map",
+        locations: [{ id: "relay-9", x: 10, y: 10 }],
+        fleets: [{ id: "c1", faction: "Capital", x: 10, y: 10, fuel: 3, ships: [{}] }]
+      };
+      const tOrders = bridge.npcOrdersFor(station, "Capital", 5);
+      const trade = tOrders.filter(o => o.kind === "trade")[0] || null;
+      if (!trade) bad.push("no-trade-order");
+      const tRes = trade ? bridge.npcResolve(station, trade, 5) : { mapState: station, events: [] };
+      if ((tRes.events.map(e => e.kind)).indexOf("npcTrade") === -1) bad.push("no-trade-event");
+      return {
+        name: "M6e SEEDED NPC INTERACTION — TWO FLEETS, NO PLAYER INPUT",
+        pass: bad.length === 0,
+        detail: "battle=[" + kinds.join(",") + "] trade=[" + tRes.events.map(e => e.kind).join(",") + "] issues=[" + bad.join("; ") + "]"
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -2117,7 +2160,8 @@ const runGameTests = function (bridge, testName) {
         this.testReputationBands(), this.testStanceAndSharing(), this.testReputationEvents(),
         this.testDialogueModel(), this.testDialogueOutcome(), this.testHailPanel(),
         this.testMissionBoard(), this.testMissionPayout(), this.testMissionChainComplete(),
-        this.testSaveMigration()
+        this.testSaveMigration(),
+        this.testNpcMapInteraction()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;

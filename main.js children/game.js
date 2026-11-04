@@ -1107,6 +1107,32 @@ function _mapMerchantOffer(events){
 
 // Map turn commit: with an encounter open, the next turn launches the
 // battle through the M2 seam (startSector -> deployment -> generate).
+// M6(e) world life: the NPC turn on the map — every faction's fleets decide
+// orders through the map AI and act through the shared map rules; the
+// visible outcomes land in the turn reports.
+function _npcMapTurn(){
+  const map = _mapSection();
+  if (!map || map.screen === "battle") return;
+  const ids = Factions ? Factions.Ids() : [];
+  let current = map;
+  for (let i = 0; i < ids.length; i++){
+    const fid = ids[i];
+    const orders = CampaignMapLib.MapAi(current, fid, rngFor("map-ai-" + (current.turn || 0) + "-" + fid));
+    for (let j = 0; j < orders.length; j++){
+      const res = CampaignMapLib.ApplyMapOrder(current, orders[j], rngFor("map-ai-act-" + (current.turn || 0) + "-" + fid + "-" + j));
+      current = (res && res.mapState) ? res.mapState : current;
+      const evs = (res && res.events) || [];
+      for (let k = 0; k < evs.length; k++){
+        const ev = evs[k];
+        if (ev && typeof ev.text === "string" && ev.kind !== "merchantFleetEvent"){
+          State.turnReportQueue.push(ev.text);
+        }
+      }
+    }
+  }
+  if (current !== map) _patchMap({ fleets: current.fleets });
+}
+
 function _mapTurnCommit(){
   const map = _mapSection();
   if (!map) return;
@@ -1120,6 +1146,9 @@ function _mapTurnCommit(){
   const advanced = Missions ? Missions.Advance(c0, "turn", 1) : c0;
   if (advanced !== c0) TryPatchGameState({ campaign: advanced });
   _mapClockTick();
+  // M6(e) world life: the NPC turn — every faction's fleets decide and act
+  // through the same map rules; the outcomes land in the turn reports.
+  _npcMapTurn();
   Hud.updateAll();
 }
 
@@ -3694,6 +3723,10 @@ const api = {
         if (nx !== c) TryPatchGameState({ campaign: nx });
         return GetGameState().campaign;
       },
+      // M6(e) world life seam (tests): the NPC map turn is pure over the map
+      // state — decide orders and resolve one order's visible outcome.
+      npcOrdersFor(mapState, fid, seed){ return CampaignMapLib.MapAi(mapState, fid, mulberry32(seed)); },
+      npcResolve(mapState, order, seed){ return CampaignMapLib.ApplyMapOrder(mapState, order, mulberry32(seed)); },
       transitionToPlayerTurn(){ return Actions.transitionToPlayerTurn(); },
       transitionToAITurn(){ return Actions.transitionToAITurn(); },
       defaultDeployChoice(){
