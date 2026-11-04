@@ -1,7 +1,12 @@
 {
   "$comment": "Canonical RNG seeds and their expected deterministic sector layouts (test-architecture doc §2, §7). Pure data. expectedLayouts[seed] is the unit-layout fingerprint produced by SD.setSeed(seed) + SD.SectorGenerator.generate(101) (captured from observed output at v125, re-verified at v127, level 101): units sorted by id with flags sorted — the exact shape tests/specs/02-sector-generation.spec.ts compares against.",
   "seeds": {
-    "sectorDeterminism": 42
+    "sectorDeterminism": 42,
+    "inPageBoardTests": 42
+  },
+  "observedInPage": {
+    "$comment": "Captured observed values for the in-page suite (SD.runTests) RNG pin — t_39002303, v140. The suite re-seeds to seeds.inPageBoardTests before every board test so the planner's mistake roll is deterministic; unseeded it flipped the budget-planning test at ~12% per run (failing detail '2-AP plan apCost: 1'). Every board test passes at seed 42; 14 of 100 seeds reproduce the flip.",
+    "T-9 BUDGET-AWARE PLANNING": "2-AP plan apCost: 2, 1-AP plan apCost: 1"
   },
   "expectedLayouts": {
     "42": [

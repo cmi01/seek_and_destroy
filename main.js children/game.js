@@ -3179,6 +3179,7 @@ const api = {
         _pendingDeploy = null;
         Rules.initState({ preserve: ["profile"] });
       },
+      setSeed(s){ State.rng = mulberry32(s); State.rngSeed = s; },
       startCampaignBattle(opts){
         const o = opts || {};
         if (InitializeCampaign && !GetGameState().campaign) InitializeCampaign();

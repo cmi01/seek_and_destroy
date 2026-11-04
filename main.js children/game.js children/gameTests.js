@@ -4,11 +4,24 @@
 // gameTests.js — job: run the game-side self-tests through the test bridge.
 // Owner: game.js. Holds no state unless it is a core.
 // ============================================================
-const runGameTests = function (bridge, testName) {  const suite = {
+const runGameTests = function (bridge, testName) {
+  // RNG pin (T-9 flake, t_39002303): the planner's per-unit plan pick draws a
+  // "mistake" roll from the seeded RNG seam — unseeded it is Math.random —
+  // and a roll below the difficulty's mistake chance swaps in the 2nd-best
+  // plan. Unseeded, T-9's composite-plan assertion flipped at that 12% rate
+  // (observed at v139: 35/300 isolated and 3/15 full-suite runs, failing
+  // detail "2-AP plan apCost: 1"; 14 of 100 seeds reproduce it).
+  // clearBoard() re-seeds to the canonical fixture seed (42, pinned with its
+  // observed outcomes in the test-architecture seed fixture) so every board
+  // test starts from the same stream position — no cross-test RNG drift —
+  // and the runner tail restores the caller's RNG afterwards.
+  const PIN_SEED = 42;
+  const suite = {
     // Fresh state from the single template (profile kept), then only the
     // test-specific board: open space, AI has credits, player has none.
     clearBoard() {
       bridge.resetState();
+      bridge.setSeed(PIN_SEED);
       const st = bridge.state;
       const gridSize = bridge.gridSize;
       st.terrain = Array.from({ length: gridSize }, () => Array(gridSize).fill("EMPTY"));
@@ -1350,10 +1363,19 @@ const runGameTests = function (bridge, testName) {  const suite = {
     }
   };
 
+  // The pin must not leak out of the suite: restore the caller's RNG stream
+  // (exact function, not a re-seed) after the run.
+  const callerRng = bridge.state.rng;
+  const callerRngSeed = bridge.state.rngSeed;
+  const restoreRng = function () {
+    bridge.state.rng = callerRng;
+    bridge.state.rngSeed = callerRngSeed;
+  };
+
   if (testName && typeof suite[testName] === "function") {
-    return suite[testName]();
+    try { return suite[testName](); } finally { restoreRng(); }
   }
-  return suite.runAll();
+  try { return suite.runAll(); } finally { restoreRng(); }
 };
 // Loading convention: this file defines runGameTests at top level; the owner
 // captures it after the boot list resolves.
