@@ -112,6 +112,14 @@ let BuildMissionRows = null;
 let BuildStationHeader = null;
 let BuildMapHudExtra = null;
 let ResolveCursorStyle = null;
+let FindMerchantOfferEvent = null;
+let HasMapEvent = null;
+let PickMapPatch = null;
+let FindPlayerFleet = null;
+let ResolveMapClickTarget = null;
+let ResolveHullThemes = null;
+let CopyMetrics = null;
+let BuildAISnapshot = null;
 // Frozen plain-data facade of the pure rule queries, handed to the AI on the
 // snapshot DTO instead of the Rules module identity (built once in load()).
 let PURE_RULES = null;
@@ -1067,12 +1075,12 @@ function _mapTravel(dest){
   }
   const res = CampaignMapLib.MoveFleet(map, "player", dest);
   if (res.mapState){
-    _patchMap({ fleets: res.mapState.fleets, turn: res.mapState.turn, locationId: res.mapState.locationId });
-    const moved = res.events.some(function (e){ return e && e.kind === "fleetMoved"; });
+    _patchMap(PickMapPatch(res.mapState));
+    const moved = HasMapEvent({ events: res.events, kind: "fleetMoved" });
     if (moved){
       _patchMap({ pendingMerchant: null });
       const next = _mapSection();
-      const pf = (next.fleets || []).find(function (f){ return f.faction === "player"; });
+      const pf = FindPlayerFleet({ fleets: next.fleets || [] });
       // Arrival is the fleet's ACTUAL position (travel may cap at the
       // slowest ship), not the requested destination.
       _mapArrival(next, pf ? { x: pf.x, y: pf.y } : null);
@@ -1093,12 +1101,12 @@ function _mapJump(target){
   }
   const res = CampaignMapLib.HyperspaceJump(map, "player", target);
   if (res.mapState){
-    _patchMap({ fleets: res.mapState.fleets, turn: res.mapState.turn, locationId: res.mapState.locationId });
-    const jumped = res.events.some(function (e){ return e && e.kind === "fleetJumped"; });
+    _patchMap(PickMapPatch(res.mapState));
+    const jumped = HasMapEvent({ events: res.events, kind: "fleetJumped" });
     if (jumped){
       _patchMap({ pendingMerchant: null });
       const next = _mapSection();
-      const pf = next.fleets.find(function (f){ return f.faction === "player"; });
+      const pf = FindPlayerFleet({ fleets: next.fleets });
       _mapArrival(next, pf ? { x: pf.x, y: pf.y } : null);
       _mapClockTick();
     } else {
@@ -1114,15 +1122,12 @@ function _mapJump(target){
 // its storefront opens — discounted sale, inflated provisioning (the real
 // service behind the M3 placeholder).
 function _mapMerchantOffer(events){
-  const list = Array.isArray(events) ? events : [];
-  for (let i = 0; i < list.length; i++){
-    const e = list[i];
-    if (e && e.kind === "merchantFleetEvent"){
-      _patchMap({ pendingMerchant: { reason: e.reason || null, offer: e.offer || null } });
-      Hud.updateMapHud();
-      Hud.toggleStationModal(true);
-      return e;
-    }
+  const e = FindMerchantOfferEvent(events);
+  if (e){
+    _patchMap({ pendingMerchant: { reason: e.reason || null, offer: e.offer || null } });
+    Hud.updateMapHud();
+    Hud.toggleStationModal(true);
+    return e;
   }
   return null;
 }
@@ -1205,29 +1210,11 @@ function _launchEncounterBattle(setup){
 function _mapClick(px, py, ds){
   const map = _mapSection();
   if (!map) return;
-  const span = 64;
-  const mx = px * span / ds;
-  const my = py * span / ds;
-  let target = null;
-  const locs = Array.isArray(map.locations) ? map.locations : [];
-  for (let i = 0; i < locs.length; i++){
-    const L = locs[i];
-    const dx = mx - L.x;
-    const dy = my - L.y;
-    const w = (typeof L.well === "number") ? L.well : 6;
-    if (dx * dx + dy * dy <= w * w){ target = L; break; }
-  }
-  const pf = (map.fleets || []).find(function (f){ return f.faction === "player"; });
-  const inWell = pf ? locs.find(function (L){
-    const dx = pf.x - L.x;
-    const dy = pf.y - L.y;
-    const w = (typeof L.well === "number") ? L.well : 6;
-    return dx * dx + dy * dy <= w * w;
-  }) : null;
-  if (target && inWell && target.id !== inWell.id){
-    _mapJump(target.id);
+  const t = ResolveMapClickTarget({ map: map, px: px, py: py, ds: ds });
+  if (t.jumpToId !== null){
+    _mapJump(t.jumpToId);
   } else {
-    _mapTravel(target ? { x: target.x, y: target.y } : { x: mx, y: my });
+    _mapTravel(t.moveTo);
   }
 }
 
@@ -2232,45 +2219,29 @@ const AI = {
   _snapshot(withRolls = false, syncOnly = false){
     const aiUnitsCount = State.units.filter(u => u.hp > 0 && u.team === 2).length;
     const rolls = withRolls ? Array.from({length: aiUnitsCount}, () => RND()) : [];
-    const clonedUnits = Array.isArray(State.units)
-      ? State.units.map(u => ({ ...u, flags: new Set(u.flags) }))
-      : [];
-    const clonedTerrain = Array.isArray(State.terrain)
-      ? State.terrain.map(col => Array.isArray(col) ? col.slice() : [])
-      : [];
-    const snap = {
-      gridSize: GRID_SIZE,
-      spawnRadius: SPAWN_RADIUS,
-      difficulty: DIFFICULTY,
-      difficultyTable: DIFFICULTY_TABLE,
-      shipSpecs: SHIP_SPECS,
-      aiDoctrine: State.aiDoctrine,
-      // M6(a): the battle's faction identity and its scorer multipliers,
-      // delivered as plain data (the scorer folds them over the profile).
-      aiFaction: State.faction || null,
+    return BuildAISnapshot({
+      state: {
+        units: State.units,
+        terrain: State.terrain,
+        turnNumber: State.turnNumber,
+        activeTeam: State.activeTeam,
+        ap: State.ap,
+        credits: State.credits,
+        aiDoctrine: State.aiDoctrine,
+        faction: State.faction,
+        lastSeenEnemies: State.lastSeenEnemies,
+        aiPlan: State.aiPlan,
+        aiEmergencyMode: State.aiEmergencyMode,
+        aiScoreTrace: State.aiScoreTrace,
+        gameOver: State.gameOver
+      },
+      consts: { gridSize: GRID_SIZE, spawnRadius: SPAWN_RADIUS, difficulty: DIFFICULTY, difficultyTable: DIFFICULTY_TABLE, shipSpecs: SHIP_SPECS },
+      rules: PURE_RULES,
       aiFactionWeights: (State.faction && Factions) ? Factions.ScorerWeights(State.faction) : null,
-      turnNumber: State.turnNumber,
-      activeTeam: State.activeTeam,
-      ap: State.ap,
-      credits: State.credits ? { ...State.credits } : { 1: 0, 2: 0 },
-      terrain: clonedTerrain,
-      units: clonedUnits,
-      // O(1) Rules.getUnitAt during planning (the board does not change while
-      // the AI evaluates a beat; a new snapshot is built every beat).
-      unitIndex: Rules.buildUnitIndex(clonedUnits),
-      lastSeenEnemies: new Map(State.lastSeenEnemies),
-      reservations: (State.aiPlan && State.aiPlan.reservations) ? new Map(State.aiPlan.reservations) : new Map(),
-      aiEmergencyMode: State.aiEmergencyMode,
-      aiScoreTrace: DeepCopy(State.aiScoreTrace),
-      gameOver: State.gameOver,
-      rolls,
+      rolls: rolls,
       roll: withRolls ? RND() : 1,
-      syncOnly,
-      rules: PURE_RULES
-    };
-    // One-way boundary: the DTO is deep-frozen, so the AI tree can only read
-    // it — it returns a result object instead of decorating the snapshot.
-    return FreezeDeep(snap);
+      syncOnly: syncOnly
+    });
   },
   getAIAction(snap){
     return getAIAction(snap);
@@ -2627,26 +2598,15 @@ function freshCopy(src){
 
 let _gameLoadPromise = null;
 
-// M6(a): per-team hull identity for the frame — plain data; the renderer
-// paints the faction stripe band and the minimap ramp from it. Team 1 keeps
-// the active theme's hull ramp; team 2 wears the battle faction's theme
-// (the battle stays team 1/2-keyed). Missing entries fall through to the
-// theme palette inside the renderer.
+// M6(a): per-team hull identity for the frame — glue that resolves the
+// seam theme key; the palette/stripe assembly is the pure child's.
 function _hullThemesNow(factionOverride){
   const fid = (factionOverride !== undefined) ? factionOverride : State.faction;
-  const base = (THEME_DATA && THEME_DATA.palettes && THEME_DATA.palettes[State.theme || "default"]) || null;
-  const baseHull = (base && base.hull) || {};
-  const out = {
-    1: baseHull[1] ? Object.assign({}, baseHull[1]) : null,
-    2: baseHull[2] ? Object.assign({}, baseHull[2]) : null
-  };
-  const fkey = (fid && Factions) ? Factions.ThemeOf(fid) : null;
-  const ft = (fkey && THEME_DATA && THEME_DATA.factionThemes && THEME_DATA.factionThemes[fkey]) || null;
-  if (ft){
-    out[2] = Object.assign({}, out[2] || {}, ft.hull || {},
-      (typeof ft.stripe === "string") ? { stripe: ft.stripe } : {});
-  }
-  return out;
+  return ResolveHullThemes({
+    themeKey: State.theme || "default",
+    factionThemeKey: (fid && Factions) ? Factions.ThemeOf(fid) : null,
+    themeData: THEME_DATA
+  });
 }
 
 // A fresh plain copy of the live layout metrics per publish. The channel's
@@ -2655,24 +2615,7 @@ function _hullThemesNow(factionOverride){
 // renderer at the boot-time snapshot (visible as a stale-scale canvas after a
 // live window resize). Fresh identity per frame defeats that memo.
 function _metricsSnapshot(){
-  const m = (_host && _host.metrics) ? _host.metrics : null;
-  if (!m) return null;
-  return {
-    displaySize: m.displaySize,
-    viewportWidth: m.viewportWidth,
-    viewportHeight: m.viewportHeight,
-    isWidescreen: m.isWidescreen,
-    renderScale: m.renderScale,
-    devicePx: m.devicePx,
-    cellPx: m.cellPx,
-    fontScale: m.fontScale,
-    textScale: m.textScale,
-    uiScale: m.uiScale,
-    minimapSize: m.minimapSize,
-    minimapCanvasSize: m.minimapCanvasSize,
-    minimapDevicePx: m.minimapDevicePx,
-    ui: m.ui
-  };
+  return CopyMetrics((_host && _host.metrics) ? _host.metrics : null);
 }
 
 const api = {
@@ -2744,6 +2687,14 @@ const api = {
         "main.js children/game.js children/buildStationHeader.js",
         "main.js children/game.js children/buildMapHudExtra.js",
         "main.js children/game.js children/resolveCursorStyle.js",
+        "main.js children/game.js children/findMerchantOfferEvent.js",
+        "main.js children/game.js children/hasMapEvent.js",
+        "main.js children/game.js children/pickMapPatch.js",
+        "main.js children/game.js children/findPlayerFleet.js",
+        "main.js children/game.js children/resolveMapClickTarget.js",
+        "main.js children/game.js children/resolveHullThemes.js",
+        "main.js children/game.js children/copyMetrics.js",
+        "main.js children/game.js children/buildAISnapshot.js",
       ]);
 
       // The flattened children expose one plain pure function each at script
@@ -2805,7 +2756,15 @@ const api = {
         buildMissionRows: typeof buildMissionRows === "function" ? buildMissionRows : null,
         buildStationHeader: typeof buildStationHeader === "function" ? buildStationHeader : null,
         buildMapHudExtra: typeof buildMapHudExtra === "function" ? buildMapHudExtra : null,
-        resolveCursorStyle: typeof resolveCursorStyle === "function" ? resolveCursorStyle : null
+        resolveCursorStyle: typeof resolveCursorStyle === "function" ? resolveCursorStyle : null,
+        findMerchantOfferEvent: typeof findMerchantOfferEvent === "function" ? findMerchantOfferEvent : null,
+        hasMapEvent: typeof hasMapEvent === "function" ? hasMapEvent : null,
+        pickMapPatch: typeof pickMapPatch === "function" ? pickMapPatch : null,
+        findPlayerFleet: typeof findPlayerFleet === "function" ? findPlayerFleet : null,
+        resolveMapClickTarget: typeof resolveMapClickTarget === "function" ? resolveMapClickTarget : null,
+        resolveHullThemes: typeof resolveHullThemes === "function" ? resolveHullThemes : null,
+        copyMetrics: typeof copyMetrics === "function" ? copyMetrics : null,
+        buildAISnapshot: typeof buildAISnapshot === "function" ? buildAISnapshot : null
       };
       // DATA payloads + the two remaining registrar children (hud, ai):
       // parent-captures-child-at-load, no registrar handshake.
@@ -2878,7 +2837,15 @@ const api = {
         ["main.js children/game.js children/buildMissionRows.js",                         kids.buildMissionRows],
         ["main.js children/game.js children/buildStationHeader.js",                       kids.buildStationHeader],
         ["main.js children/game.js children/buildMapHudExtra.js",                         kids.buildMapHudExtra],
-        ["main.js children/game.js children/resolveCursorStyle.js",                       kids.resolveCursorStyle]
+        ["main.js children/game.js children/resolveCursorStyle.js",                       kids.resolveCursorStyle],
+        ["main.js children/game.js children/findMerchantOfferEvent.js",                   kids.findMerchantOfferEvent],
+        ["main.js children/game.js children/hasMapEvent.js",                              kids.hasMapEvent],
+        ["main.js children/game.js children/pickMapPatch.js",                             kids.pickMapPatch],
+        ["main.js children/game.js children/findPlayerFleet.js",                          kids.findPlayerFleet],
+        ["main.js children/game.js children/resolveMapClickTarget.js",                    kids.resolveMapClickTarget],
+        ["main.js children/game.js children/resolveHullThemes.js",                        kids.resolveHullThemes],
+        ["main.js children/game.js children/copyMetrics.js",                              kids.copyMetrics],
+        ["main.js children/game.js children/buildAISnapshot.js",                          kids.buildAISnapshot]
       ].filter(c => !c[1]).map(c => c[0]);
       if (missing.length > 0) {
         throw new Error("These scripts loaded but did not register their module (see earlier errors):\n  " + missing.join("\n  "));
@@ -2912,6 +2879,14 @@ const api = {
       BuildStationHeader = kids.buildStationHeader;
       BuildMapHudExtra = kids.buildMapHudExtra;
       ResolveCursorStyle = kids.resolveCursorStyle;
+      FindMerchantOfferEvent = kids.findMerchantOfferEvent;
+      HasMapEvent = kids.hasMapEvent;
+      PickMapPatch = kids.pickMapPatch;
+      FindPlayerFleet = kids.findPlayerFleet;
+      ResolveMapClickTarget = kids.resolveMapClickTarget;
+      ResolveHullThemes = kids.resolveHullThemes;
+      CopyMetrics = kids.copyMetrics;
+      BuildAISnapshot = kids.buildAISnapshot;
 
       RULES_DATA = FreezeDeep(_modules.rulesData);
       CAMPAIGN_DATA = FreezeDeep(_modules.campaignData);

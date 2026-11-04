@@ -394,6 +394,14 @@ lands; the Surface column says how far each file is from the bar.
 | `main.js children/game.js children/buildStationHeader.js` | storefront header fields | `buildStationHeader` | 1 fn ✓ — flatten shape |
 | `main.js children/game.js children/buildMapHudExtra.js` | map-HUD extra block | `buildMapHudExtra` | 1 fn ✓ — flatten shape |
 | `main.js children/game.js children/resolveCursorStyle.js` | evidence → cursor string | `resolveCursorStyle` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/findMerchantOfferEvent.js` | first merchant-fleet event | `findMerchantOfferEvent` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/hasMapEvent.js` | event-list kind test | `hasMapEvent` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/pickMapPatch.js` | move-result patch fields | `pickMapPatch` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/findPlayerFleet.js` | player fleet record lookup | `findPlayerFleet` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/resolveMapClickTarget.js` | map pixel → jump/travel target | `resolveMapClickTarget` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/resolveHullThemes.js` | hull palettes + stripe band | `resolveHullThemes` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/copyMetrics.js` | fresh layout-metrics copy | `copyMetrics` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/buildAISnapshot.js` | frozen AI snapshot DTO assembly | `buildAISnapshot` | 1 fn ✓ — flatten shape |
 | `main.js children/game.js children/gameState.js` | state-store operations | 6 fns | scheduled — pure `state → state/data` fns, one per file |
 | `main.js children/inputs.js` | hardware → input events | core | scheduled — pure translate fns; listeners → `main.js` |
 | `main.js children/game.js children/sectorGenerator.js` | sector/unit generation | 2 fns | scheduled |
