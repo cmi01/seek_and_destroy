@@ -6,7 +6,11 @@
 // Owner: hud.js. Holds no state.
 // ============================================================
 const buildReserveModel = function (deps, input) {
-  const units = (input.state && input.state.units) || [];
+  // D3 fix: the INPUT contract exposes the live unit DTOs at `input.units`
+  // (the state slice carries no units key). Reading `input.state.units` left
+  // `flag` permanently null — the modal read "LOCUS OFFLINE" with the
+  // flagship on the board and every summon card was born disabled.
+  const units = Array.isArray(input.units) ? input.units : [];
   let flag = null;
   for (let i = 0; i < units.length; i++){
     const u = units[i];

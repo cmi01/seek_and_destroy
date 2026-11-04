@@ -831,6 +831,27 @@ D4's expectation updated to the four Q11 options (fixture-pin convention).
 The harness `/tmp/hermes-verify-t_3f182083/verify-final-review.js` goes
 3/3 green (check 1 is its regression guard).
 
+**Fix card outcome (t_e4b60cbf, v161).** All four defects fixed and
+re-verified live (worktree harness `/tmp/hermes-verify-t_e4b60cbf/
+verify-final-review.js` 7/7, the review harness above 3/3, and the identical
+live-path probe A/B against a detached v159 worktree — baseline RED signatures
+reproduced, fixed tree green):
+
+| # | Fix | Evidence (live path) |
+|---|---|---|
+| D1 | `applyBattleResult.js` now folds `next` from `Object.assign({}, section, …)` — the whitelist that dropped `contracts` is gone and future section keys survive too | post-fold campaign keys carry `contracts` intact (active/progress/done/campaignComplete byte-equal); v159 baseline drops the key |
+| D2 | the count source is a running per-side death counter (`_reapDeadUnits` tallies each hull as `executeMove`/`executeShoot` remove it — the fold can no longer see `hp <= 0` rows); the kill event fires on any hull lost on either side (frozen M6(b) semantics, one kill-rate step per fold) and `destroy` progress credits hostile hulls only | 5 hostile kills + 1 own loss fold: `player\|Syndicate` −20→−30, `c1` progress `{kills: 5}` (own loss excluded); v159 baseline: pair unchanged, progress empty |
+| D3 | `buildReserveModel.js` reads the INPUT contract's `input.units` (the state slice carries no units key) | real canvas click on `RESERVE_SUMMON:Fighter` summons for exactly 1 AP (AP 4→3, reserve 4→3, Fighter mirage materializes as a warp signature); the modal's locus line reads `ACTIVE LOCUS: FLAGSHIP BATTLECRUISER AT [4,15] (28 VACANT CELLS WITHIN 3)`; v159 baseline: `LOCUS OFFLINE`, rows `enabled:false`, click inert |
+| D4 | `11-campaign-map.spec.ts:37` pins the observed four-option array `['HAIL_TRADE','HAIL_TALK','HAIL_THREATEN','HAIL_LEAVE']` (Q11: trade leads the list) | `npx playwright test` 30/30 (was 29/30) |
+
+Adopted semantics recorded here (the §12.8.2 reconciliation): the posted
+briefs ("destroy N hostile hulls") are the contract truth — `destroy`
+progress credits **hostile** hulls destroyed, never own losses; the
+kill-reputation event keeps the frozen M6(b) rule ("any hull lost on either
+side", one `kills ±10` step per fold). The old code comment claiming "battle
+losses count toward destroy contracts" was the stale wording and is
+corrected in place.
+
 ### 12.7 Audit counts vs v107 and the structure-warning trend
 
 Reference audit: **6/0/27/2 at every gate from v107 through v158** — no drift
@@ -862,6 +883,12 @@ subtrees did not regress the boundary rules while adding to the composer.
 2. The c1 brief says "destroy 2 hostile hulls", but the fold credits
    `destroy` progress with the count of ALL battle dead (own losses
    included) — the brief/rules wording should be reconciled when D2 is fixed.
+   **Resolved in the fix card (v161):** the briefs are the contract truth —
+   the fold now credits hostile hulls destroyed only (own losses never tick a
+   `destroy` contract), so no brief or rules wording needed changing; the one
+   stale wording was the code comment ("battle losses count"), corrected in
+   place. The kill-reputation event keeps the frozen M6(b) rule (any hull
+   lost on either side, one step per fold).
 3. There is no user-facing save/load (no menu item; `localStorage` only holds
    audio settings). The M1 criterion targets the save/restore seam, which is
    delivered and round-trips; if in-game persistence is wanted it is new
@@ -871,6 +898,29 @@ subtrees did not regress the boundary rules while adding to the composer.
    seam committed the turn (the same click flow worked elsewhere in the run,
    including DEPLOY_CONFIRM minutes later) — recorded for the fix card to
    probe; not root-caused, not counted against the criteria.
+   **Root cause (probed in the fix card, v161) — two independent mechanisms,
+   both reproduced live:**
+   (a) the map-turn commit path itself crashed: `_npcMapTurn` called a
+   label-seeded `rngFor` that was **defined nowhere in the tree**, so every
+   map turn commit without an open encounter threw mid-way — the turn
+   counter advanced and then the NPC turn and the closing `Hud.updateAll()`
+   never ran, so canvas clicks produced no observable dispatch (no HUD
+   refresh) while the raw `SD.Map.endTurn()` seam still returned the
+   committed turn. Fixed at v161 (`rngFor` defined beside `mulberry32`:
+   deterministic per label + run seed — rng-in/rng-out, never `Math.random`,
+   so NPC turns stay reproducible for save/parity);
+   post-fix the same clicks commit 3/3 with zero page errors and the NPC
+   turn resolves orders (world life actually runs).
+   (b) while ANY modal owns the screen the hit list holds only that modal's
+   buttons — END TURN is absent from `State.canvasButtons`, and a press at
+   its (still rendered or remembered) position falls through to the modal
+   guard and silently does nothing. Both modal triggers seen in the wild
+   were reproduced: the station/merchant storefront (which auto-opens on a
+   rejected map move) and the defeat path's endgame modal (whose "SECTOR
+   MAP" opens the starmap modal, which closes back to the endgame modal
+   while `gameOver` is set — §12.8.1's open design question governs whether
+   the bare map should be reachable there at all). Not changed at v161 —
+   modal-blocking is standard; recorded as the dispatch root cause.
 5. A stale station-modal render can show a disabled action row after state
    changes underneath it (the row enables on the next tab click / reopen) —
    cosmetic; worth a refresh when D3's model is touched.

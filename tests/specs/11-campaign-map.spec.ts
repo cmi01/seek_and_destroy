@@ -31,10 +31,11 @@ test('campaign map: entering an encounter opens the hailing shell and the NEXT t
   expect(map.pendingEncounter).not.toBeNull();
   expect(map.pendingEncounter!.kind).toBe('fleet');
 
-  // The hailing shell (voice placeholder) is on the map HUD with the three
-  // dialogue options as canvas buttons.
+  // The hailing shell (voice placeholder) is on the map HUD with the four
+  // Q11 dialogue options as canvas buttons (trade leads the list — observed
+  // output pinned, M6(c)/v155 added HAIL_TRADE).
   const hailIds = opened.canvasButtons.map((b) => b.id).filter((id) => id.startsWith('HAIL_'));
-  expect(hailIds).toEqual(['HAIL_TALK', 'HAIL_THREATEN', 'HAIL_LEAVE']);
+  expect(hailIds).toEqual(['HAIL_TRADE', 'HAIL_TALK', 'HAIL_THREATEN', 'HAIL_LEAVE']);
 
   // (c) the NEXT turn commits the encounter to battle through the M2 seam:
   // the DEPLOYMENT step opens (the level ladder no longer launches battles).

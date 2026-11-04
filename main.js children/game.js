@@ -22,6 +22,12 @@ const _stateBox = { current: null };
 let _hudView = null;
 let _hudCache = { priorityKey: "", priorityLabel: null, hoveredSpotted: false };
 let _battleSnapshot = null;
+// D2 fix: dead hulls are removed from State.units the moment they die (the
+// reaper below), so the fold can NOT count `hp <= 0` rows — that count was
+// always 0 and the kill/destroy hooks never fired. This running counter is
+// the count source: each reaped hull is tallied per side as it leaves the
+// board (mirages are warp signatures, not hulls, and do not count).
+let _battleDeaths = { 1: 0, 2: 0 };
 let _pendingDeploy = null;
 // M5(c) per-shot weapon choice (Q8): the player picks which mounted weapon
 // fires on a unit's one attack per turn. Game-owned transient UI state (like
@@ -165,6 +171,25 @@ function mulberry32(seed){
   };
 }
 function RND(){ return State.rng ? State.rng() : Math.random(); }
+// Probe fix (§12.8.4 root cause): the NPC map turn called this label-seeded
+// rng but it was never defined — every map turn commit without an open
+// encounter threw mid-way (the turn counter advanced, then the NPC turn and
+// the closing HUD refresh never ran, so canvas clicks looked dead while the
+// raw turn seam still reported the commit). Deterministic per label + run
+// seed (rng-in/rng-out per the mechanics contract — never Math.random, which
+// would make NPC turns irreproducible and break save/parity expectations):
+// the same turn/faction rerolls identically for a given run seed.
+function rngFor(label){
+  const base = (State.rngSeed !== undefined && State.rngSeed !== null)
+    ? (State.rngSeed | 0)
+    : 0;
+  let h = (base ^ 0x9E3779B9) >>> 0;
+  const s = String(label);
+  for (let i = 0; i < s.length; i++){
+    h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0;
+  }
+  return mulberry32(h);
+}
 
 // ---- Host & Interface services ------------------------------------------
 // The central shell injects the platform host and the 3 unidirectional Interface Server
@@ -575,7 +600,7 @@ const Actions = {
       }
 
       State.turnReportQueue.push(`BLIND-SECTOR COLLISION AT [${dest.x},${dest.y}]: ${unitA.type} RAMMED ${occupant.type}!`);
-      State.units=State.units.filter(u=>u.hp>0);
+      _reapDeadUnits();
       if(unitA.team===1) Selection.sync();
     } else {
       GameAudio.play("unit.move", {from:origin, to:dest, team:unitA.team, unitType:unitA.type, isVisible:visStartOrEnd});
@@ -675,7 +700,7 @@ const Actions = {
 
     if(target.hp<=0){
       target.hp=0;
-      State.units=State.units.filter(u=>u.hp>0);
+      _reapDeadUnits();
       this.addAnimation({kind:"destroy",duration:380,cell:dest,shipType:target.type});
       GameAudio.play("unit.destroy", {from:dest, to:dest, team:target.team, unitType:target.type, category:SHIP_SPECS[target.type].category, isVisible:visStartOrEnd});
       Visibility.invalidate();
@@ -758,18 +783,25 @@ const Actions = {
         const packed=CampaignLib.CollectResult(State.units, State.battleReserve, _battleSnapshot, status);
         const folded=CampaignLib.ApplyBattleResult(State.campaign, packed, SHIP_SPECS, CombatMath.crewLostFromDamage);
         if (folded && folded.state){
-          // M6(b) kill event hook: any ship lost on either side moves the
-          // player↔faction pair by the frozen kill rate (Q10: kills ±10).
           let s = _mirrorMapFleet(folded.state);
+          // D2 fix: the counts come from the death counter — dead hulls leave
+          // State.units at death, so the old `hp <= 0` scan always read 0 and
+          // these hooks never fired. M6(b): any hull lost on either side
+          // moves the pair by the frozen kill rate (Q10: kills ±10).
+          const hostileDead = _battleDeaths[2];
+          const ownDead = _battleDeaths[1];
+          _battleDeaths = { 1: 0, 2: 0 };
           if (State.faction && Reputation){
-            let dead = 0;
-            for (let i = 0; i < State.units.length; i++){ if (State.units[i].hp <= 0) dead++; }
-            if (dead > 0){
+            if (hostileDead + ownDead > 0){
               s = Object.assign({}, s, {
                 reputation: Reputation.ApplyEvent(s.reputation, "kill", "player", State.faction)
               });
-              // M6(d): battle losses count toward accepted "destroy" contracts.
-              s = Missions.Advance(s, "destroy", dead);
+            }
+            // M6(d): hostile hulls destroyed count toward accepted "destroy"
+            // contracts (the posted briefs read "destroy N hostile hulls" —
+            // own losses do not credit the contract).
+            if (hostileDead > 0){
+              s = Missions.Advance(s, "destroy", hostileDead);
             }
           }
           // M3: the result folds back onto the map — the map screen returns,
@@ -908,6 +940,18 @@ function _unitDTO(u){
     cost: u.cost,
     flags: new Set(u.flags)
   };
+}
+
+// D2 fix: the single place a dead hull leaves State.units. Each removed hull
+// is tallied on its side first, because the battle fold runs AFTER removal
+// and can no longer see `hp <= 0` rows. Mirages are warp signatures, not
+// hulls — a destroyed mirage is not a kill.
+function _reapDeadUnits(){
+  for (let i = 0; i < State.units.length; i++){
+    const u = State.units[i];
+    if (u.hp <= 0 && u.kind !== "mirage") _battleDeaths[u.team === 2 ? 2 : 1]++;
+  }
+  State.units = State.units.filter(u => u.hp > 0);
 }
 
 // Plain-data input for one hud operation (see hud.js INPUT contract).
@@ -2626,6 +2670,7 @@ const SectorGenerator = {
       overflow: setup.overflow.slice(),
       opponent: (setup.deployments[1] && setup.deployments[1].units) ? setup.deployments[1].units.slice() : []
     };
+    _battleDeaths = { 1: 0, 2: 0 };
     const playerHulls = _battleSnapshot.deployed.map(e => e.hull || e.type);
     const enemyHulls = _battleSnapshot.opponent.map(e => e.hull || e.type);
 
@@ -3658,6 +3703,7 @@ const api = {
         State.aiTimers.forEach(t => clearTimeout(t));
         GameAudio.clearAll();
         _battleSnapshot = null;
+        _battleDeaths = { 1: 0, 2: 0 };
         _pendingDeploy = null;
         Rules.initState({ preserve: ["profile"] });
       },

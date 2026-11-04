@@ -115,7 +115,12 @@ const applyBattleResult = function (section, battleResult, shipSpecs, crewLostFn
     events.push({ kind: "campaignOver", reason: "flagship-lost" });
   }
 
-  const next = {
+  // D1 fix: the fold must carry every section key it does not recompute —
+  // the explicit key whitelist below rebuilt `next` without `contracts`, so
+  // any battle silently deleted the accepted contracts, their progress and
+  // `campaignComplete`. Spreading the incoming section keeps those (and any
+  // key added later) intact while the recomputed keys override.
+  const next = Object.assign({}, section, {
     fleet: nextFleet,
     wallet: wallet,
     cargo: cargo,
@@ -123,6 +128,6 @@ const applyBattleResult = function (section, battleResult, shipSpecs, crewLostFn
     clock: section.clock,
     map: section.map,
     market: section.market
-  };
+  });
   return { state: next, events: events };
 };
