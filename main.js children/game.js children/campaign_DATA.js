@@ -65,6 +65,13 @@ const campaignDataPayload = (() => ({
         "Storm Missile Battery": 2800
       }
     },
+    // ---- reputation (M6): the frozen event-rate table (Q10 defaults:
+    // kills ±10, missions ±15, trade ±2). The quintile boundaries are the
+    // fixed Q10 decision (cited where the band is computed); these rates
+    // are tuning and move only here.
+    reputation: {
+      rates: { kill: -10, mission: 15, trade: 2 }
+    },
     // ---- map (M3): the systems/stations table the map state is built from.
     // Money values are the ×100 economy scale (DESIGN §4.5): fuelUnitPrice is
     // 5 ⒸB per fuel unit. Locations carry their gravity well (destination
@@ -86,7 +93,7 @@ const campaignDataPayload = (() => ({
         { id: "ember-reach", kind: "planet", name: "EMBER REACH", x: 54, y: 14, levelId: 3, defenders: ["Missile Frigate", "Probe"] },
         { id: "citadel-singularity", kind: "planet", name: "CITADEL SINGULARITY", x: 58, y: 32, levelId: 3, defenders: ["Flagship Battlecruiser", "Battleship"] },
         { id: "cold-anchor", kind: "station", name: "COLD ANCHOR", x: 56, y: 54, levelId: 3, defenders: [] },
-        { id: "freehold-concourse", kind: "planet", name: "FREEHOLD CONCOURSE", x: 32, y: 58, levelId: 3, defenders: [] }
+        { id: "freehold-concourse", kind: "planet", name: "FREEHOLD CONCOURSE", x: 32, y: 58, levelId: 3, defenders: [], owner: "Freehold" }
       ],
       fleets: [
         // The player entry takes its ships from start.startFleet and its fuel

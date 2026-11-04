@@ -18,14 +18,20 @@
 // without one the section simply carries no market (pre-M4 shape).
 // ============================================================
 
-const initializeCampaignState = function (campaignData, shipSpecs, buildMapFn, buildMarketFn){
+const initializeCampaignState = function (campaignData, shipSpecs, buildMapFn, buildMarketFn, buildRepFn){
   const start = campaignData.start;
   const factions = campaignData.factions;
 
-  const reputation = {};
-  for (let i = 0; i < factions.length; i++){
-    for (let j = i + 1; j < factions.length; j++){
-      reputation[factions[i] + "|" + factions[j]] = 0;
+  // M6: the pair table comes from the injected builder when the composer
+  // supplies one (player pairs seeded at their faction default alignment);
+  // without one the section keeps the M1 shape (faction pairs at 0).
+  let reputation = (typeof buildRepFn === "function") ? buildRepFn() : null;
+  if (!reputation || typeof reputation !== "object"){
+    reputation = {};
+    for (let i = 0; i < factions.length; i++){
+      for (let j = i + 1; j < factions.length; j++){
+        reputation[factions[i] + "|" + factions[j]] = 0;
+      }
     }
   }
 

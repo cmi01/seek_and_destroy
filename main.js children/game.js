@@ -57,6 +57,7 @@ let ActionLegality = null;
 let CombatMath = null;
 let Outfitting = null;
 let Factions = null;
+let Reputation = null;
 let ReservePlacement = null;
 let EndgameStatus = null;
 // The pure game.js children (single job each, registered below at load time).
@@ -753,10 +754,21 @@ const Actions = {
         const packed=CampaignLib.CollectResult(State.units, State.battleReserve, _battleSnapshot, status);
         const folded=CampaignLib.ApplyBattleResult(State.campaign, packed, SHIP_SPECS, CombatMath.crewLostFromDamage);
         if (folded && folded.state){
+          // M6(b) kill event hook: any ship lost on either side moves the
+          // player↔faction pair by the frozen kill rate (Q10: kills ±10).
+          let s = _mirrorMapFleet(folded.state);
+          if (State.faction && Reputation){
+            let dead = 0;
+            for (let i = 0; i < State.units.length; i++){ if (State.units[i].hp <= 0) dead++; }
+            if (dead > 0){
+              s = Object.assign({}, s, {
+                reputation: Reputation.ApplyEvent(s.reputation, "kill", "player", State.faction)
+              });
+            }
+          }
           // M3: the result folds back onto the map — the map screen returns,
           // the freeze lifts, and the map fleet mirrors the post-battle
-          // roster (the shared mirror helper).
-          let s = _mirrorMapFleet(folded.state);
+          // roster (the shared mirror helper above).
           if (s.map){
             s = Object.assign({}, s, {
               map: Object.assign({}, s.map, {
@@ -1379,6 +1391,16 @@ function _stationBundle(){
   };
 }
 
+// M6(b): the faction that speaks for a map location (the row's `owner`),
+// else null — the trade/mission reputation counterparty.
+function _locationOwner(locId){
+  const locs = (CAMPAIGN_DATA && CAMPAIGN_DATA.campaign && CAMPAIGN_DATA.campaign.map && CAMPAIGN_DATA.campaign.map.locations) || [];
+  for (let i = 0; i < locs.length; i++){
+    if (locs[i].id === locId) return locs[i].owner || null;
+  }
+  return null;
+}
+
 // M4 merchant quoting: the M3 offer's multipliers over the same seeded mid
 // price the station quotes — buy (player purchases) inflated, sell (player
 // sells) discounted. Plain data, computed where the trade executes so the
@@ -1411,7 +1433,18 @@ function _stationTrade(good, sign){
     : EconomyLib.Quote(c, good, locId, turn);
   const res = EconomyLib.ApplyTrade(c, good, sign * lot, locId, unit);
   if (!res || !res.state) { GameAudio.play("ui.invalid"); return; }
-  TryPatchGameState({ campaign: _mirrorMapFleet(res.state) });
+  // M6(b) trade event hook: a completed trade moves the player↔owner pair
+  // by the frozen trade rate (Q10: trade ±2) when the location row names an
+  // owner. Merchant storefront trades are excluded — the merchant fleet's
+  // faction is not part of the design yet (open item in the M6 handoff).
+  let nextState = res.state;
+  const party = merchant ? null : _locationOwner(locId);
+  if (party && Reputation){
+    nextState = Object.assign({}, nextState, {
+      reputation: Reputation.ApplyEvent(nextState.reputation, "trade", "player", party)
+    });
+  }
+  TryPatchGameState({ campaign: _mirrorMapFleet(nextState) });
   GameAudio.play("ui.select");
   Hud.updateMapHud();
   Hud.toggleStationModal(true);
@@ -2688,6 +2721,7 @@ const api = {
         "main.js children/game.js children/campaignMap.js",
         "main.js children/game.js children/economy.js",
         "main.js children/game.js children/factions.js",
+        "main.js children/game.js children/reputation.js",
         "main.js children/game.js children/themes.js",
         "main.js children/game.js children/rulesConfig.js",
         "main.js children/game.js children/boardQueries.js",
@@ -2740,6 +2774,7 @@ const api = {
         campaignMap:      typeof campaignMap === "function" ? campaignMap : null,
         economy:          typeof economy === "function" ? economy : null,
         factions:         typeof factions === "function" ? factions : null,
+        reputation:       typeof reputation === "function" ? reputation : null,
         boardQueries:     typeof boardQueries === "function" ? boardQueries : null,
         visionQueries:    typeof visionQueries === "function" ? visionQueries : null,
         actionLegality:   typeof actionLegality === "function" ? actionLegality : null
@@ -2765,6 +2800,7 @@ const api = {
         ["main.js children/game.js children/campaignMap.js",             kids.campaignMap],
         ["main.js children/game.js children/economy.js",                  kids.economy],
         ["main.js children/game.js children/factions.js",                 kids.factions],
+        ["main.js children/game.js children/reputation.js",               kids.reputation],
         ["main.js children/game.js children/themes.js",                  kids.themes],
         ["main.js children/game.js children/rulesConfig.js",             kids.rulesConfig],
         ["main.js children/game.js children/boardQueries.js",            kids.boardQueries],
@@ -2836,7 +2872,8 @@ const api = {
       CampaignMapLib = kids.campaignMap();
       EconomyLib = kids.economy();
       InitializeCampaign = () => {
-        const fresh = campaignLib.InitializeCampaignState(CAMPAIGN_DATA.campaign, SHIP_SPECS, buildMapSection, buildMarketSection);
+        const fresh = campaignLib.InitializeCampaignState(CAMPAIGN_DATA.campaign, SHIP_SPECS, buildMapSection, buildMarketSection,
+          () => Reputation.Init(CAMPAIGN_DATA.campaign.factions, id => Factions.AlignmentOf(id)));
         if (!TryPatchGameState({ campaign: fresh })) {
           console.error("[S&D campaign] initializeCampaign: patch rejected.");
           return null;
@@ -2870,6 +2907,9 @@ const api = {
       // M6(a) faction seam: identity rows + doctrine-weighted fleet
       // composition over the frozen faction table and the roster.
       Factions = kids.factions(SHIP_SPECS);
+      // M6(b) reputation seam: bands, stances, adjustments and the sensor
+      // sharing policy over the frozen event-rate table.
+      Reputation = kids.reputation(CAMPAIGN_DATA.campaign.reputation);
       ReservePlacement = kids.reservePlacement(RULES_DATA);
       EndgameStatus = {
         checkEndgameStatus: kids.endgameStatus
@@ -3471,6 +3511,14 @@ const api = {
       factionRow(id){ return Factions ? Factions.Row(id) : null; },
       rollFleet(id, budget, seed){ return Factions ? Factions.ComposeFleet(id, budget, mulberry32(seed)) : []; },
       hullThemesFor(id){ return _hullThemesNow(id); },
+      // M6(b) reputation seam (tests): bands, stances, adjustments, the
+      // sharing policy and the pair-table seed.
+      repBand(score){ return Reputation.Band(score); },
+      repStance(rep, a, b){ return Reputation.Stance(rep, a, b); },
+      repAdjust(rep, a, b, d){ return Reputation.Adjust(rep, a, b, d); },
+      repEvent(rep, kind, a, b, sign){ return Reputation.ApplyEvent(rep, kind, a, b, sign); },
+      repShares(band, where){ return Reputation.SharesSensors(band, where); },
+      repInit(){ return Reputation.Init(CAMPAIGN_DATA.campaign.factions, id => Factions.AlignmentOf(id)); },
       transitionToPlayerTurn(){ return Actions.transitionToPlayerTurn(); },
       transitionToAITurn(){ return Actions.transitionToAITurn(); },
       defaultDeployChoice(){

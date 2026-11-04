@@ -506,6 +506,10 @@ const GAME_LEAF_SCRIPTS = [
   "main.js children/game.js children/economy.js children/payWages.js",
   "main.js children/game.js children/factions.js children/factions_DATA.js",
   "main.js children/game.js children/factions.js children/composeFleet.js",
+  "main.js children/game.js children/reputation.js children/reputationBand.js",
+  "main.js children/game.js children/reputation.js children/stanceBetween.js",
+  "main.js children/game.js children/reputation.js children/adjustReputation.js",
+  "main.js children/game.js children/reputation.js children/sharesSensors.js",
   "main.js children/game.js children/actionLegality.js children/crewStatus.js"
 ];
 
@@ -679,6 +683,10 @@ async function startGame(){
       ["main.js children/game.js children/economy.js children/payWages.js", () => typeof payWages === "function"],
       ["main.js children/game.js children/factions.js children/factions_DATA.js", () => typeof factionsDataPayload === "object" && factionsDataPayload !== null],
       ["main.js children/game.js children/factions.js children/composeFleet.js", () => typeof composeFleet === "function"],
+      ["main.js children/game.js children/reputation.js children/reputationBand.js", () => typeof reputationBand === "function"],
+      ["main.js children/game.js children/reputation.js children/stanceBetween.js", () => typeof stanceBetween === "function"],
+      ["main.js children/game.js children/reputation.js children/adjustReputation.js", () => typeof adjustReputation === "function"],
+      ["main.js children/game.js children/reputation.js children/sharesSensors.js", () => typeof sharesSensors === "function"],
       ["main.js children/game.js children/actionLegality.js children/crewStatus.js", () => typeof crewStatus === "function"]
     ]);
 

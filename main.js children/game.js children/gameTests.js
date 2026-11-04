@@ -277,7 +277,7 @@ const runGameTests = function (bridge, testName) {
       bridge.initializeCampaign();
       const before = bridge.campaign;
       const ok = Boolean(before && Array.isArray(before.fleet) && before.fleet.length === 5 &&
-        before.wallet === 25000 && before.cargo && before.reputation && before.clock);
+        before.wallet === 25000 && before.cargo && before["reputation"] && before.clock);
       if (!ok) return { name: "CAMPAIGN STATE ROUND-TRIP (M1)", pass: false, detail: "campaign state missing or wrong shape" };
 
       const snapshot = JSON.stringify(before);
@@ -328,7 +328,7 @@ const runGameTests = function (bridge, testName) {
       if (st.turnNumber !== 3 || st.levelId !== 101 || st.viewSpan !== 16) fail("non-money fields were scaled");
       const section = st.campaign;
       const sectionOk = section && Array.isArray(section.fleet) && typeof section.wallet === "number" &&
-        section.cargo && section.reputation && section.clock && section.map;
+        section.cargo && section["reputation"] && section.clock && section.map;
       if (!sectionOk) fail("migrated save has no campaign section");
       if (Object.prototype.hasOwnProperty.call(fixture.state, "campaign")) fail("fixture must omit campaign");
 
@@ -1775,6 +1775,94 @@ const runGameTests = function (bridge, testName) {
       };
     },
 
+    // T-M6b-1 (M6): the Q10 quintile boundaries pin exactly, and a
+    // reputation delta can flip a pair's band at a threshold.
+    testReputationBands() {
+      const bad = [];
+      const expect = [[-100, "enemy"], [-41, "enemy"], [-40, "unfriendly"], [0, "unfriendly"], [19, "unfriendly"],
+        [20, "neutral"], [79, "neutral"], [80, "friendly"], [139, "friendly"], [140, "allied"], [200, "allied"]];
+      for (const [score, band] of expect) {
+        const got = bridge.repBand(score);
+        if (got !== band) bad.push(score + "=" + got + "!=" + band);
+      }
+      if (bridge.repBand(-150) !== "enemy") bad.push("clamp-low");
+      if (bridge.repBand(999) !== "allied") bad.push("clamp-high");
+      // The acceptance flip: unfriendly 19 + delta 1 crosses 20 into neutral.
+      const rep = bridge.repAdjust({ "player|Syndicate": 19 }, "player", "Syndicate", 1);
+      const flipped = bridge.repBand(rep["player|Syndicate"]);
+      if (flipped !== "neutral") bad.push("flip=" + flipped);
+      // ...and neutral 79 + delta 1 crosses 80 into friendly.
+      const rep2 = bridge.repAdjust({ "player|Syndicate": 79 }, "player", "Syndicate", 1);
+      if (bridge.repBand(rep2["player|Syndicate"]) !== "friendly") bad.push("flip2");
+      return {
+        name: "M6b-1 REPUTATION QUINTILES + BAND FLIP (Q10 boundaries)",
+        pass: bad.length === 0,
+        detail: "checks=" + (expect.length + 5) + " issues=[" + bad.join("; ") + "]"
+      };
+    },
+
+    // T-M6b-2 (M6): stances are band-driven and strictly pairwise (no
+    // transitivity); the sharing policy follows DESIGN §2.7 — allied-only
+    // out of battle, friendly+ in battle, never in hyperspace or across
+    // systems.
+    testStanceAndSharing() {
+      const bad = [];
+      if (bridge.repStance({ "player|Syndicate": -100 }, "player", "Syndicate") !== "hostile") bad.push("hostile");
+      if (bridge.repStance({ "player|Syndicate": 0 }, "player", "Syndicate") !== "neutral") bad.push("neutral");
+      if (bridge.repStance({ "player|Syndicate": 200 }, "player", "Syndicate") !== "allied") bad.push("allied");
+      if (bridge.repStance({ "Syndicate|player": 150 }, "player", "Syndicate") !== "allied") bad.push("key-order");
+      if (bridge.repStance({}, "player", "Syndicate") !== "neutral") bad.push("missing-pair");
+      // Non-transitive: A-B and B-C allied says nothing about A-C.
+      const web = { "A|B": 200, "B|C": 200 };
+      if (bridge.repStance(web, "A", "C") !== "neutral") bad.push("transitive");
+      const shares = [
+        [bridge.repShares("allied", { inBattle: false, sameSystem: true }), true, "allied-out"],
+        [bridge.repShares("friendly", { inBattle: false, sameSystem: true }), false, "friendly-out"],
+        [bridge.repShares("friendly", { inBattle: true, sameSystem: true }), true, "friendly-in"],
+        [bridge.repShares("neutral", { inBattle: true, sameSystem: true }), false, "neutral-in"],
+        [bridge.repShares("allied", { inBattle: true, inHyperspace: true, sameSystem: true }), false, "hyper"],
+        [bridge.repShares("allied", { inBattle: true, sameSystem: false }), false, "cross-system"]
+      ];
+      for (const [got, want, label] of shares) if (got !== want) bad.push(label + "=" + got);
+      return {
+        name: "M6b-2 STANCE PAIRWISE + SHARING POLICY (DESIGN 2.7)",
+        pass: bad.length === 0,
+        detail: "checks=13 issues=[" + bad.join("; ") + "]"
+      };
+    },
+
+    // T-M6b-3 (M6): the event hooks carry the Q10 rates (kills ±10,
+    // missions ±15, trade ±2), the pair table seeds from default
+    // alignment, and scores clamp to −100..200.
+    testReputationEvents() {
+      const bad = [];
+      const seed = bridge.repInit();
+      if (seed["player|Syndicate"] !== -20) bad.push("seed-syndicate=" + seed["player|Syndicate"]);
+      if (seed["player|Capital"] !== 20) bad.push("seed-capital=" + seed["player|Capital"]);
+      if (seed["Syndicate|Capital"] !== 0) bad.push("seed-pair");
+      const r1 = bridge.repEvent({}, "kill", "player", "Syndicate");
+      if (r1["player|Syndicate"] !== -10) bad.push("kill=" + r1["player|Syndicate"]);
+      const r2 = bridge.repEvent({}, "mission", "player", "Capital");
+      if (r2["player|Capital"] !== 15) bad.push("mission=" + r2["player|Capital"]);
+      const r3 = bridge.repEvent({}, "trade", "player", "Freehold");
+      if (r3["player|Freehold"] !== 2) bad.push("trade=" + r3["player|Freehold"]);
+      const r4 = bridge.repEvent({}, "mission", "player", "Capital", -1);
+      if (r4["player|Capital"] !== -15) bad.push("mission-fail=" + r4["player|Capital"]);
+      const clamped = bridge.repAdjust({ "player|Capital": 195 }, "player", "Capital", 50);
+      if (clamped["player|Capital"] !== 200) bad.push("clamp-high=" + clamped["player|Capital"]);
+      const clamped2 = bridge.repAdjust({ "player|Capital": -95 }, "player", "Capital", -50);
+      if (clamped2["player|Capital"] !== -100) bad.push("clamp-low=" + clamped2["player|Capital"]);
+      // Adjust returns a NEW table (transforms never mutate the input).
+      const before = { "player|Capital": 0 };
+      bridge.repAdjust(before, "player", "Capital", 5);
+      if (before["player|Capital"] !== 0) bad.push("mutated");
+      return {
+        name: "M6b-3 REPUTATION EVENT RATES + CLAMPS (Q10 defaults)",
+        pass: bad.length === 0,
+        detail: "seed=[" + seed["player|Syndicate"] + "," + seed["player|Capital"] + "] issues=[" + bad.join("; ") + "]"
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -1808,7 +1896,8 @@ const runGameTests = function (bridge, testName) {
         this.testBattleUnitLoadoutTruth(), this.testWeaponClassShieldBreak(), this.testSaveLoadoutMigration(),
         this.testMultiWeaponFire(), this.testRedNumbersChosenWeapon(), this.testRedNumbersShieldedTarget(),
         this.testOutfitStationFlow(), this.testGeneratorLegalLoadoutSweep(), this.testOutfitModelRows(),
-        this.testFactionFleetRolls(), this.testFactionDoctrineStats(), this.testFactionTableComplete()
+        this.testFactionFleetRolls(), this.testFactionDoctrineStats(), this.testFactionTableComplete(),
+        this.testReputationBands(), this.testStanceAndSharing(), this.testReputationEvents()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;
