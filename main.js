@@ -45,6 +45,286 @@ function getMinimapOffscreenCanvas(){
   return _minimapOffscreen;
 }
 
+// ============================================================
+// TEXT METRICS (C2a) — built ONCE at boot from ctx.measureText, then
+// threaded as a value into every builder that emits text ops:
+//   metrics[fontSpec] -> { measure(text) -> pxWidth, height: number }
+// Truncation/ellipsis decisions happen in the builders (D3); the draw
+// executor renders text literally. Entries are created on first access and
+// memoized, so the map is deterministic for the whole session.
+// ============================================================
+function makeTextMetrics() {
+  const cache = Object.create(null);
+  const probe = document.createElement("canvas").getContext("2d");
+  return new Proxy(cache, {
+    get(target, fontSpec) {
+      if (typeof fontSpec !== "string") return undefined;
+      let entry = target[fontSpec];
+      if (!entry) {
+        entry = {
+          measure(text) {
+            probe.font = fontSpec;
+            return probe.measureText(String(text)).width;
+          },
+          height: (function () {
+            probe.font = fontSpec;
+            const m = probe.measureText("M");
+            return (m.fontBoundingBoxAscent || 0) + (m.fontBoundingBoxDescent || 0);
+          })()
+        };
+        target[fontSpec] = entry;
+      }
+      return entry;
+    }
+  });
+}
+
+// ============================================================
+// C2 DRAW EXECUTOR — the only place that executes DrawCmd lists
+// (REMEDIATION_CONTRACTS C2). Builders return data; this walks it.
+// The 7 ops are EXACT: an unknown op is a hard error.
+//
+// Paint values (`fill` / `stroke`) are a colour string or a plain paint
+// spec: { color, dash? } for dashed strokes, or
+// { gradient: { type: "linear"|"radial", ...coords, stops: [[t, colour], …] } }
+// — plain data, so gradients survive the pure-builder boundary.
+// `arc` traces the arc itself: `fill` fills the closed span (full circles in
+// practice), `stroke` strokes the arc; pie wedges are emitted as `path`.
+// ============================================================
+function drawPaint(ctx, value, isStroke) {
+  if (value == null) return;
+  if (typeof value === "string") {
+    if (isStroke) { ctx.setLineDash([]); ctx.strokeStyle = value; }
+    else ctx.fillStyle = value;
+    return;
+  }
+  const spec = value;
+  if (spec.gradient) {
+    const g = spec.gradient;
+    let grad;
+    if (g.type === "radial") {
+      grad = ctx.createRadialGradient(g.x0, g.y0, g.r0, g.x1, g.y1, g.r1);
+    } else {
+      grad = ctx.createLinearGradient(g.x0, g.y0, g.x1, g.y1);
+    }
+    for (const [t, colour] of g.stops) grad.addColorStop(t, colour);
+    if (isStroke) { ctx.setLineDash([]); ctx.strokeStyle = grad; }
+    else ctx.fillStyle = grad;
+    return;
+  }
+  if (isStroke) {
+    ctx.setLineDash(Array.isArray(spec.dash) ? spec.dash : []);
+    ctx.strokeStyle = spec.color;
+  } else {
+    ctx.fillStyle = spec.color;
+  }
+}
+
+function executeDrawList(ctx, cmds) {
+  if (!Array.isArray(cmds)) throw new Error("executeDrawList: DrawCmd[] expected, got " + typeof cmds);
+  for (const cmd of cmds) {
+    if (!cmd || typeof cmd !== "object" || typeof cmd.op !== "string") {
+      throw new Error("executeDrawList: entry is not a DrawCmd object");
+    }
+    switch (cmd.op) {
+      case "rect": {
+        if (cmd.alpha != null) ctx.save(), ctx.globalAlpha = cmd.alpha;
+        if (cmd.radius) {
+          ctx.beginPath();
+          ctx.roundRect(cmd.x, cmd.y, cmd.w, cmd.h, cmd.radius);
+          if (cmd.fill) { drawPaint(ctx, cmd.fill, false); ctx.fill(); }
+          if (cmd.stroke) { drawPaint(ctx, cmd.stroke, true); ctx.lineWidth = cmd.lineWidth == null ? 1 : cmd.lineWidth; ctx.stroke(); }
+        } else {
+          if (cmd.fill) { drawPaint(ctx, cmd.fill, false); ctx.fillRect(cmd.x, cmd.y, cmd.w, cmd.h); }
+          if (cmd.stroke) { drawPaint(ctx, cmd.stroke, true); ctx.lineWidth = cmd.lineWidth == null ? 1 : cmd.lineWidth; ctx.strokeRect(cmd.x, cmd.y, cmd.w, cmd.h); }
+        }
+        if (cmd.alpha != null) ctx.restore();
+        break;
+      }
+      case "text": {
+        if (cmd.alpha != null) ctx.save(), ctx.globalAlpha = cmd.alpha;
+        ctx.font = cmd.font;
+        ctx.textAlign = cmd.align || "left";
+        ctx.textBaseline = cmd.baseline || "alphabetic";
+        drawPaint(ctx, cmd.fill, false);
+        // D3: the string is rendered literally — no executor-side truncation.
+        ctx.fillText(cmd.text, cmd.x, cmd.y);
+        if (cmd.alpha != null) ctx.restore();
+        break;
+      }
+      case "path": {
+        const pts = cmd.points;
+        if (!Array.isArray(pts) || pts.length === 0) break;
+        if (cmd.alpha != null) ctx.save(), ctx.globalAlpha = cmd.alpha;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        if (cmd.close) ctx.closePath();
+        if (cmd.fill) { drawPaint(ctx, cmd.fill, false); ctx.fill(); }
+        if (cmd.stroke) { drawPaint(ctx, cmd.stroke, true); ctx.lineWidth = cmd.lineWidth == null ? 1 : cmd.lineWidth; ctx.stroke(); }
+        if (cmd.alpha != null) ctx.restore();
+        break;
+      }
+      case "arc": {
+        if (cmd.alpha != null) ctx.save(), ctx.globalAlpha = cmd.alpha;
+        ctx.beginPath();
+        ctx.arc(cmd.cx, cmd.cy, cmd.r, cmd.start, cmd.end, Boolean(cmd.ccw));
+        if (cmd.fill) { drawPaint(ctx, cmd.fill, false); ctx.fill(); }
+        if (cmd.stroke) { drawPaint(ctx, cmd.stroke, true); ctx.lineWidth = cmd.lineWidth == null ? 1 : cmd.lineWidth; ctx.stroke(); }
+        if (cmd.alpha != null) ctx.restore();
+        break;
+      }
+      case "image": {
+        const sheet = spriteMaterial(cmd.sprite);
+        if (!sheet) break;
+        if (cmd.alpha != null) ctx.save(), ctx.globalAlpha = cmd.alpha;
+        if (cmd.sw != null) {
+          ctx.drawImage(sheet, cmd.sx, cmd.sy, cmd.sw, cmd.sh, cmd.dx, cmd.dy,
+                        cmd.dw == null ? cmd.sw : cmd.dw, cmd.dh == null ? cmd.sh : cmd.dh);
+        } else {
+          ctx.drawImage(sheet, cmd.dx, cmd.dy, cmd.dw, cmd.dh);
+        }
+        if (cmd.alpha != null) ctx.restore();
+        break;
+      }
+      case "clip": {
+        ctx.save();
+        executeDrawList(ctx, [cmd.shape].filter(Boolean));
+        ctx.clip();
+        executeDrawList(ctx, cmd.children || []);
+        ctx.restore();
+        break;
+      }
+      case "group": {
+        ctx.save();
+        if (cmd.alpha != null) ctx.globalAlpha = cmd.alpha;
+        if (cmd.translate) ctx.translate(cmd.translate.x, cmd.translate.y);
+        executeDrawList(ctx, cmd.children || []);
+        ctx.restore();
+        break;
+      }
+      default:
+        throw new Error("executeDrawList: unknown DrawCmd op `" + cmd.op + "`");
+    }
+  }
+}
+
+// ============================================================
+// SPRITE ATLAS & TERRAIN TILE CACHE — draw-executor internals (C2:
+// "sprite atlas access moves inside the draw executor"). Builders emit
+// `image` ops referencing sprites BY KEY only; this section owns every
+// offscreen canvas and Image behind those keys. assets/graphics.pak calls
+// registerGraphicsAssets() at load (its container is not a scanned script).
+// ============================================================
+const THEME_FILES = {
+  default: "sprites_default.png",
+  retro: "sprites_retro.png",
+  alien: "sprites_alien.png"
+};
+const AtlasState = { baked: null, images: {}, readyPromises: [], initialized: false };
+
+function registerGraphicsAssets(assets) {
+  AtlasState.baked = assets || null;
+}
+
+function initBakedAtlases() {
+  if (AtlasState.initialized) return;
+  AtlasState.initialized = true;
+  const baked = AtlasState.baked;
+  Object.keys(THEME_FILES).forEach(theme => {
+    if (AtlasState.images[theme]) return;
+    const img = new Image();
+    AtlasState.images[theme] = img;
+    const p = new Promise(resolve => {
+      img.onload = () => resolve(img);
+      img.onerror = () => {
+        console.error("[S&D] Failed to decode sprite atlas for theme \"" + theme + "\"; ships in this theme will not draw.");
+        resolve(null);
+      };
+    });
+    AtlasState.readyPromises.push(p);
+    img.src = (baked && baked[theme]) ? baked[theme] : THEME_FILES[theme];
+  });
+}
+
+function whenAtlasesReady() {
+  initBakedAtlases();
+  return Promise.all(AtlasState.readyPromises);
+}
+
+// Terrain tile cache: core-owned tile canvases (GS-12), full device density
+// under a 4096-side budget, LRU over tiles near the viewport. The composer
+// supplies `paint(canvas)` (the tile's draw list); the canvases live here.
+const TerrainTiles = {
+  worldKey: "", ref: null, map: new Map(), stamp: 0,
+  lastDensity: 0, lastTilePx: 0, lastVisible: 0,
+  reset(worldKey, ref) {
+    if (this.worldKey !== worldKey || this.ref !== ref) {
+      this.map.clear();
+      this.worldKey = worldKey;
+      this.ref = ref;
+    }
+  },
+  ensure(key, meta, paint) {
+    this.stamp += 1;
+    let tile = this.map.get(key);
+    if (!tile) {
+      const canvas = document.createElement("canvas");
+      canvas.width = meta.pxW;
+      canvas.height = meta.pxH;
+      paint(canvas);
+      tile = Object.assign({ canvas }, meta);
+      this.map.set(key, tile);
+    }
+    tile.stamp = this.stamp;
+    return tile;
+  },
+  hold(key) {
+    const tile = this.map.get(key);
+    if (tile) tile.stamp = this.stamp;
+    return tile;
+  },
+  evict(budgetPx) {
+    let used = 0;
+    const entries = [];
+    this.map.forEach((tile, key) => {
+      used += tile.pxW * tile.pxH;
+      entries.push([key, tile]);
+    });
+    if (used <= budgetPx) return;
+    entries.sort((a, b) => a[1].stamp - b[1].stamp);
+    for (let i = 0; i < entries.length; i++) {
+      if (used <= budgetPx) break;
+      const tile = entries[i][1];
+      if (tile.stamp === this.stamp) continue;
+      this.map.delete(entries[i][0]);
+      used -= tile.pxW * tile.pxH;
+    }
+  },
+  canvasFor(key) {
+    const tile = this.map.get(key);
+    return tile ? tile.canvas : null;
+  },
+  info() {
+    return {
+      density: this.lastDensity || 0,
+      tilePx: this.lastTilePx || 0,
+      tiles: this.map.size,
+      visible: this.lastVisible || 0
+    };
+  }
+};
+
+// Sprite material for an `image` op: atlas sheet key, a terrain tile key
+// ("terrain:<tileKey>"), or the minimap offscreen.
+function spriteMaterial(key) {
+  if (typeof key !== "string") return null;
+  if (key.indexOf("terrain:") === 0) return TerrainTiles.canvasFor(key.slice(8));
+  if (key === "minimap") return getMinimapOffscreenCanvas();
+  initBakedAtlases();
+  return AtlasState.images[key] || null;
+}
+
 const HostBridge = {
   get metrics(){ return LayoutMetrics; },
   getCellPx(){ return LayoutMetrics.cellPx; },
@@ -746,7 +1026,12 @@ async function startGame(){
     });
     Graphics.bindInterface(graphicsChannel.consumer, {
       getBattleCanvas: () => document.getElementById("battle-canvas"),
-      getMinimapCanvas: () => getMinimapOffscreenCanvas()
+      getMinimapCanvas: () => getMinimapOffscreenCanvas(),
+      executeDrawList: (ctx, cmds) => executeDrawList(ctx, cmds),
+      spriteMaterial: key => spriteMaterial(key),
+      terrainTiles: TerrainTiles,
+      textMetrics: makeTextMetrics(),
+      whenAtlasesReady: () => whenAtlasesReady()
     });
     if (typeof SoundEngine !== "undefined" && typeof SoundEngine.bindInterface === "function") {
       SoundEngine.bindInterface(audioChannel.consumer);

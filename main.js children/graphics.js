@@ -14,12 +14,6 @@ const Graphics = (() => {
   ];
   const GRAPHICS_TEST_CHILD = "main.js children/graphics.js children/graphicsTests.js";
 
-  const THEME_FILES = {
-    default: "sprites_default.png",
-    retro: "sprites_retro.png",
-    alien: "sprites_alien.png"
-  };
-
   const _layers = {
     background: null,
     object: null,
@@ -29,16 +23,12 @@ const Graphics = (() => {
     tests: null
   };
 
-  let _registrationOpen = true;
   let _loadPromise = null;
   let _graphicsBridge = null;
   let _activeTheme = "default";
-  let _atlasesInitialized = false;
   let _missingChildrenReported = false;
   let _stylesInjected = false;
-  const _terrainTiles = { worldKey: "", ref: null, map: new Map(), stamp: 0 };
   let _indexTerrainTiles = null;
-  const _atlasState = { images: {}, readyPromises: [] };
   let _themesData = null;
   const _colorCaches = {};
   const _uiColorCache = {};
@@ -242,11 +232,6 @@ const Graphics = (() => {
     });
   }
 
-  function _registerLayer(name, api) {
-    if (!_registrationOpen || !(name in _layers)) return;
-    _layers[name] = api;
-  }
-
   function _ensureCanvasStyles() {
     if (_stylesInjected || typeof document === "undefined" || !document.head) return;
     _stylesInjected = true;
@@ -313,32 +298,14 @@ const Graphics = (() => {
   // The core creates/loads the atlas Images and owns _atlasState. The object
   // layer only answers pure slice queries ({sheetKey, sx, sy, sw, sh}).
 
-  function _initBakedAtlases() {
-    const baked = _layers.assets; // { theme: dataURL } | null
-    Object.keys(THEME_FILES).forEach(theme => {
-      if (_atlasState.images[theme]) return;
-      const img = new Image();
-      _atlasState.images[theme] = img;
-      const p = new Promise(resolve => {
-        img.onload = () => {
-          resolve(img);
-        };
-        img.onerror = () => {
-          console.error("[S&D graphics] Failed to decode sprite atlas for theme \"" + theme + "\"; ships in this theme will not draw.");
-          resolve(null);
-        };
-      });
-      _atlasState.readyPromises.push(p);
-      img.src = (baked && baked[theme]) ? baked[theme] : THEME_FILES[theme];
-    });
-  }
-
   // Resolves a unit to sheet+rect drawing material (the Image plus its source
-  // rect) — the material layers use for their own ctx.drawImage calls.
+  // rect) — the atlas Images live in the shell's draw-executor internals; this
+  // core only answers pure slice queries and looks the sheet up by key.
   function _sliceMaterial(unit) {
     const slice = _layers.object({ op: "getSpriteSlice", unit, tKey: _activeTheme, spriteConfig: _spriteConfig() });
     if (!slice) return null;
-    const sheet = _atlasState.images[slice.sheetKey] || null;
+    const sheet = (_canvasProvider && typeof _canvasProvider.spriteMaterial === "function")
+      ? _canvasProvider.spriteMaterial(slice.sheetKey) : null;
     if (!sheet) return null;
     return { sheet, sx: slice.sx, sy: slice.sy, sw: slice.sw, sh: slice.sh };
   }
@@ -608,7 +575,8 @@ const Graphics = (() => {
     return out;
   }
 
-  // ---- Terrain cache: core-owned tile canvases, key & invalidation ---------
+  // ---- Terrain cache: tile canvases live in the shell (cf. _minimapOffscreen
+  // in the central shell); this core only composes the tile specs and paints.
   function _terrainWorldKey(state, themeKey, gridSize, CP, FS, density) {
     return `${state.levelId}|${themeKey}|${gridSize}|${CP.toFixed(2)}|${FS.toFixed(3)}|${Number(density).toFixed(4)}`;
   }
@@ -652,8 +620,9 @@ const Graphics = (() => {
     };
   }
 
-  // Bakes one tile (plus a 1-cell halo so asteroid overflow is not clipped).
-  function _bakeTerrainTile(spec, density, state, bp, gridSize, CP, FS, shapes) {
+  // Ensures one tile (plus a 1-cell halo so asteroid overflow is not clipped)
+  // exists in the shell's tile cache, painting it on miss.
+  function _bakeTerrainTile(cache, key, spec, density, state, bp, gridSize, CP, FS, shapes) {
     const paintCP = CP * density;
     const paintFS = FS * density;
     const pad = 1;
@@ -663,51 +632,26 @@ const Graphics = (() => {
     const endGy = Math.min(gridSize, spec.gy0 + spec.cellsY + pad);
     const pxW = Math.max(1, Math.ceil((endGx - originGx) * paintCP));
     const pxH = Math.max(1, Math.ceil((endGy - originGy) * paintCP));
-    const canvas = _createCanvas(pxW, pxH);
-    _layers.background({
-      op: "paintTerrain",
-      canvas, state, bp, gridSize, CP: paintCP, FS: paintFS,
-      shapes, TC: _themeColor,
-      originGx, originGy, gx0: originGx, gy0: originGy, gx1: endGx, gy1: endGy
+    return cache.ensure(key, {
+      gx0: spec.gx0, gy0: spec.gy0,
+      cellsX: spec.cellsX, cellsY: spec.cellsY,
+      originGx, originGy, pxW, pxH
+    }, (canvas) => {
+      _layers.background({
+        op: "paintTerrain",
+        canvas, state, bp, gridSize, CP: paintCP, FS: paintFS,
+        shapes, TC: _themeColor,
+        originGx, originGy, gx0: originGx, gy0: originGy, gx1: endGx, gy1: endGy
+      });
     });
-    return {
-      canvas,
-      gx0: spec.gx0,
-      gy0: spec.gy0,
-      cellsX: spec.cellsX,
-      cellsY: spec.cellsY,
-      originGx,
-      originGy,
-      pxW,
-      pxH,
-      stamp: 0
-    };
-  }
-
-  function _evictTerrainTiles(budgetPx, liveStamp) {
-    const cache = _terrainTiles;
-    let used = 0;
-    const entries = [];
-    cache.map.forEach(function (tile, key) {
-      used += tile.pxW * tile.pxH;
-      entries.push([key, tile]);
-    });
-    if (used <= budgetPx) return;
-    entries.sort(function (a, b) { return a[1].stamp - b[1].stamp; });
-    for (let i = 0; i < entries.length; i++) {
-      if (used <= budgetPx) break;
-      const tile = entries[i][1];
-      if (tile.stamp === liveStamp) continue;
-      cache.map.delete(entries[i][0]);
-      used -= tile.pxW * tile.pxH;
-    }
   }
 
   // Returns the visible tile canvases for this viewport, baking at full
   // renderScale. Each tile is at most 2048 device px per side; memory is
   // bounded by an LRU (~64M device px) over tiles near the viewport.
   function _ensureTerrainTiles(state, themeKey, bp, gridSize, CP, FS, DX0, DX1, DY0, DY1) {
-    if (!_indexTerrainTiles || !_layers.background) return { density: 1, tiles: [] };
+    const cache = _canvasProvider && _canvasProvider.terrainTiles;
+    if (!_indexTerrainTiles || !_layers.background || !cache) return { density: 1, tiles: [] };
     const RS = (_graphicsBridge && _graphicsBridge.metrics && _graphicsBridge.metrics.renderScale) || 1;
     const idx = _indexTerrainTiles({
       gridSize, cellPx: CP, renderScale: RS,
@@ -715,32 +659,15 @@ const Graphics = (() => {
       dx0: DX0, dx1: DX1, dy0: DY0, dy1: DY1
     });
     const worldKey = _terrainWorldKey(state, themeKey, gridSize, CP, FS, idx.density);
-    const cache = _terrainTiles;
-    if (cache.worldKey !== worldKey || cache.ref !== state.terrain) {
-      cache.map.clear();
-      cache.worldKey = worldKey;
-      cache.ref = state.terrain;
-    }
-    cache.stamp += 1;
-    const stamp = cache.stamp;
+    cache.reset(worldKey, state.terrain);
     const shapes = _terrainShapes(state, gridSize, FS * idx.density);
     const visible = [];
     for (let i = 0; i < idx.visible.length; i++) {
       const spec = idx.visible[i];
-      let tile = cache.map.get(spec.key);
-      if (!tile) {
-        tile = _bakeTerrainTile(spec, idx.density, state, bp, gridSize, CP, FS, shapes);
-        cache.map.set(spec.key, tile);
-      }
-      tile.stamp = stamp;
-      visible.push(tile);
+      visible.push(_bakeTerrainTile(cache, spec.key, spec, idx.density, state, bp, gridSize, CP, FS, shapes));
     }
-    for (let i = 0; i < idx.keep.length; i++) {
-      const spec = idx.keep[i];
-      const held = cache.map.get(spec.key);
-      if (held) held.stamp = stamp;
-    }
-    _evictTerrainTiles(idx.budgetPx, stamp);
+    for (let i = 0; i < idx.keep.length; i++) cache.hold(idx.keep[i].key);
+    cache.evict(idx.budgetPx);
     cache.lastDensity = idx.density;
     cache.lastTilePx = idx.tilePx;
     cache.lastVisible = visible.length;
@@ -762,11 +689,7 @@ const Graphics = (() => {
         _missingChildrenReported = true;
         console.error("[S&D graphics] One or more child renderers are not loaded; the board cannot be drawn.");
       }
-      return;
     }
-    if (_atlasesInitialized) return;
-    _atlasesInitialized = true;
-    _initBakedAtlases();
   }
 
   const Renderer = {
@@ -1116,7 +1039,9 @@ const Graphics = (() => {
 
   function whenReady() {
     _ensureAtlases();
-    return _areChildrenReady() ? Promise.all(_atlasState.readyPromises) : Promise.resolve([]);
+    return (_areChildrenReady() && _canvasProvider && typeof _canvasProvider.whenAtlasesReady === "function")
+      ? _canvasProvider.whenAtlasesReady()
+      : Promise.resolve([]);
   }
 
   async function load() {
@@ -1125,23 +1050,20 @@ const Graphics = (() => {
       await _loadScripts(GRAPHICS_CHILDREN);
       // Parent captures each child BY NAME at composition (C4): each child
       // exposes exactly one script-scope binding; load order (the manifest)
-      // guarantees it exists. The atlas pack still uses the load-time
-      // registrar because its container is not a scanned script. A missing
+      // guarantees it exists. The atlas pack registers its data with the
+      // central shell's registerGraphicsAssets() at load. A missing
       // capture fails exactly where an unregistered module did.
       _layers.background = (typeof buildBackgroundLayer === "function") ? buildBackgroundLayer : null;
       _layers.object = (typeof buildObjectLayer === "function") ? buildObjectLayer : null;
       _layers.ui = (typeof buildUiLayer === "function") ? buildUiLayer : null;
       _indexTerrainTiles = (typeof terrainTileIndex === "function") ? terrainTileIndex : null;
       _layers.vfx = (typeof drawAnimation === "function") ? drawAnimation : null;
-      _registrationOpen = false;
-      delete api._registerLayer;
       const missing = [
         ["main.js children/graphics.js children/terrainTileIndex.js",   _indexTerrainTiles],
         ["main.js children/graphics.js children/backgroundRenderer.js", _layers.background],
         ["main.js children/graphics.js children/objectRenderer.js",     _layers.object],
         ["main.js children/graphics.js children/vfx.js",                _layers.vfx],
-        ["main.js children/graphics.js children/uiRenderer.js",         _layers.ui],
-        ["assets/graphics.pak",            _layers.assets]
+        ["main.js children/graphics.js children/uiRenderer.js",         _layers.ui]
       ].filter(c => !c[1]).map(c => c[0]);
       if (missing.length > 0) {
         throw new Error("These scripts loaded but did not register their module (see earlier errors):\n  " + missing.join("\n  "));
@@ -1189,7 +1111,6 @@ const Graphics = (() => {
   _ensureCanvasStyles();
 
   const api = {
-    _registerLayer,
     load,
     bindInterface,
     step,
@@ -1207,12 +1128,9 @@ const Graphics = (() => {
     drawUnitDynamic: (ctx, cx, cy, cellPx, unit, now) => Renderer.drawUnitDynamic(ctx, cx, cy, cellPx, unit, now),
     drawUnitOnCanvas: (ctx, cx, cy, cellPx, unit, now) => Renderer.drawUnitOnCanvas(ctx, cx, cy, cellPx, unit, now),
     terrainCacheInfo() {
-      return {
-        density: _terrainTiles.lastDensity || 0,
-        tilePx: _terrainTiles.lastTilePx || 0,
-        tiles: _terrainTiles.map.size,
-        visible: _terrainTiles.lastVisible || 0
-      };
+      return (_canvasProvider && _canvasProvider.terrainTiles)
+        ? _canvasProvider.terrainTiles.info()
+        : { density: 0, tilePx: 0, tiles: 0, visible: 0 };
     }
   };
 
