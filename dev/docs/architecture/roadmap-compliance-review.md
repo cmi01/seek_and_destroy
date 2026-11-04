@@ -577,3 +577,113 @@ the implementer's report. M5 is released to start (its only other open edge,
    as a defect in future probes.
 4. Carry-over from §9.6: `game.js`, `hud.js`, `campaign_DATA.js`, `main.js`
    remain shared-file hotspots for M5/M6 — keep updates small and rebased.
+
+---
+
+## 11. Gate review — M5 outfitting and multi-weapon (2026-11-04)
+
+**Verdict: MET.** M5 (implementation `t_fc6ed596`, releases v143–v147) is fully
+delivered on `origin/main` @ `57ee136`. Every roadmap §4 M5 deliverable and
+acceptance criterion was re-verified independently by the reviewer — re-run on
+the reviewer's own detached worktree and the live `/v147/`, not quoted from the
+implementer's report. M6 is released to start.
+
+### 11.1 Standing gates re-run (detached review worktree @ 57ee136 = origin/main = v147)
+
+| Gate | Result |
+|---|---|
+| `node --check` (all 182 `.js`) | clean |
+| `structure_audit.py` | 0 violations / 20 warnings; one-function check 0 |
+| `reference_audit.py` | legacy 6 / child-names 0 / doc-window 27 / import-direction 2 — **= baseline** |
+| in-page `?test`, fresh port 8611 (my worktree build) | 71/71 game + 5/5 audio, zero page errors |
+| live `https://…/v147/?test&bust=gateM5live1` | 71/71 + 5/5 |
+| Playwright (`npx playwright test`, my worktree) | 30/30 passed |
+| ad-hoc harnesses (re-executed on my tree) | 24/24 + 6/6 + 9/9 + 10/10 — `/tmp/hermes-verify-t_0afa0fc6/verify-m5{a,b,c,d}.js` |
+
+### 11.2 Red-number A/B re-driven independently (real picker clicks, two resolutions)
+
+- **Real flow into a real battle:** map-click travel to Aurora Prime → the
+  encounter opens (hail panel) → the next turn launches the battle → a real
+  `DEPLOY_CONFIRM` click → the generated battle board (16 units). The only
+  direct write is the two-weapon `loadout` on the flagship (the station OUTFIT
+  flow that performs this in play is M5.3, verified separately in §11.4).
+- **Real canvas clicks on the `WEAPON_PICK` rows** (the `game.js` id dispatch):
+  the number source flips with the pick — **7** (Unguided Torpedo, D:7 R:1) ↔
+  **1** (Light Missile Battery, D:1 R:8); reach cells 4 ↔ 125–136 (R1 ↔ R8).
+  Identical readings at **1280×800 and 1600×1000**. Canvas-pixel captures
+  (`q8-real-1280-*.png`, `q8-real-1600-*.png`) show the red chosen-weapon number
+  on the hovered reach cell (the `objectRenderer` ISS-048 path): the red 7 one
+  cell right of the selected Battlecruiser (torpedo) vs the red 1 two cells out
+  (missile).
+- **Pre-commit = commit:** an unshielded Bomber shows the exact 7 and dies
+  (hp 1); a missile shot at an Attack Frigate commits exactly 1 (hp 4 → 3).
+  Shielded targets read 1 for both non-railgun classes (the strip rule),
+  matching T-M5c-3's class-keyed 1-vs-3. Probe note: the diamond number on a
+  spotted enemy cell is `spottedEnemyDmg`; the number on a hovered reach cell
+  is the chosen weapon's `firepower` — both flip with the pick.
+
+### 11.3 Single-weapon battle parity re-driven (vs live `/v143/`)
+
+- Seeded browser replay (seed 4242: shield → five shots including a kill → a
+  move) run on live `/v143/` (pre-adoption) and on the review build: state
+  projections **byte-identical** (`parity-143.json` = `parity-147.json` —
+  units/hp/flags, ap 2, nextUnitId 5).
+- Combat-math A/B (`verify-m5b.js`, re-executed): all 1936
+  hull × hull × shield × mirage combos identical pre/post adoption, unarmed
+  parity, and record shape (no raw `wType`/`firepower`/`range` on unit records
+  or generated sector units).
+
+### 11.4 Roadmap §4 M5 deliverables / acceptance — verdicts
+
+| # | Criterion | Verdict | Evidence (mine) |
+|---|---|---|---|
+| M5.1 | Slot-sum validation; two weapons fire with own dmg/range | **met** | `verify-m5a.js` slot pins (Light Railgun 14, Heavy Railgun 23, Ultra 81, Torpedo 7) and boundary (≤ accepted, > rejected, unknown rejected); `verify-m5c.js` per-mount profiles (1/R8 and 7/R1) + shield class rule; in-page T-M5a-1..5 / T-M5b-1..3 / T-M5c-1 |
+| M5.2 | Red numbers = the firing weapon's exact pre-commit damage; A/B at two resolutions | **met** | §11.2 — re-driven A/B at 1280×800 AND 1600×1000 with real picker clicks and canvas-pixel captures |
+| M5.3 | Station outfitting (swap/mount within capacity, priced) | **met** | `verify-m5d.js` transform checks (unmount → stock +1 part; mount from stock; over-capacity / no-stock / no-parts rejected with state untouched) + T-M5d-1/3 outfit rows with fit verdicts; code: `hud buildOutfitModel.js` + the `applyStationService` outfit operation |
+| M5.4 | Generator + AI produce/score legal multi-weapon loadouts | **met** | `verify-m5d.js` seeded sweep re-run: 400 generations / 4000 units / 800 multi-weapon variants / **0 illegal**; same-seed determinism; mount-aware AI estimates (`env.bestDmgOf`) confirmed in code |
+
+### 11.5 Design §4.5 / §5.5 contracts and R3
+
+- **Boundary grep (§4.5, "grep-enforceable"):** every weapon-stat read outside
+  the `outfitting.js` subtree routes through the `Outfitting.*` seam — `game.js`
+  call sites are seam calls (`UnitWeapons`/`UnitFirepower`/`UnitRange`/
+  `SlotSize`/`LoadoutOf`); `_activeDamage`/`_activeRange` read the chosen
+  weapon ROW only ("never a sum/max", Q8); `frameUnits`' `firepower`/`range`
+  are `deps.fpOf`/`deps.rngOf` (seam-derived at DTO build) and its `wType` is
+  the animation fx-type string. Residuals are spec-table mirror pins in
+  tests/fixtures and frame-DTO reads in graphics — exactly as the §2 M5 rows
+  document. **R3 CLOSED**: `unit.loadout` is the sole weapon truth on records.
+- **§5.5 interfaces:** the `outfitting.js` children ship with the documented
+  spellings (declared rename `defaultLoadout.js → defaultLoadoutOf.js` accepted
+  — the design name collides with the `shipSpecs.defaultLoadout` data field);
+  `executeShoot(…, weaponName?)` semantics verified live by the two-weapon fire.
+
+### 11.6 M1–M4 non-regression and release discipline
+
+- 71/71 in-page spans M1 (roster/round-trip/migration), M2 (battle/summon/
+  deploy/credits-frozen, T-1…T-9, T-12), M3 (fuel/hyperspace/visibility/
+  encounters), M4 (economy/crew/merchant) and the 14 new M5 tests; Playwright
+  30/30 spans boot, combat, map and economy specs; audits at exact baseline —
+  no drift in M1–M4 surfaces.
+- v143–v147: every tag + branch + `main` on origin with matching SHAs
+  (`git ls-remote`); `main` tip = `v147` = `57ee136`; root 302 → `/v147/`;
+  public `/v147/` serves 71/71 + 5/5. Five releases, all runbook-compliant.
+
+### 11.7 Non-blocking observations (for the next lanes)
+
+1. Select-click precision: a board click mapped to exactly the cell center
+   (grid + 0.5) missed the unit twice; a +0.2-cell offset selected reliably —
+   `pixelToGrid` floors at exact boundaries. Probe clicks should land slightly
+   inside the cell (not a product defect; human clicks are never exact).
+2. A battle board built by direct state writes (units without a real
+   `Game.startSector` generation) makes the render loop throw
+   `TypeError: … reading '0'` and the canvas keeps the last frame — it looks
+   like a stale screen while the DTOs are live. Probe setups should enter
+   battle through the real encounter flow (or run `SectorGenerator.generate`
+   first). The repeat-error suppression works as designed.
+3. `capture_screenshot()` / `cdp('Page.captureScreenshot')` can target a
+   different tab than `js()`; canvas exports via `canvas.toDataURL()` run in
+   the page `js()` touches and are trustworthy pixel evidence.
+4. Hotspots for M6: `game.js`, `aiThreatScorer.js`, `rules_DATA.js` (M5's
+   hotspots) plus `hud.js` / `campaign_DATA.js` / `main.js` (§9.6/§10.6
+   carry-over) — serialize M6 work against these.
