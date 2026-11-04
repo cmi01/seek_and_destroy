@@ -31,6 +31,8 @@
   load("main.js children/game.js children/hud.js children/buildTopBarChrome.js", ["buildTopBarChrome"]);
   load("main.js children/game.js children/hud.js children/buildDeploymentModel.js", ["buildDeploymentModel"]);
   load("main.js children/game.js children/hud.js children/buildDeploymentButtons.js", ["buildDeploymentButtons"]);
+  load("main.js children/game.js children/hud.js children/buildStationModel.js", ["buildStationModel"]);
+  load("main.js children/game.js children/hud.js children/buildMapHudModel.js", ["buildMapHudModel"]);
 
   const tokens = ctx.uiTokensTable;
   const resolve = ctx.resolveUiMetrics;
@@ -206,6 +208,93 @@
     check(name + " GS-15 deploy rows in canvas", rowsIn, JSON.stringify(dep.buttons.map(function (b) { return b.id + ":" + b.w; })));
     check(name + " GS-15 deploy row labels fit", rowsFit, "");
     check(name + " GS-15 rows clear wrapped cap block", rowsClearCap, "capExtra=" + capExtra + " lines=" + depModel.capLines.length);
+
+    // GS-16 (v167): the labels gui_scale_browser_check.py pins for the M4-M6
+    // surfaces must fit the budgets their models compute — the station header
+    // lines, the row-label column, the action buttons, and the hail option
+    // buttons. (The tab bar and the price/owned columns are the GS-16
+    // truncation finding: their budgets cannot hold their strings and the
+    // labels are deliberately not pinned until that is fixed.)
+    const station = ctx.buildStationModel({
+      title: "SOL GATE STATION",
+      subtitle: "STATION SERVICES — POSTED PRICES",
+      walletText: "WALLET 25000 ⒸB   PARTS 5   FUEL 500",
+      tab: "commodities",
+      tabs: [
+        { id: "commodities", label: "GOODS", active: true },
+        { id: "hulls", label: "HULLS", active: false },
+        { id: "weapons", label: "WEAPONS", active: false },
+        { id: "services", label: "SERVICE", active: false },
+        { id: "outfit", label: "OUTFIT", active: false },
+        { id: "missions", label: "MISSIONS", active: false }
+      ],
+      rows: [
+        { id: "parts", kind: "ware", label: "PARTS", sub: "LOT 5", priceText: "BUY 441 / SELL 208", ownedText: "HELD 5", buyLabel: "BUY 5", sellLabel: "SELL 5" },
+        { id: "fuel", kind: "ware", label: "FUEL", sub: "LOT 50", priceText: "BUY 5 / SELL 2", ownedText: "HELD 500", buyLabel: "BUY 50", sellLabel: "SELL 50" },
+        { id: "crew", kind: "ware", label: "CREW", sub: "LOT 10", priceText: "BUY 153 / SELL 73", ownedText: "HELD 10", buyLabel: "BUY 10", sellLabel: "SELL 10" },
+        { id: "outfit-ship:2", kind: "outfit", label: "ATTACK FRIGATE", sub: "(UNARMED)", priceText: "SLOTS 0/6", ownedText: "", actionId: "OUTFIT_SELECT:2", actionLabel: "OUTFIT" },
+        { id: "outfit-ship:0", kind: "outfit", label: "FLAGSHIP BATTLECRUISER", sub: "HEAVY CANNON BATTERY", priceText: "SLOTS 4/10", ownedText: "MOUNTED", actionId: "OUTFIT_SELECT:0", actionLabel: "EDITING" },
+        { id: "outfit-slot:0:Heavy Cannon Battery", kind: "outfit", label: "  HEAVY CANNON BATTERY", sub: "D:7 R:6 SLOTS:2", priceText: "", ownedText: "MOUNTED", actionId: "OUTFIT_UNMOUNT:0:Heavy Cannon Battery", actionLabel: "UNMOUNT" },
+        { id: "c1-wolfpack-bounty", kind: "mission", label: "WOLFPACK BOUNTY", sub: "Authority patrols are stretched thin.", priceText: "PAYOUT 4000 ⒸB", ownedText: "CAPITAL", actionId: "MISSION_ACCEPT:c1-wolfpack-bounty", actionLabel: "ACCEPT" }
+      ],
+      note: "Posted prices: the trade executes at the quoted price."
+    }, { metrics: inp.metrics });
+    const stPanel = station.panel;
+    const hdrBudget = stPanel.w - Math.round(24 * inp.metrics.uiScale);
+    check(name + " GS-16 station header fits",
+      hdrBudget + 1 >= "STATION SERVICES — POSTED PRICES".length * ui.charW * 0.9 &&
+      hdrBudget + 1 >= "WALLET 25000 ⒸB   PARTS 5   FUEL 500".length * ui.charW * 0.9,
+      "budget=" + hdrBudget + " estimate=" + ("WALLET 25000 ⒸB   PARTS 5   FUEL 500".length * ui.charW * 0.9).toFixed(1));
+    const pinnedRowLabels = ["PARTS", "FUEL", "CREW", "ATTACK FRIGATE", "WOLFPACK BOUNTY"];
+    const pinnedRowSubs = ["(UNARMED)"];
+    let stRowsFit = true;
+    for (const r of station.rows) {
+      if (pinnedRowLabels.indexOf(r.label.trim()) !== -1 &&
+          r.label.trim().length * ui.charW * 0.9 > stPanel.w * 0.34 + 1) stRowsFit = false;
+      if (pinnedRowSubs.indexOf(r.sub) !== -1 &&
+          r.sub.length * ui.charW * 0.9 > stPanel.w * 0.22 + 1) stRowsFit = false;
+    }
+    check(name + " GS-16 station row labels fit", stRowsFit,
+      "labelBudget=" + (stPanel.w * 0.34).toFixed(1) + " subBudget=" + (stPanel.w * 0.22).toFixed(1));
+    const pinnedActionLabels = ["CLOSE", "OUTFIT", "EDITING", "UNMOUNT", "ACCEPT"];
+    let stBtnsFit = true, stBtnSeen = 0;
+    const stBtnDetail = [];
+    for (const b of station.buttons) {
+      if (b.id.indexOf("STATION_TAB:") === 0) continue; // tab bar = GS-16 finding
+      if (pinnedActionLabels.indexOf(b.label) === -1) continue;
+      stBtnSeen++;
+      const budget = b.w - Math.round(19 * inp.metrics.uiScale);
+      stBtnDetail.push(b.label + ":" + budget);
+      if (b.label.length * ui.charW * 0.9 > budget + 1) stBtnsFit = false;
+    }
+    check(name + " GS-16 station action labels fit", stBtnsFit && stBtnSeen === 5, stBtnDetail.join(" "));
+
+    const mapHud = ctx.buildMapHudModel({
+      locationId: "wolfpack-debris",
+      turn: 1,
+      locations: [{ id: "wolfpack-debris", name: "Wolfpack Debris" }],
+      fleets: [{ faction: "player", fuel: 500, ships: [{}, {}, {}] }]
+    }, {
+      metrics: inp.metrics,
+      hail: {
+        speaker: "SYNDICATE VESSEL",
+        lines: [
+          "HAIL OPEN // SYNDICATE VESSEL @ WOLFPACK-DEBRIS",
+          "TONE: RUDE, VOLATILE // STANDING: UNFRIENDLY",
+          "\"What do you want, soft-hull? Make it quick.\""
+        ],
+        options: ["trade", "talk", "threaten", "leave"]
+      }
+    });
+    const hail = mapHud.hail;
+    let hailFit = true;
+    const hailDetail = [];
+    for (const b of hail.buttons) {
+      const budget = b.w - Math.round(19 * inp.metrics.uiScale);
+      hailDetail.push(b.label + ":" + budget);
+      if (b.label.length * ui.charW * 0.9 > budget + 1) hailFit = false;
+    }
+    check(name + " GS-16 hail option labels fit", hailFit && hail.buttons.length === 4, hailDetail.join(" "));
   }
 
   const ratios = [];

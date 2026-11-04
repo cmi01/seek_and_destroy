@@ -4,7 +4,9 @@
 Boots the game in headless Chromium, forces the same 1920x1080 OS-scale
 rows as the audit (100/125/150/200/250%), plus the 200px minimum canvas
 and a DPR change that does not resize. Asserts GS-01/02/03 numerically,
-that GS-04..GS-11 labels are drawn without an ellipsis, and GS-12
+that the pinned surface labels (GS-04..GS-11, GS-15, and the M4-M6
+station/outfit, mission-board and hail/dialogue surfaces) are drawn
+without an ellipsis at the pinned contrast and alignment, and GS-12
 terrain density (viewSpan 5, dpr 1 vs 2).
 
   python3 dev/scripts/gui_scale_browser_check.py [--root REPO] [--port N]
@@ -39,11 +41,18 @@ SCALES = [
     ("os250", 768, 432, 2.50),
 ]
 # Endgame sets gameOver, which pins the HUD on that modal. Probe it last.
-SCREENS = ("base", "campaign", "help", "bridge", "deploy", "endgame")
+# The hail setup (open_screen below) moves the player fleet off the station,
+# so the station/outfit/missions screens must run before "hail".
+SCREENS = ("base", "campaign", "help", "bridge", "deploy",
+           "station", "outfit", "missions", "hail", "endgame")
 ELLIPSIS = "\u2026"
-# GS-14/GS-15 pinned label list: every label on the four reported surfaces,
-# with the alignment its owner documents (left-anchored text must draw with
+# GS-14/GS-15/GS-16 pinned label list: labels on the reported surfaces, with
+# the alignment their owner documents (left-anchored text must draw with
 # textAlign "left"; the GS-14 defect class draws it inherited "center").
+# A pin must draw WHOLE at every scale row: a needle contained in an
+# ellipsized draw poisons its own gate (longest-needle attribution), so the
+# M4-M6 labels that fit-to-width truncate (station tab bar, price/owned
+# columns, hail dialogue lines) are the GS-16 follow-up, not pins.
 PINS = {
     "campaign": (("CLOSE [ESC]", "left"),),
     "endgame": (("REDEPLOY SECTOR", "left"), ("SECTOR MAP", "left"),
@@ -54,6 +63,23 @@ PINS = {
                ("CORNER SLOTS", "center"), ("ALWAYS ON", "center")),
     "base": (("REINFORCEMENTS", "left"), ("MENU v", "left"), ("END TURN", "left"),
              ("MAP //", "left"), ("AP 4/4", "left")),
+    # M4 station storefront (commodities tab): subtitle header line, the
+    # wallet line (attribution: the wallet draw contains PARTS/FUEL too —
+    # longest-needle gives it to "WALLET"), the row-label column, CLOSE.
+    "station": (("STATION SERVICES \u2014 POSTED PRICES", "left"), ("WALLET", "left"),
+                ("FUEL", "left"), ("CREW", "left"), ("PARTS", "left"), ("CLOSE", "left")),
+    # M4/M5 outfit tab: a fleet row label, the unarmed sub line, and the
+    # per-row action buttons (select / edit / unmount).
+    "outfit": (("ATTACK FRIGATE", "left"), ("(UNARMED)", "left"), ("OUTFIT", "left"),
+               ("EDITING", "left"), ("UNMOUNT", "left")),
+    # M6 mission board (station missions tab): header line, the contract
+    # title column and the accept action.
+    "missions": (("STATION SERVICES \u2014 POSTED PRICES", "left"), ("WOLFPACK BOUNTY", "left"),
+                 ("ACCEPT", "left"), ("CLOSE", "left")),
+    # M6 hail/dialogue panel: the four Q11 option buttons. The speaker and
+    # dialogue lines are GS-16 (they intersect each other's draws and
+    # truncate), so only the buttons are pinnable.
+    "hail": (("TRADE", "left"), ("TALK", "left"), ("THREATEN", "left"), ("LEAVE", "left")),
 }
 MUST_DRAW = {screen: tuple(needle for needle, _align in pins) for screen, pins in PINS.items()}
 # GS-14 legibility floor: WCAG contrast between the label's ink and the
@@ -184,12 +210,14 @@ def open_screen(page, name: str) -> None:
           if (H.toggleBridgeModal) H.toggleBridgeModal(false);
           if (H.toggleCampaignModal) H.toggleCampaignModal(false);
           if (H.toggleDeployModal) H.toggleDeployModal(false);
-          window.__sdFillText && (window.__sdFillText.length = 0);
+          if (H.toggleStationModal) H.toggleStationModal(false);
+          if (H.hideHailPanel) H.hideHailPanel();
           if (name === "campaign") H.toggleCampaignModal(true);
           else if (name === "endgame") H.showEndgameModal(false);
           else if (name === "help") H.toggleHelpModal(true);
           else if (name === "bridge") H.toggleBridgeModal(true);
           else if (name === "deploy") H.toggleDeployModal(true);
+          else if (name === "station" || name === "outfit" || name === "missions") H.toggleStationModal(true);
           else if (name === "menu") H.toggleMenu(true);
           if (SD.Renderer && typeof SD.Renderer.draw === "function") {
             SD.Renderer.draw(performance.now());
@@ -197,7 +225,73 @@ def open_screen(page, name: str) -> None:
         }""",
         name,
     )
+    if name == "outfit":
+        # M5(d): switch to the outfit tab and select a ship so the mounted /
+        # stock rows (UNMOUNT / MOUNT actions) draw too.
+        click_canvas_button(page, "STATION_TAB:outfit")
+        click_canvas_button(page, "OUTFIT_SELECT:0")
+    elif name == "missions":
+        click_canvas_button(page, "STATION_TAB:missions")
+    elif name == "hail":
+        # M3/M6: park the player fleet one square from the first foreign
+        # fleet and enter its square through the real travel op — the
+        # encounter opens and the hailing shell draws on the map HUD
+        # (same recipe as tests/pages/gamePage.ts).
+        page.evaluate(
+            """() => {
+              const s = SD.getRawState();
+              const m = JSON.parse(JSON.stringify(s.campaign.map));
+              const foe = m.fleets.find(f => f.faction !== "player");
+              const pf = m.fleets.find(f => f.faction === "player");
+              pf.x = foe.x - 1;
+              pf.y = foe.y;
+              s.campaign.map.fleets = m.fleets;
+              SD.Map.travel("player", { x: foe.x, y: foe.y });
+              if (SD.Renderer && typeof SD.Renderer.draw === "function") {
+                SD.Renderer.draw(performance.now());
+              }
+            }"""
+        )
     page.wait_for_timeout(120)
+    # One clean frame per surface. The setup clicks above change the
+    # surface's own row layout (the outfit screen's select re-lays the rows),
+    # so draw records captured before the change would be measured against
+    # the FINAL canvas at stale coordinates — a phantom "best" contrast that
+    # can mask a low-contrast draw (found while pinning the M4-M6 rows: the
+    # outfit "(UNARMED)" row measured 6.69 from a stale record over a dark
+    # row while the live draw measured 1.59 on its block). Clear both hook
+    # arrays, draw exactly one frame, and let the gates see only that state.
+    page.evaluate(
+        """() => {
+          window.__sdFillText && (window.__sdFillText.length = 0);
+          window.__sdFillTextRec && (window.__sdFillTextRec.length = 0);
+          if (SD.Renderer && typeof SD.Renderer.draw === "function") {
+            SD.Renderer.draw(performance.now());
+          }
+        }"""
+    )
+    page.wait_for_timeout(60)
+
+
+def click_canvas_button(page, btn_id: str) -> None:
+    """Click a HUD canvas button by id with real pointer input (the same
+    normalized dispatch tests/helpers/input.ts uses)."""
+    geo = page.evaluate(
+        """(id) => {
+          const b = (SD.State.canvasButtons || []).find(x => x.id === id);
+          if (!b) return null;
+          const ds = SD.LayoutMetrics.displaySize;
+          return { u: (b.x + b.w / 2) / ds, v: (b.y + b.h / 2) / ds };
+        }""",
+        btn_id,
+    )
+    if not geo:
+        raise SystemExit(f"canvas button not on screen: {btn_id}")
+    box = page.locator("#battle-canvas").bounding_box()
+    page.mouse.move(box["x"] + geo["u"] * box["width"], box["y"] + geo["v"] * box["height"])
+    page.mouse.down()
+    page.mouse.up()
+    page.wait_for_timeout(80)
 
 
 def shot_canvas(page, dest: Path) -> None:

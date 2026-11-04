@@ -91,6 +91,8 @@ drawn, nothing off the canvas.
 | GS-13 | HUD chrome | DS 200 vs DS 1072 | Linux Chrome | strokes scale with `uiScale` | 31 `lineWidth` assignments in `uiRenderer.js` are CSS-px literals (1, 1.2, 1.4, 1.5, 2, 2.2). DPR scales them; `uiScale` does not. At DS 200 a 1px stroke is ~5× thicker relative to the 768 design than at DS 1072. | `v105/win200-base.png`, `v105/os100-base.png` | `uiRenderer.js` (31 sites; examples L77, L95, L365, L776) |
 | GS-14 | HUD/top bar, help, endgame, deploy — every frame after the campaign map has drawn once (battle frames included: canvas 2D state persists across frames) | all sizes and DPRs | Linux Chrome | every text draw owns its alignment; left-anchored labels land on their anchor inside their panel/button | The map-object layer sets `textAlign = "center"` for its node labels and never restores it, so every later left-anchored draw that does not pin its own alignment inherits "center": the label is centered on its left anchor and half of it shifts off the panel/canvas and clips. Help body reads `LOSE`, `NTROLS`, title `1 // CALIBRATION RANGE`; `REINFORCEMENTS` (w 126) centered at x=545 hangs 63px out of its button; `MAP // SOL GATE STATION` (w 207) drawn at x=19 spans −84..122 — half off-canvas. Drawn strings carry no ellipsis and often keep high pixel contrast where the shifted text lands, so the GS-04..GS-11 ellipsis hook could never see this class (the card's gap (b)). | `v163/win1280x800-dpr1-span16-help.png`, `v163/win1280x800-dpr1-span16-base.png`, `v163/win1280x800-dpr1-battle-base.png` | `objectRenderer.js` `drawMapObjects` (`textAlign = "center"`, no restore); consumed by the five `uiRenderer.js` draws that never pinned alignment: `_drawButtonWidget`, `_drawTopLeftHudBar`, `_drawTelemetryCard`, `_drawIntelOverlay`, `_drawHelpModal` (plus `drawBattleWorldReticles`' SEL badge) |
 | GS-15 | deploy modal (M2, added v112 — after the GS label sweep) | all sizes and DPRs | Linux Chrome | `DEPLOY n / m CORNER SLOTS — FLAGSHIP IS ALWAYS ON` and `CONFIRM DEPLOYMENT` fully drawn | The capacity line was one unwrapped string, ellipsized to the panel width (`…FLAGSHIP IS ALWAY…`) with a draw span overflowing the canvas (x+w 809 on DS 790); the CONFIRM label ellipsized (`CONFIRM DEPLOYM…`) because the button width came from the `endgameBtnW` floor instead of a label-fit token (the GS-05/GS-06 defect class). | `v163/win1280x800-dpr1-span16-deploy.png` | `buildDeploymentModel.js` (unwrapped capText), `buildDeploymentButtons.js` (confirmW floor), `uiRenderer.js` `_drawDeployModal` (single-line cap draw) |
+| GS-16 | station storefront + outfit/mission-board tabs (M4/M5/M6) — found by the v167 pin sweep | all sizes and DPRs | Linux Chrome | row labels and sub-lines drawn over their row's own background at the pinned contrast floor (3.0 ≥ 6px, 2.0 at 4px) | The row-stripe draw `ctx.fillStyle = C["rgba(255, 255, 255, 0.03)"]` resolves through graphics.js `UI_COLOR_LITERALS` and that literal is missing from the map (dropped in the v81 TC-closure → literal-map migration): `fillStyle = undefined` is a silent no-op, so the stripe rect paints with the leftover fill at full opacity — the first striped row is gold (leftover `bp.gold` from the wallet line), later ones slate `#94a3b8` (leftover from the owned column). Row text over the block measures 1.24–2.06 (the GS-14 invisible class). The gate's pre-fix record handling also masked one of them with a phantom 6.69 (see Verification v167 — stale-record masking). | `v167/pre-fix-station-os150.png`, `v167/pre-fix-outfit-os150.png`, `v167/pre-fix-missions-os150.png` | `graphics.js` `UI_COLOR_LITERALS` (missing literal); `uiRenderer.js` `_drawStationModal` L615 (the stripe) |
+| GS-17 | station/outfit/mission-board tabs + hail/dialogue panel (M4/M5/M6) | all sizes and DPRs | Linux Chrome | surface labels drawn whole (the GS-04..GS-11 contract) | Fit-to-width ellipsizes whole label classes at every scale row: the station tab bar (6 tabs share `(mw − 2·pad)/6` → ~4.9-char budgets: `GOODS`→`GOO…`, `WEAPONS`→`WEA…`, `MISSIONS`→`MIS…`), the price/owned columns (`BUY 356 / SELL 321` in a 0.18·mw column → `BUY 356…`; `HELD 5` → `HELD…`), the outfit sub-lines (`FLAGSHIP BATTLE…`, `SLOTS 4/10`→`SLOTS 4…`, `D:7 R:6 S…`), the mission brief/payout/faction columns (`PAYOUT …`, `CAPI…`), the station note, and the hail dialogue lines (`HAIL OPEN // … @ WOLFPACK-DE…` truncates even at 100%; the quote line likewise). These labels are deliberately NOT pinned while they truncate — pinning them would rightfully fail the ellipsis gate. | `v167/pre-fix-station-os150.png`, `v167/pre-fix-outfit-os150.png`, `v167/pre-fix-missions-os150.png` | `buildStationModel.js` (tabW + row column widths), `buildMapHudModel.js` L51 / `_drawHailPanel` (hail panel width vs line lengths), `_fitTextToWidth` call sites in `uiRenderer.js` |
 
 Intel and the menu dropdown had no off-canvas buttons and no measured
 overlaps at 100–250%. Shots: `v105/os{100,125,150,200,250}-{intel,menu}.png`.
@@ -600,10 +602,13 @@ green (see run log). Ad-hoc harness kept on disk:
   **Resolved 2026-11-04 (card `t_8c5a6325`) — Decision record below: option
   3, canvas minimum raised 200 → 300.**
 - **M4–M6 modal surfaces (station/outfit, hail/dialogue, mission board).**
-  The GS-14 root cause is already fixed for them (leak contained at the
-  source; their draws pinned alignment at birth). The remainder is
-  instrument coverage: their labels are not in the pinned list. Cheap
-  follow-up: extend `PINS` with their labels.
+  Instrument coverage added in v167 (see Verification below): the surfaces
+  are opened by the checker and 19 labels are pinned with their documented
+  alignment. The pin sweep itself surfaced two new findings — **GS-16**
+  (row stripes painting opaque; fixed in v167) and **GS-17** (the M4–M6
+  label truncation class: tab bar, price/owned columns, outfit sub-lines,
+  mission brief/payout, hail dialogue lines — deferred, needs column/wrap
+  design work and belongs to a fix card, not an instrument card).
 
 ## Decision record — DS 200 4px-glyph legibility (2026-11-04)
 
@@ -723,3 +728,68 @@ Acceptance criteria:
   CLOSE on-canvas, deploy rows clear the wrapped cap block).
 - Standing gates at baseline (`node --check`, structure audit, reference
   audit vs parent tree), in-page suites green, playwright green.
+
+## Verification (v167)
+
+**Instrument coverage (the card).** `dev/scripts/gui_scale_browser_check.py`
+now opens the four M4–M6 surfaces in `SCREENS` order (station, outfit,
+missions, hail — before `endgame`, which pins `gameOver`, and before each
+other in that order because the hail setup moves the fleet off the station)
+and pins **19 labels** with their documented alignment: station header
+(`STATION SERVICES — POSTED PRICES`), wallet line, the commodities
+row-label column (`FUEL`/`CREW`/`PARTS`) and `CLOSE`; the outfit tab's
+`ATTACK FRIGATE` row label, `(UNARMED)` sub and the `OUTFIT`/`EDITING`/
+`UNMOUNT` actions; the mission board's `WOLFPACK BOUNTY` title and
+`ACCEPT`; and the hail panel's four Q11 option buttons (`TRADE`/`TALK`/
+`THREATEN`/`LEAVE`). Longest-needle attribution handles the overlaps (the
+wallet draw carries `PARTS`/`FUEL` too and attributes to `WALLET`; the
+hail first line carries `SYNDICATE VESSEL` and — since it truncates at
+most scales (GS-17) — no speaker needle can be pinned without poisoning
+its own ellipsis gate). `dev/scripts/gui_scale_layout_check.js` gained the
+matching label budgets (GS-16 station header / row-label column / action
+buttons / hail option buttons) against the real model geometry
+(`buildStationModel`, `buildMapHudModel`), deliberately excluding the tab
+bar and price/owned columns (GS-17: their budgets cannot hold their
+strings).
+
+**Instrument finding — stale-record masking (fixed here).** The contrast
+gate measures each record's crop against the *current* canvas and takes
+the best value; records accumulated across a surface's own state change
+(the outfit screen's select click re-lays the rows) are then measured at
+stale coordinates. The pre-fix gate reported `(UNARMED)` at **6.69** from
+a stale record that landed on a dark row of the *final* layout while the
+live draw measured **1.59** on its block — a phantom pass that masked a
+GS-16 row. `open_screen` now clears both hook arrays after the surface
+setup and draws exactly one clean frame before the gates run.
+
+**GS-16 fix (the card's one deviation — see the run note).** The pinned
+contrast gate could not pass without it and the defect is the GS-14
+invisible-text class itself, so the one-line root-cause fix landed with
+this card: `UI_COLOR_LITERALS` gains `"rgba(255, 255, 255, 0.03)"`, the
+literal `_drawStationModal` already names. The stripe now paints as
+written (3% white over the panel) instead of the leftover fill at full
+opacity. The second unlisted literal (`rgba(6, 8, 14, 0.94)`, the menu
+dropdown fill, `uiRenderer.js` L1128) is the same class but blocks no
+gate — it rides the GS-17 follow-up card.
+
+**Measured (v167, merged-tip run
+`/tmp/hermes-verify-t_51ccdd2d/run4/measurements.json`
+(also committed as `v167/measurements-v167.json`), 456 rows): ALL PASS** —
+222 contrast rows + 222 align rows, 0 bad draws, 0 ellipsized pinned
+draws; `run2/` and `run3/` (pre-rebase tree — identical game code, the
+concurrent v166 release is docs-only) are identical. **Positive control:** the
+same checker against the pre-fix tree (the literal stashed, everything
+else identical) reports **15 fails** — `CREW` 2.05–2.07, `(UNARMED)`
+1.54–1.59, `WOLFPACK BOUNTY` 1.26–1.30 across the five OS rows (the
+4px win200 band clears its 2.0 floor), i.e. exactly the GS-16 labels and
+nothing else. Before → after per row: `CREW` 2.05–2.07 → **15.04/14.85/14.61/11.52/7.73/5.00**,
+`WOLFPACK BOUNTY` 1.26–1.30 → **14.53/14.15/13.82/11.06/8.60/5.21**,
+`(UNARMED)` 6.44–6.69 *(phantom)* → **10.48/10.48/10.42/8.51/6.96/4.85**
+(os100…os250, win200). Worst contrast overall is unchanged from v165:
+2.77 (`CRITICAL DEFEAT`, 4px red accent band), next 3.49 (`[LMB]`).
+Layout check ALL PASS with the GS-16 budgets (100–250% + DS 200/400/768/
+1440). Standing gates: `node --check` clean on every touched file;
+`structure_audit.py` 0 violations / 23 warnings / one-function 0;
+`reference_policy_check.py` 1 pre-existing R1-inbound-cap (identical to
+the parent tree); `reference_audit.py` at baseline. Pre-fix shots for the
+GS-16/GS-17 evidence: `v167/pre-fix-{station,outfit,missions}-os150.png`.

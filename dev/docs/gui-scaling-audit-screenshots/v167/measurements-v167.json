@@ -1,0 +1,3266 @@
+{
+  "fails": [],
+  "rows": [
+    {
+      "row": "os100",
+      "displaySize": 1070,
+      "renderScale": 1,
+      "devicePx": 1070,
+      "canvasWidth": 1070,
+      "clientWidth": 1070,
+      "offsetWidth": 1072,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 1,
+      "uiTextPx": 21
+    },
+    {
+      "row": "os100/base/contrast",
+      "needle": "REINFORCEMENTS",
+      "contrast": 16.277298994995125,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/base/contrast",
+      "needle": "MENU v",
+      "contrast": 16.277298994995125,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/base/contrast",
+      "needle": "END TURN",
+      "contrast": 16.277298994995125,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/base/contrast",
+      "needle": "MAP //",
+      "contrast": 7.5941150677216465,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/base/contrast",
+      "needle": "AP 4/4",
+      "contrast": 9.36696970535351,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/base/align",
+      "needle": "REINFORCEMENTS",
+      "want": "left",
+      "draws": 28,
+      "bad": 0
+    },
+    {
+      "row": "os100/base/align",
+      "needle": "MENU v",
+      "want": "left",
+      "draws": 28,
+      "bad": 0
+    },
+    {
+      "row": "os100/base/align",
+      "needle": "END TURN",
+      "want": "left",
+      "draws": 28,
+      "bad": 0
+    },
+    {
+      "row": "os100/base/align",
+      "needle": "MAP //",
+      "want": "left",
+      "draws": 28,
+      "bad": 0
+    },
+    {
+      "row": "os100/base/align",
+      "needle": "AP 4/4",
+      "want": "left",
+      "draws": 28,
+      "bad": 0
+    },
+    {
+      "row": "os100/campaign/contrast",
+      "needle": "CLOSE [ESC]",
+      "contrast": 16.233142833801296,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/campaign/align",
+      "needle": "CLOSE [ESC]",
+      "want": "left",
+      "draws": 10,
+      "bad": 0
+    },
+    {
+      "row": "os100/help/contrast",
+      "needle": "CLOSE",
+      "contrast": 16.261769371285343,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/help/contrast",
+      "needle": "CONTROLS",
+      "contrast": 12.999076823205243,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/help/contrast",
+      "needle": "[LMB]",
+      "contrast": 11.4267850769532,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/help/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 12,
+      "bad": 0
+    },
+    {
+      "row": "os100/help/align",
+      "needle": "CONTROLS",
+      "want": "left",
+      "draws": 12,
+      "bad": 0
+    },
+    {
+      "row": "os100/help/align",
+      "needle": "[LMB]",
+      "want": "left",
+      "draws": 12,
+      "bad": 0
+    },
+    {
+      "row": "os100/bridge/contrast",
+      "needle": "RESUME [SPC]",
+      "contrast": 16.233142833801296,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/bridge/align",
+      "needle": "RESUME [SPC]",
+      "want": "left",
+      "draws": 7,
+      "bad": 0
+    },
+    {
+      "row": "os100/deploy/contrast",
+      "needle": "DEPLOYMENT",
+      "contrast": 9.292382186206618,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/deploy/contrast",
+      "needle": "CONFIRM DEPLOYMENT",
+      "contrast": 11.870270372530975,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/deploy/contrast",
+      "needle": "CORNER SLOTS",
+      "contrast": 11.608466600138168,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/deploy/contrast",
+      "needle": "ALWAYS ON",
+      "contrast": 12.32338240231693,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/deploy/align",
+      "needle": "DEPLOYMENT",
+      "want": "center",
+      "draws": 14,
+      "bad": 0
+    },
+    {
+      "row": "os100/deploy/align",
+      "needle": "CONFIRM DEPLOYMENT",
+      "want": "left",
+      "draws": 14,
+      "bad": 0
+    },
+    {
+      "row": "os100/deploy/align",
+      "needle": "CORNER SLOTS",
+      "want": "center",
+      "draws": 14,
+      "bad": 0
+    },
+    {
+      "row": "os100/deploy/align",
+      "needle": "ALWAYS ON",
+      "want": "center",
+      "draws": 14,
+      "bad": 0
+    },
+    {
+      "row": "os100/station/contrast",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "contrast": 12.344085489112224,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/station/contrast",
+      "needle": "WALLET",
+      "contrast": 11.322902612761686,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/station/contrast",
+      "needle": "FUEL",
+      "contrast": 15.661354572685907,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/station/contrast",
+      "needle": "CREW",
+      "contrast": 15.04467308471705,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/station/contrast",
+      "needle": "PARTS",
+      "contrast": 15.506403831067253,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/station/contrast",
+      "needle": "CLOSE",
+      "contrast": 16.261769371285343,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/station/align",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "want": "left",
+      "draws": 16,
+      "bad": 0
+    },
+    {
+      "row": "os100/station/align",
+      "needle": "WALLET",
+      "want": "left",
+      "draws": 16,
+      "bad": 0
+    },
+    {
+      "row": "os100/station/align",
+      "needle": "FUEL",
+      "want": "left",
+      "draws": 16,
+      "bad": 0
+    },
+    {
+      "row": "os100/station/align",
+      "needle": "CREW",
+      "want": "left",
+      "draws": 16,
+      "bad": 0
+    },
+    {
+      "row": "os100/station/align",
+      "needle": "PARTS",
+      "want": "left",
+      "draws": 16,
+      "bad": 0
+    },
+    {
+      "row": "os100/station/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 16,
+      "bad": 0
+    },
+    {
+      "row": "os100/outfit/contrast",
+      "needle": "ATTACK FRIGATE",
+      "contrast": 14.982869943863822,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/outfit/contrast",
+      "needle": "(UNARMED)",
+      "contrast": 10.47917679879533,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/outfit/contrast",
+      "needle": "OUTFIT",
+      "contrast": 16.261769371285347,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/outfit/contrast",
+      "needle": "EDITING",
+      "contrast": 11.76345158510789,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/outfit/contrast",
+      "needle": "UNMOUNT",
+      "contrast": 16.261769371285347,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/outfit/align",
+      "needle": "ATTACK FRIGATE",
+      "want": "left",
+      "draws": 15,
+      "bad": 0
+    },
+    {
+      "row": "os100/outfit/align",
+      "needle": "(UNARMED)",
+      "want": "left",
+      "draws": 15,
+      "bad": 0
+    },
+    {
+      "row": "os100/outfit/align",
+      "needle": "OUTFIT",
+      "want": "left",
+      "draws": 60,
+      "bad": 0
+    },
+    {
+      "row": "os100/outfit/align",
+      "needle": "EDITING",
+      "want": "left",
+      "draws": 15,
+      "bad": 0
+    },
+    {
+      "row": "os100/outfit/align",
+      "needle": "UNMOUNT",
+      "want": "left",
+      "draws": 15,
+      "bad": 0
+    },
+    {
+      "row": "os100/missions/contrast",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "contrast": 12.344085489112224,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/missions/contrast",
+      "needle": "WOLFPACK BOUNTY",
+      "contrast": 14.528382241280763,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/missions/contrast",
+      "needle": "ACCEPT",
+      "contrast": 16.16625706888451,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/missions/contrast",
+      "needle": "CLOSE",
+      "contrast": 16.261769371285343,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/missions/align",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "want": "left",
+      "draws": 11,
+      "bad": 0
+    },
+    {
+      "row": "os100/missions/align",
+      "needle": "WOLFPACK BOUNTY",
+      "want": "left",
+      "draws": 11,
+      "bad": 0
+    },
+    {
+      "row": "os100/missions/align",
+      "needle": "ACCEPT",
+      "want": "left",
+      "draws": 11,
+      "bad": 0
+    },
+    {
+      "row": "os100/missions/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 11,
+      "bad": 0
+    },
+    {
+      "row": "os100/hail/contrast",
+      "needle": "TRADE",
+      "contrast": 11.870266298033188,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/hail/contrast",
+      "needle": "TALK",
+      "contrast": 11.870207531549294,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/hail/contrast",
+      "needle": "THREATEN",
+      "contrast": 11.870113506385351,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/hail/contrast",
+      "needle": "LEAVE",
+      "contrast": 11.870189901717591,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/hail/align",
+      "needle": "TRADE",
+      "want": "left",
+      "draws": 28,
+      "bad": 0
+    },
+    {
+      "row": "os100/hail/align",
+      "needle": "TALK",
+      "want": "left",
+      "draws": 28,
+      "bad": 0
+    },
+    {
+      "row": "os100/hail/align",
+      "needle": "THREATEN",
+      "want": "left",
+      "draws": 28,
+      "bad": 0
+    },
+    {
+      "row": "os100/hail/align",
+      "needle": "LEAVE",
+      "want": "left",
+      "draws": 28,
+      "bad": 0
+    },
+    {
+      "row": "os100/endgame/contrast",
+      "needle": "REDEPLOY SECTOR",
+      "contrast": 11.870246895701149,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/endgame/contrast",
+      "needle": "SECTOR MAP",
+      "contrast": 16.261769371285347,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/endgame/contrast",
+      "needle": "CRITICAL DEFEAT",
+      "contrast": 5.421700892144061,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/endgame/contrast",
+      "needle": "All friendly",
+      "contrast": 11.818929363804596,
+      "fontPx": 21.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os100/endgame/align",
+      "needle": "REDEPLOY SECTOR",
+      "want": "left",
+      "draws": 14,
+      "bad": 0
+    },
+    {
+      "row": "os100/endgame/align",
+      "needle": "SECTOR MAP",
+      "want": "left",
+      "draws": 14,
+      "bad": 0
+    },
+    {
+      "row": "os100/endgame/align",
+      "needle": "CRITICAL DEFEAT",
+      "want": "center",
+      "draws": 14,
+      "bad": 0
+    },
+    {
+      "row": "os100/endgame/align",
+      "needle": "All friendly",
+      "want": "center",
+      "draws": 14,
+      "bad": 0
+    },
+    {
+      "row": "os125",
+      "displaySize": 854,
+      "renderScale": 1.25,
+      "devicePx": 1068,
+      "canvasWidth": 1068,
+      "clientWidth": 854,
+      "offsetWidth": 856,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 1.25,
+      "uiTextPx": 17
+    },
+    {
+      "row": "os125/base/contrast",
+      "needle": "REINFORCEMENTS",
+      "contrast": 16.277298994995125,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/base/contrast",
+      "needle": "MENU v",
+      "contrast": 16.277298994995125,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/base/contrast",
+      "needle": "END TURN",
+      "contrast": 16.277298994995125,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/base/contrast",
+      "needle": "MAP //",
+      "contrast": 7.594115067721648,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/base/contrast",
+      "needle": "AP 4/4",
+      "contrast": 9.367082260437508,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/base/align",
+      "needle": "REINFORCEMENTS",
+      "want": "left",
+      "draws": 19,
+      "bad": 0
+    },
+    {
+      "row": "os125/base/align",
+      "needle": "MENU v",
+      "want": "left",
+      "draws": 19,
+      "bad": 0
+    },
+    {
+      "row": "os125/base/align",
+      "needle": "END TURN",
+      "want": "left",
+      "draws": 19,
+      "bad": 0
+    },
+    {
+      "row": "os125/base/align",
+      "needle": "MAP //",
+      "want": "left",
+      "draws": 19,
+      "bad": 0
+    },
+    {
+      "row": "os125/base/align",
+      "needle": "AP 4/4",
+      "want": "left",
+      "draws": 19,
+      "bad": 0
+    },
+    {
+      "row": "os125/campaign/contrast",
+      "needle": "CLOSE [ESC]",
+      "contrast": 16.233142833801296,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/campaign/align",
+      "needle": "CLOSE [ESC]",
+      "want": "left",
+      "draws": 10,
+      "bad": 0
+    },
+    {
+      "row": "os125/help/contrast",
+      "needle": "CLOSE",
+      "contrast": 16.261769371285347,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/help/contrast",
+      "needle": "CONTROLS",
+      "contrast": 12.999165845840874,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/help/contrast",
+      "needle": "[LMB]",
+      "contrast": 10.92241267795869,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/help/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 11,
+      "bad": 0
+    },
+    {
+      "row": "os125/help/align",
+      "needle": "CONTROLS",
+      "want": "left",
+      "draws": 11,
+      "bad": 0
+    },
+    {
+      "row": "os125/help/align",
+      "needle": "[LMB]",
+      "want": "left",
+      "draws": 11,
+      "bad": 0
+    },
+    {
+      "row": "os125/bridge/contrast",
+      "needle": "RESUME [SPC]",
+      "contrast": 16.233142833801296,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/bridge/align",
+      "needle": "RESUME [SPC]",
+      "want": "left",
+      "draws": 7,
+      "bad": 0
+    },
+    {
+      "row": "os125/deploy/contrast",
+      "needle": "DEPLOYMENT",
+      "contrast": 9.292526092826883,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/deploy/contrast",
+      "needle": "CONFIRM DEPLOYMENT",
+      "contrast": 11.870341400454496,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/deploy/contrast",
+      "needle": "CORNER SLOTS",
+      "contrast": 11.547302460973027,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/deploy/contrast",
+      "needle": "ALWAYS ON",
+      "contrast": 11.676790041558544,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/deploy/align",
+      "needle": "DEPLOYMENT",
+      "want": "center",
+      "draws": 16,
+      "bad": 0
+    },
+    {
+      "row": "os125/deploy/align",
+      "needle": "CONFIRM DEPLOYMENT",
+      "want": "left",
+      "draws": 16,
+      "bad": 0
+    },
+    {
+      "row": "os125/deploy/align",
+      "needle": "CORNER SLOTS",
+      "want": "center",
+      "draws": 16,
+      "bad": 0
+    },
+    {
+      "row": "os125/deploy/align",
+      "needle": "ALWAYS ON",
+      "want": "center",
+      "draws": 16,
+      "bad": 0
+    },
+    {
+      "row": "os125/station/contrast",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "contrast": 12.142976111845508,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/station/contrast",
+      "needle": "WALLET",
+      "contrast": 10.899949120183589,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/station/contrast",
+      "needle": "FUEL",
+      "contrast": 15.36423270993154,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/station/contrast",
+      "needle": "CREW",
+      "contrast": 14.854302006364351,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/station/contrast",
+      "needle": "PARTS",
+      "contrast": 15.254773261211037,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/station/contrast",
+      "needle": "CLOSE",
+      "contrast": 16.261769371285347,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/station/align",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "want": "left",
+      "draws": 17,
+      "bad": 0
+    },
+    {
+      "row": "os125/station/align",
+      "needle": "WALLET",
+      "want": "left",
+      "draws": 17,
+      "bad": 0
+    },
+    {
+      "row": "os125/station/align",
+      "needle": "FUEL",
+      "want": "left",
+      "draws": 17,
+      "bad": 0
+    },
+    {
+      "row": "os125/station/align",
+      "needle": "CREW",
+      "want": "left",
+      "draws": 17,
+      "bad": 0
+    },
+    {
+      "row": "os125/station/align",
+      "needle": "PARTS",
+      "want": "left",
+      "draws": 17,
+      "bad": 0
+    },
+    {
+      "row": "os125/station/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 17,
+      "bad": 0
+    },
+    {
+      "row": "os125/outfit/contrast",
+      "needle": "ATTACK FRIGATE",
+      "contrast": 15.101714490958617,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/outfit/contrast",
+      "needle": "(UNARMED)",
+      "contrast": 10.481029907335763,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/outfit/contrast",
+      "needle": "OUTFIT",
+      "contrast": 16.261769371285347,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/outfit/contrast",
+      "needle": "EDITING",
+      "contrast": 11.763476513963548,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/outfit/contrast",
+      "needle": "UNMOUNT",
+      "contrast": 16.261769371285347,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/outfit/align",
+      "needle": "ATTACK FRIGATE",
+      "want": "left",
+      "draws": 15,
+      "bad": 0
+    },
+    {
+      "row": "os125/outfit/align",
+      "needle": "(UNARMED)",
+      "want": "left",
+      "draws": 15,
+      "bad": 0
+    },
+    {
+      "row": "os125/outfit/align",
+      "needle": "OUTFIT",
+      "want": "left",
+      "draws": 60,
+      "bad": 0
+    },
+    {
+      "row": "os125/outfit/align",
+      "needle": "EDITING",
+      "want": "left",
+      "draws": 15,
+      "bad": 0
+    },
+    {
+      "row": "os125/outfit/align",
+      "needle": "UNMOUNT",
+      "want": "left",
+      "draws": 15,
+      "bad": 0
+    },
+    {
+      "row": "os125/missions/contrast",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "contrast": 12.142976111845508,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/missions/contrast",
+      "needle": "WOLFPACK BOUNTY",
+      "contrast": 14.147911966717892,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/missions/contrast",
+      "needle": "ACCEPT",
+      "contrast": 16.16625706888451,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/missions/contrast",
+      "needle": "CLOSE",
+      "contrast": 16.261769371285347,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/missions/align",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "want": "left",
+      "draws": 24,
+      "bad": 0
+    },
+    {
+      "row": "os125/missions/align",
+      "needle": "WOLFPACK BOUNTY",
+      "want": "left",
+      "draws": 24,
+      "bad": 0
+    },
+    {
+      "row": "os125/missions/align",
+      "needle": "ACCEPT",
+      "want": "left",
+      "draws": 24,
+      "bad": 0
+    },
+    {
+      "row": "os125/missions/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 24,
+      "bad": 0
+    },
+    {
+      "row": "os125/hail/contrast",
+      "needle": "TRADE",
+      "contrast": 11.870441454273458,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/hail/contrast",
+      "needle": "TALK",
+      "contrast": 11.870249320989185,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/hail/contrast",
+      "needle": "THREATEN",
+      "contrast": 11.870113506385351,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/hail/contrast",
+      "needle": "LEAVE",
+      "contrast": 11.870332136297318,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/hail/align",
+      "needle": "TRADE",
+      "want": "left",
+      "draws": 70,
+      "bad": 0
+    },
+    {
+      "row": "os125/hail/align",
+      "needle": "TALK",
+      "want": "left",
+      "draws": 70,
+      "bad": 0
+    },
+    {
+      "row": "os125/hail/align",
+      "needle": "THREATEN",
+      "want": "left",
+      "draws": 70,
+      "bad": 0
+    },
+    {
+      "row": "os125/hail/align",
+      "needle": "LEAVE",
+      "want": "left",
+      "draws": 70,
+      "bad": 0
+    },
+    {
+      "row": "os125/endgame/contrast",
+      "needle": "REDEPLOY SECTOR",
+      "contrast": 11.870384747290986,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/endgame/contrast",
+      "needle": "SECTOR MAP",
+      "contrast": 16.261769371285347,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/endgame/contrast",
+      "needle": "CRITICAL DEFEAT",
+      "contrast": 5.422313246047816,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/endgame/contrast",
+      "needle": "All friendly",
+      "contrast": 11.182429763269782,
+      "fontPx": 17.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os125/endgame/align",
+      "needle": "REDEPLOY SECTOR",
+      "want": "left",
+      "draws": 41,
+      "bad": 0
+    },
+    {
+      "row": "os125/endgame/align",
+      "needle": "SECTOR MAP",
+      "want": "left",
+      "draws": 41,
+      "bad": 0
+    },
+    {
+      "row": "os125/endgame/align",
+      "needle": "CRITICAL DEFEAT",
+      "want": "center",
+      "draws": 41,
+      "bad": 0
+    },
+    {
+      "row": "os125/endgame/align",
+      "needle": "All friendly",
+      "want": "center",
+      "draws": 41,
+      "bad": 0
+    },
+    {
+      "row": "os150",
+      "displaySize": 710,
+      "renderScale": 1.5,
+      "devicePx": 1065,
+      "canvasWidth": 1065,
+      "clientWidth": 710,
+      "offsetWidth": 712,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 1.5,
+      "uiTextPx": 14
+    },
+    {
+      "row": "os150/base/contrast",
+      "needle": "REINFORCEMENTS",
+      "contrast": 16.277298994995125,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/base/contrast",
+      "needle": "MENU v",
+      "contrast": 16.277298994995125,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/base/contrast",
+      "needle": "END TURN",
+      "contrast": 16.277298994995125,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/base/contrast",
+      "needle": "MAP //",
+      "contrast": 7.5941150677216465,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/base/contrast",
+      "needle": "AP 4/4",
+      "contrast": 9.367044591153867,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/base/align",
+      "needle": "REINFORCEMENTS",
+      "want": "left",
+      "draws": 22,
+      "bad": 0
+    },
+    {
+      "row": "os150/base/align",
+      "needle": "MENU v",
+      "want": "left",
+      "draws": 22,
+      "bad": 0
+    },
+    {
+      "row": "os150/base/align",
+      "needle": "END TURN",
+      "want": "left",
+      "draws": 22,
+      "bad": 0
+    },
+    {
+      "row": "os150/base/align",
+      "needle": "MAP //",
+      "want": "left",
+      "draws": 22,
+      "bad": 0
+    },
+    {
+      "row": "os150/base/align",
+      "needle": "AP 4/4",
+      "want": "left",
+      "draws": 22,
+      "bad": 0
+    },
+    {
+      "row": "os150/campaign/contrast",
+      "needle": "CLOSE [ESC]",
+      "contrast": 16.062037261228117,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/campaign/align",
+      "needle": "CLOSE [ESC]",
+      "want": "left",
+      "draws": 9,
+      "bad": 0
+    },
+    {
+      "row": "os150/help/contrast",
+      "needle": "CLOSE",
+      "contrast": 16.220095416696346,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/help/contrast",
+      "needle": "CONTROLS",
+      "contrast": 12.999409987196138,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/help/contrast",
+      "needle": "[LMB]",
+      "contrast": 10.866507800974565,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/help/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 18,
+      "bad": 0
+    },
+    {
+      "row": "os150/help/align",
+      "needle": "CONTROLS",
+      "want": "left",
+      "draws": 18,
+      "bad": 0
+    },
+    {
+      "row": "os150/help/align",
+      "needle": "[LMB]",
+      "want": "left",
+      "draws": 18,
+      "bad": 0
+    },
+    {
+      "row": "os150/bridge/contrast",
+      "needle": "RESUME [SPC]",
+      "contrast": 16.224927105032112,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/bridge/align",
+      "needle": "RESUME [SPC]",
+      "want": "left",
+      "draws": 15,
+      "bad": 0
+    },
+    {
+      "row": "os150/deploy/contrast",
+      "needle": "DEPLOYMENT",
+      "contrast": 9.28257009354466,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/deploy/contrast",
+      "needle": "CONFIRM DEPLOYMENT",
+      "contrast": 11.866956932925211,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/deploy/contrast",
+      "needle": "CORNER SLOTS",
+      "contrast": 11.278776363188788,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/deploy/contrast",
+      "needle": "ALWAYS ON",
+      "contrast": 11.138079719907129,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/deploy/align",
+      "needle": "DEPLOYMENT",
+      "want": "center",
+      "draws": 34,
+      "bad": 0
+    },
+    {
+      "row": "os150/deploy/align",
+      "needle": "CONFIRM DEPLOYMENT",
+      "want": "left",
+      "draws": 34,
+      "bad": 0
+    },
+    {
+      "row": "os150/deploy/align",
+      "needle": "CORNER SLOTS",
+      "want": "center",
+      "draws": 34,
+      "bad": 0
+    },
+    {
+      "row": "os150/deploy/align",
+      "needle": "ALWAYS ON",
+      "want": "center",
+      "draws": 34,
+      "bad": 0
+    },
+    {
+      "row": "os150/station/contrast",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "contrast": 12.070463207354972,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/station/contrast",
+      "needle": "WALLET",
+      "contrast": 10.603360597770298,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/station/contrast",
+      "needle": "FUEL",
+      "contrast": 14.930448658953383,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/station/contrast",
+      "needle": "CREW",
+      "contrast": 14.607612306975277,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/station/contrast",
+      "needle": "PARTS",
+      "contrast": 15.241389896805952,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/station/contrast",
+      "needle": "CLOSE",
+      "contrast": 16.220095416696346,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/station/align",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "want": "left",
+      "draws": 25,
+      "bad": 0
+    },
+    {
+      "row": "os150/station/align",
+      "needle": "WALLET",
+      "want": "left",
+      "draws": 25,
+      "bad": 0
+    },
+    {
+      "row": "os150/station/align",
+      "needle": "FUEL",
+      "want": "left",
+      "draws": 25,
+      "bad": 0
+    },
+    {
+      "row": "os150/station/align",
+      "needle": "CREW",
+      "want": "left",
+      "draws": 25,
+      "bad": 0
+    },
+    {
+      "row": "os150/station/align",
+      "needle": "PARTS",
+      "want": "left",
+      "draws": 25,
+      "bad": 0
+    },
+    {
+      "row": "os150/station/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 25,
+      "bad": 0
+    },
+    {
+      "row": "os150/outfit/contrast",
+      "needle": "ATTACK FRIGATE",
+      "contrast": 14.174131269001753,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/outfit/contrast",
+      "needle": "(UNARMED)",
+      "contrast": 10.420694063788098,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/outfit/contrast",
+      "needle": "OUTFIT",
+      "contrast": 16.261769371285347,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/outfit/contrast",
+      "needle": "EDITING",
+      "contrast": 11.763509261909972,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/outfit/contrast",
+      "needle": "UNMOUNT",
+      "contrast": 16.261769371285347,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/outfit/align",
+      "needle": "ATTACK FRIGATE",
+      "want": "left",
+      "draws": 34,
+      "bad": 0
+    },
+    {
+      "row": "os150/outfit/align",
+      "needle": "(UNARMED)",
+      "want": "left",
+      "draws": 34,
+      "bad": 0
+    },
+    {
+      "row": "os150/outfit/align",
+      "needle": "OUTFIT",
+      "want": "left",
+      "draws": 136,
+      "bad": 0
+    },
+    {
+      "row": "os150/outfit/align",
+      "needle": "EDITING",
+      "want": "left",
+      "draws": 34,
+      "bad": 0
+    },
+    {
+      "row": "os150/outfit/align",
+      "needle": "UNMOUNT",
+      "want": "left",
+      "draws": 34,
+      "bad": 0
+    },
+    {
+      "row": "os150/missions/contrast",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "contrast": 12.070463207354972,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/missions/contrast",
+      "needle": "WOLFPACK BOUNTY",
+      "contrast": 13.81924735057593,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/missions/contrast",
+      "needle": "ACCEPT",
+      "contrast": 16.045981606241476,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/missions/contrast",
+      "needle": "CLOSE",
+      "contrast": 16.220095416696346,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/missions/align",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "want": "left",
+      "draws": 26,
+      "bad": 0
+    },
+    {
+      "row": "os150/missions/align",
+      "needle": "WOLFPACK BOUNTY",
+      "want": "left",
+      "draws": 26,
+      "bad": 0
+    },
+    {
+      "row": "os150/missions/align",
+      "needle": "ACCEPT",
+      "want": "left",
+      "draws": 26,
+      "bad": 0
+    },
+    {
+      "row": "os150/missions/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 26,
+      "bad": 0
+    },
+    {
+      "row": "os150/hail/contrast",
+      "needle": "TRADE",
+      "contrast": 11.868977309103398,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/hail/contrast",
+      "needle": "TALK",
+      "contrast": 11.661680337117936,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/hail/contrast",
+      "needle": "THREATEN",
+      "contrast": 11.87041010553027,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/hail/contrast",
+      "needle": "LEAVE",
+      "contrast": 11.85098567710029,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/hail/align",
+      "needle": "TRADE",
+      "want": "left",
+      "draws": 56,
+      "bad": 0
+    },
+    {
+      "row": "os150/hail/align",
+      "needle": "TALK",
+      "want": "left",
+      "draws": 56,
+      "bad": 0
+    },
+    {
+      "row": "os150/hail/align",
+      "needle": "THREATEN",
+      "want": "left",
+      "draws": 56,
+      "bad": 0
+    },
+    {
+      "row": "os150/hail/align",
+      "needle": "LEAVE",
+      "want": "left",
+      "draws": 56,
+      "bad": 0
+    },
+    {
+      "row": "os150/endgame/contrast",
+      "needle": "REDEPLOY SECTOR",
+      "contrast": 11.870547247780403,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/endgame/contrast",
+      "needle": "SECTOR MAP",
+      "contrast": 16.14021231382599,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/endgame/contrast",
+      "needle": "CRITICAL DEFEAT",
+      "contrast": 5.348226929341539,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/endgame/contrast",
+      "needle": "All friendly",
+      "contrast": 11.318270506085327,
+      "fontPx": 14.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os150/endgame/align",
+      "needle": "REDEPLOY SECTOR",
+      "want": "left",
+      "draws": 31,
+      "bad": 0
+    },
+    {
+      "row": "os150/endgame/align",
+      "needle": "SECTOR MAP",
+      "want": "left",
+      "draws": 31,
+      "bad": 0
+    },
+    {
+      "row": "os150/endgame/align",
+      "needle": "CRITICAL DEFEAT",
+      "want": "center",
+      "draws": 31,
+      "bad": 0
+    },
+    {
+      "row": "os150/endgame/align",
+      "needle": "All friendly",
+      "want": "center",
+      "draws": 31,
+      "bad": 0
+    },
+    {
+      "row": "os200",
+      "displaySize": 530,
+      "renderScale": 2,
+      "devicePx": 1060,
+      "canvasWidth": 1060,
+      "clientWidth": 530,
+      "offsetWidth": 532,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 2,
+      "uiTextPx": 10
+    },
+    {
+      "row": "os200/base/contrast",
+      "needle": "REINFORCEMENTS",
+      "contrast": 16.277298994995125,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/base/contrast",
+      "needle": "MENU v",
+      "contrast": 16.277298994995125,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/base/contrast",
+      "needle": "END TURN",
+      "contrast": 16.277298994995125,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/base/contrast",
+      "needle": "MAP //",
+      "contrast": 7.5941150677216465,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/base/contrast",
+      "needle": "AP 4/4",
+      "contrast": 9.367201563414238,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/base/align",
+      "needle": "REINFORCEMENTS",
+      "want": "left",
+      "draws": 19,
+      "bad": 0
+    },
+    {
+      "row": "os200/base/align",
+      "needle": "MENU v",
+      "want": "left",
+      "draws": 19,
+      "bad": 0
+    },
+    {
+      "row": "os200/base/align",
+      "needle": "END TURN",
+      "want": "left",
+      "draws": 19,
+      "bad": 0
+    },
+    {
+      "row": "os200/base/align",
+      "needle": "MAP //",
+      "want": "left",
+      "draws": 19,
+      "bad": 0
+    },
+    {
+      "row": "os200/base/align",
+      "needle": "AP 4/4",
+      "want": "left",
+      "draws": 19,
+      "bad": 0
+    },
+    {
+      "row": "os200/campaign/contrast",
+      "needle": "CLOSE [ESC]",
+      "contrast": 15.287109815977544,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/campaign/align",
+      "needle": "CLOSE [ESC]",
+      "want": "left",
+      "draws": 11,
+      "bad": 0
+    },
+    {
+      "row": "os200/help/contrast",
+      "needle": "CLOSE",
+      "contrast": 15.341785926914394,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/help/contrast",
+      "needle": "CONTROLS",
+      "contrast": 11.925193501942225,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/help/contrast",
+      "needle": "[LMB]",
+      "contrast": 8.65012896035481,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/help/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 22,
+      "bad": 0
+    },
+    {
+      "row": "os200/help/align",
+      "needle": "CONTROLS",
+      "want": "left",
+      "draws": 22,
+      "bad": 0
+    },
+    {
+      "row": "os200/help/align",
+      "needle": "[LMB]",
+      "want": "left",
+      "draws": 22,
+      "bad": 0
+    },
+    {
+      "row": "os200/bridge/contrast",
+      "needle": "RESUME [SPC]",
+      "contrast": 15.369841997244176,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/bridge/align",
+      "needle": "RESUME [SPC]",
+      "want": "left",
+      "draws": 10,
+      "bad": 0
+    },
+    {
+      "row": "os200/deploy/contrast",
+      "needle": "DEPLOYMENT",
+      "contrast": 8.5703665865457,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/deploy/contrast",
+      "needle": "CONFIRM DEPLOYMENT",
+      "contrast": 10.889989697398414,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/deploy/contrast",
+      "needle": "CORNER SLOTS",
+      "contrast": 9.224490571583997,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/deploy/contrast",
+      "needle": "ALWAYS ON",
+      "contrast": 9.034842187032798,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/deploy/align",
+      "needle": "DEPLOYMENT",
+      "want": "center",
+      "draws": 30,
+      "bad": 0
+    },
+    {
+      "row": "os200/deploy/align",
+      "needle": "CONFIRM DEPLOYMENT",
+      "want": "left",
+      "draws": 30,
+      "bad": 0
+    },
+    {
+      "row": "os200/deploy/align",
+      "needle": "CORNER SLOTS",
+      "want": "center",
+      "draws": 30,
+      "bad": 0
+    },
+    {
+      "row": "os200/deploy/align",
+      "needle": "ALWAYS ON",
+      "want": "center",
+      "draws": 30,
+      "bad": 0
+    },
+    {
+      "row": "os200/station/contrast",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "contrast": 9.091251290108582,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/station/contrast",
+      "needle": "WALLET",
+      "contrast": 8.747524096724812,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/station/contrast",
+      "needle": "FUEL",
+      "contrast": 12.351858085757618,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/station/contrast",
+      "needle": "CREW",
+      "contrast": 11.517844671477231,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/station/contrast",
+      "needle": "PARTS",
+      "contrast": 11.179587107294632,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/station/contrast",
+      "needle": "CLOSE",
+      "contrast": 15.342471294472961,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/station/align",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "want": "left",
+      "draws": 18,
+      "bad": 0
+    },
+    {
+      "row": "os200/station/align",
+      "needle": "WALLET",
+      "want": "left",
+      "draws": 18,
+      "bad": 0
+    },
+    {
+      "row": "os200/station/align",
+      "needle": "FUEL",
+      "want": "left",
+      "draws": 18,
+      "bad": 0
+    },
+    {
+      "row": "os200/station/align",
+      "needle": "CREW",
+      "want": "left",
+      "draws": 18,
+      "bad": 0
+    },
+    {
+      "row": "os200/station/align",
+      "needle": "PARTS",
+      "want": "left",
+      "draws": 18,
+      "bad": 0
+    },
+    {
+      "row": "os200/station/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 18,
+      "bad": 0
+    },
+    {
+      "row": "os200/outfit/contrast",
+      "needle": "ATTACK FRIGATE",
+      "contrast": 11.560966834344248,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/outfit/contrast",
+      "needle": "(UNARMED)",
+      "contrast": 8.510008339044628,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/outfit/contrast",
+      "needle": "OUTFIT",
+      "contrast": 13.252872598270244,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/outfit/contrast",
+      "needle": "EDITING",
+      "contrast": 10.628283259235465,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/outfit/contrast",
+      "needle": "UNMOUNT",
+      "contrast": 14.976602268869373,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/outfit/align",
+      "needle": "ATTACK FRIGATE",
+      "want": "left",
+      "draws": 12,
+      "bad": 0
+    },
+    {
+      "row": "os200/outfit/align",
+      "needle": "(UNARMED)",
+      "want": "left",
+      "draws": 12,
+      "bad": 0
+    },
+    {
+      "row": "os200/outfit/align",
+      "needle": "OUTFIT",
+      "want": "left",
+      "draws": 48,
+      "bad": 0
+    },
+    {
+      "row": "os200/outfit/align",
+      "needle": "EDITING",
+      "want": "left",
+      "draws": 12,
+      "bad": 0
+    },
+    {
+      "row": "os200/outfit/align",
+      "needle": "UNMOUNT",
+      "want": "left",
+      "draws": 12,
+      "bad": 0
+    },
+    {
+      "row": "os200/missions/contrast",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "contrast": 9.091251290108582,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/missions/contrast",
+      "needle": "WOLFPACK BOUNTY",
+      "contrast": 11.055797566487806,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/missions/contrast",
+      "needle": "ACCEPT",
+      "contrast": 14.349618157259235,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/missions/contrast",
+      "needle": "CLOSE",
+      "contrast": 15.342471294472961,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/missions/align",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "want": "left",
+      "draws": 21,
+      "bad": 0
+    },
+    {
+      "row": "os200/missions/align",
+      "needle": "WOLFPACK BOUNTY",
+      "want": "left",
+      "draws": 21,
+      "bad": 0
+    },
+    {
+      "row": "os200/missions/align",
+      "needle": "ACCEPT",
+      "want": "left",
+      "draws": 21,
+      "bad": 0
+    },
+    {
+      "row": "os200/missions/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 21,
+      "bad": 0
+    },
+    {
+      "row": "os200/hail/contrast",
+      "needle": "TRADE",
+      "contrast": 11.025620050863045,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/hail/contrast",
+      "needle": "TALK",
+      "contrast": 10.145034426772886,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/hail/contrast",
+      "needle": "THREATEN",
+      "contrast": 11.14712017289774,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/hail/contrast",
+      "needle": "LEAVE",
+      "contrast": 11.265813049396613,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/hail/align",
+      "needle": "TRADE",
+      "want": "left",
+      "draws": 46,
+      "bad": 0
+    },
+    {
+      "row": "os200/hail/align",
+      "needle": "TALK",
+      "want": "left",
+      "draws": 46,
+      "bad": 0
+    },
+    {
+      "row": "os200/hail/align",
+      "needle": "THREATEN",
+      "want": "left",
+      "draws": 46,
+      "bad": 0
+    },
+    {
+      "row": "os200/hail/align",
+      "needle": "LEAVE",
+      "want": "left",
+      "draws": 46,
+      "bad": 0
+    },
+    {
+      "row": "os200/endgame/contrast",
+      "needle": "REDEPLOY SECTOR",
+      "contrast": 11.30469863712904,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/endgame/contrast",
+      "needle": "SECTOR MAP",
+      "contrast": 14.252677992888716,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/endgame/contrast",
+      "needle": "CRITICAL DEFEAT",
+      "contrast": 4.701011218987671,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/endgame/contrast",
+      "needle": "All friendly",
+      "contrast": 8.92129782546769,
+      "fontPx": 10.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os200/endgame/align",
+      "needle": "REDEPLOY SECTOR",
+      "want": "left",
+      "draws": 22,
+      "bad": 0
+    },
+    {
+      "row": "os200/endgame/align",
+      "needle": "SECTOR MAP",
+      "want": "left",
+      "draws": 22,
+      "bad": 0
+    },
+    {
+      "row": "os200/endgame/align",
+      "needle": "CRITICAL DEFEAT",
+      "want": "center",
+      "draws": 22,
+      "bad": 0
+    },
+    {
+      "row": "os200/endgame/align",
+      "needle": "All friendly",
+      "want": "center",
+      "draws": 22,
+      "bad": 0
+    },
+    {
+      "row": "os250",
+      "displaySize": 422,
+      "renderScale": 2.5,
+      "devicePx": 1055,
+      "canvasWidth": 1055,
+      "clientWidth": 422,
+      "offsetWidth": 424,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 2.5,
+      "uiTextPx": 8
+    },
+    {
+      "row": "os250/base/contrast",
+      "needle": "REINFORCEMENTS",
+      "contrast": 16.277298994995125,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/base/contrast",
+      "needle": "MENU v",
+      "contrast": 16.277298994995125,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/base/contrast",
+      "needle": "END TURN",
+      "contrast": 16.277298994995125,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/base/contrast",
+      "needle": "MAP //",
+      "contrast": 7.5941150677216465,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/base/contrast",
+      "needle": "AP 4/4",
+      "contrast": 9.367201563414238,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/base/align",
+      "needle": "REINFORCEMENTS",
+      "want": "left",
+      "draws": 18,
+      "bad": 0
+    },
+    {
+      "row": "os250/base/align",
+      "needle": "MENU v",
+      "want": "left",
+      "draws": 18,
+      "bad": 0
+    },
+    {
+      "row": "os250/base/align",
+      "needle": "END TURN",
+      "want": "left",
+      "draws": 18,
+      "bad": 0
+    },
+    {
+      "row": "os250/base/align",
+      "needle": "MAP //",
+      "want": "left",
+      "draws": 18,
+      "bad": 0
+    },
+    {
+      "row": "os250/base/align",
+      "needle": "AP 4/4",
+      "want": "left",
+      "draws": 18,
+      "bad": 0
+    },
+    {
+      "row": "os250/campaign/contrast",
+      "needle": "CLOSE [ESC]",
+      "contrast": 13.148165040853785,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/campaign/align",
+      "needle": "CLOSE [ESC]",
+      "want": "left",
+      "draws": 30,
+      "bad": 0
+    },
+    {
+      "row": "os250/help/contrast",
+      "needle": "CLOSE",
+      "contrast": 13.745562721374556,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/help/contrast",
+      "needle": "CONTROLS",
+      "contrast": 10.870206345742805,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/help/contrast",
+      "needle": "[LMB]",
+      "contrast": 6.137447243560769,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/help/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 17,
+      "bad": 0
+    },
+    {
+      "row": "os250/help/align",
+      "needle": "CONTROLS",
+      "want": "left",
+      "draws": 17,
+      "bad": 0
+    },
+    {
+      "row": "os250/help/align",
+      "needle": "[LMB]",
+      "want": "left",
+      "draws": 17,
+      "bad": 0
+    },
+    {
+      "row": "os250/bridge/contrast",
+      "needle": "RESUME [SPC]",
+      "contrast": 13.521049728502872,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/bridge/align",
+      "needle": "RESUME [SPC]",
+      "want": "left",
+      "draws": 17,
+      "bad": 0
+    },
+    {
+      "row": "os250/deploy/contrast",
+      "needle": "DEPLOYMENT",
+      "contrast": 7.937139977618001,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/deploy/contrast",
+      "needle": "CONFIRM DEPLOYMENT",
+      "contrast": 10.07261173852681,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/deploy/contrast",
+      "needle": "CORNER SLOTS",
+      "contrast": 6.557546126730326,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/deploy/contrast",
+      "needle": "ALWAYS ON",
+      "contrast": 6.938744082590866,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/deploy/align",
+      "needle": "DEPLOYMENT",
+      "want": "center",
+      "draws": 24,
+      "bad": 0
+    },
+    {
+      "row": "os250/deploy/align",
+      "needle": "CONFIRM DEPLOYMENT",
+      "want": "left",
+      "draws": 24,
+      "bad": 0
+    },
+    {
+      "row": "os250/deploy/align",
+      "needle": "CORNER SLOTS",
+      "want": "center",
+      "draws": 24,
+      "bad": 0
+    },
+    {
+      "row": "os250/deploy/align",
+      "needle": "ALWAYS ON",
+      "want": "center",
+      "draws": 24,
+      "bad": 0
+    },
+    {
+      "row": "os250/station/contrast",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "contrast": 6.740928511626212,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/station/contrast",
+      "needle": "WALLET",
+      "contrast": 6.346633559563532,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/station/contrast",
+      "needle": "FUEL",
+      "contrast": 7.704071826841908,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/station/contrast",
+      "needle": "CREW",
+      "contrast": 7.734951288051135,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/station/contrast",
+      "needle": "PARTS",
+      "contrast": 8.264297121558199,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/station/contrast",
+      "needle": "CLOSE",
+      "contrast": 13.759218244997488,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/station/align",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "want": "left",
+      "draws": 48,
+      "bad": 0
+    },
+    {
+      "row": "os250/station/align",
+      "needle": "WALLET",
+      "want": "left",
+      "draws": 48,
+      "bad": 0
+    },
+    {
+      "row": "os250/station/align",
+      "needle": "FUEL",
+      "want": "left",
+      "draws": 48,
+      "bad": 0
+    },
+    {
+      "row": "os250/station/align",
+      "needle": "CREW",
+      "want": "left",
+      "draws": 48,
+      "bad": 0
+    },
+    {
+      "row": "os250/station/align",
+      "needle": "PARTS",
+      "want": "left",
+      "draws": 48,
+      "bad": 0
+    },
+    {
+      "row": "os250/station/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 48,
+      "bad": 0
+    },
+    {
+      "row": "os250/outfit/contrast",
+      "needle": "ATTACK FRIGATE",
+      "contrast": 8.253756573655501,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/outfit/contrast",
+      "needle": "(UNARMED)",
+      "contrast": 6.958384095359374,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/outfit/contrast",
+      "needle": "OUTFIT",
+      "contrast": 13.35191048023934,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/outfit/contrast",
+      "needle": "EDITING",
+      "contrast": 10.295104919952012,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/outfit/contrast",
+      "needle": "UNMOUNT",
+      "contrast": 13.343351748680501,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/outfit/align",
+      "needle": "ATTACK FRIGATE",
+      "want": "left",
+      "draws": 43,
+      "bad": 0
+    },
+    {
+      "row": "os250/outfit/align",
+      "needle": "(UNARMED)",
+      "want": "left",
+      "draws": 43,
+      "bad": 0
+    },
+    {
+      "row": "os250/outfit/align",
+      "needle": "OUTFIT",
+      "want": "left",
+      "draws": 172,
+      "bad": 0
+    },
+    {
+      "row": "os250/outfit/align",
+      "needle": "EDITING",
+      "want": "left",
+      "draws": 43,
+      "bad": 0
+    },
+    {
+      "row": "os250/outfit/align",
+      "needle": "UNMOUNT",
+      "want": "left",
+      "draws": 43,
+      "bad": 0
+    },
+    {
+      "row": "os250/missions/contrast",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "contrast": 6.740928511626212,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/missions/contrast",
+      "needle": "WOLFPACK BOUNTY",
+      "contrast": 8.60298930506771,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/missions/contrast",
+      "needle": "ACCEPT",
+      "contrast": 14.17936547247523,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/missions/contrast",
+      "needle": "CLOSE",
+      "contrast": 13.759218244997488,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/missions/align",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "want": "left",
+      "draws": 16,
+      "bad": 0
+    },
+    {
+      "row": "os250/missions/align",
+      "needle": "WOLFPACK BOUNTY",
+      "want": "left",
+      "draws": 16,
+      "bad": 0
+    },
+    {
+      "row": "os250/missions/align",
+      "needle": "ACCEPT",
+      "want": "left",
+      "draws": 16,
+      "bad": 0
+    },
+    {
+      "row": "os250/missions/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 16,
+      "bad": 0
+    },
+    {
+      "row": "os250/hail/contrast",
+      "needle": "TRADE",
+      "contrast": 10.593537607842315,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/hail/contrast",
+      "needle": "TALK",
+      "contrast": 9.854501518500566,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/hail/contrast",
+      "needle": "THREATEN",
+      "contrast": 10.958512785738561,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/hail/contrast",
+      "needle": "LEAVE",
+      "contrast": 10.339123017276878,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/hail/align",
+      "needle": "TRADE",
+      "want": "left",
+      "draws": 40,
+      "bad": 0
+    },
+    {
+      "row": "os250/hail/align",
+      "needle": "TALK",
+      "want": "left",
+      "draws": 40,
+      "bad": 0
+    },
+    {
+      "row": "os250/hail/align",
+      "needle": "THREATEN",
+      "want": "left",
+      "draws": 40,
+      "bad": 0
+    },
+    {
+      "row": "os250/hail/align",
+      "needle": "LEAVE",
+      "want": "left",
+      "draws": 40,
+      "bad": 0
+    },
+    {
+      "row": "os250/endgame/contrast",
+      "needle": "REDEPLOY SECTOR",
+      "contrast": 10.447129070014796,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/endgame/contrast",
+      "needle": "SECTOR MAP",
+      "contrast": 12.952290372191834,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/endgame/contrast",
+      "needle": "CRITICAL DEFEAT",
+      "contrast": 4.461074323635777,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/endgame/contrast",
+      "needle": "All friendly",
+      "contrast": 6.455538532124653,
+      "fontPx": 8.0,
+      "floor": 3.0
+    },
+    {
+      "row": "os250/endgame/align",
+      "needle": "REDEPLOY SECTOR",
+      "want": "left",
+      "draws": 30,
+      "bad": 0
+    },
+    {
+      "row": "os250/endgame/align",
+      "needle": "SECTOR MAP",
+      "want": "left",
+      "draws": 30,
+      "bad": 0
+    },
+    {
+      "row": "os250/endgame/align",
+      "needle": "CRITICAL DEFEAT",
+      "want": "center",
+      "draws": 30,
+      "bad": 0
+    },
+    {
+      "row": "os250/endgame/align",
+      "needle": "All friendly",
+      "want": "center",
+      "draws": 30,
+      "bad": 0
+    },
+    {
+      "row": "win200",
+      "displaySize": 200,
+      "renderScale": 1,
+      "devicePx": 200,
+      "canvasWidth": 200,
+      "clientWidth": 200,
+      "offsetWidth": 202,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 1,
+      "uiTextPx": 4
+    },
+    {
+      "row": "win200/base/contrast",
+      "needle": "REINFORCEMENTS",
+      "contrast": 8.039247148196166,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/base/contrast",
+      "needle": "MENU v",
+      "contrast": 7.099392880943378,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/base/contrast",
+      "needle": "END TURN",
+      "contrast": 9.658187071976812,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/base/contrast",
+      "needle": "MAP //",
+      "contrast": 5.50394701764357,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/base/contrast",
+      "needle": "AP 4/4",
+      "contrast": 5.001404911765203,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/base/align",
+      "needle": "REINFORCEMENTS",
+      "want": "left",
+      "draws": 27,
+      "bad": 0
+    },
+    {
+      "row": "win200/base/align",
+      "needle": "MENU v",
+      "want": "left",
+      "draws": 27,
+      "bad": 0
+    },
+    {
+      "row": "win200/base/align",
+      "needle": "END TURN",
+      "want": "left",
+      "draws": 27,
+      "bad": 0
+    },
+    {
+      "row": "win200/base/align",
+      "needle": "MAP //",
+      "want": "left",
+      "draws": 27,
+      "bad": 0
+    },
+    {
+      "row": "win200/base/align",
+      "needle": "AP 4/4",
+      "want": "left",
+      "draws": 27,
+      "bad": 0
+    },
+    {
+      "row": "win200/campaign/contrast",
+      "needle": "CLOSE [ESC]",
+      "contrast": 7.660429603433587,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/campaign/align",
+      "needle": "CLOSE [ESC]",
+      "want": "left",
+      "draws": 12,
+      "bad": 0
+    },
+    {
+      "row": "win200/help/contrast",
+      "needle": "CLOSE",
+      "contrast": 7.325945619522488,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/help/contrast",
+      "needle": "CONTROLS",
+      "contrast": 6.33050698987622,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/help/contrast",
+      "needle": "[LMB]",
+      "contrast": 3.494015127137129,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/help/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 58,
+      "bad": 0
+    },
+    {
+      "row": "win200/help/align",
+      "needle": "CONTROLS",
+      "want": "left",
+      "draws": 58,
+      "bad": 0
+    },
+    {
+      "row": "win200/help/align",
+      "needle": "[LMB]",
+      "want": "left",
+      "draws": 58,
+      "bad": 0
+    },
+    {
+      "row": "win200/bridge/contrast",
+      "needle": "RESUME [SPC]",
+      "contrast": 7.488180138427496,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/bridge/align",
+      "needle": "RESUME [SPC]",
+      "want": "left",
+      "draws": 14,
+      "bad": 0
+    },
+    {
+      "row": "win200/deploy/contrast",
+      "needle": "DEPLOYMENT",
+      "contrast": 5.007526362286003,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/deploy/contrast",
+      "needle": "CONFIRM DEPLOYMENT",
+      "contrast": 6.866347400130664,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/deploy/contrast",
+      "needle": "CORNER SLOTS",
+      "contrast": 4.200974969961944,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/deploy/contrast",
+      "needle": "ALWAYS ON",
+      "contrast": 4.110045505357245,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/deploy/align",
+      "needle": "DEPLOYMENT",
+      "want": "center",
+      "draws": 21,
+      "bad": 0
+    },
+    {
+      "row": "win200/deploy/align",
+      "needle": "CONFIRM DEPLOYMENT",
+      "want": "left",
+      "draws": 21,
+      "bad": 0
+    },
+    {
+      "row": "win200/deploy/align",
+      "needle": "CORNER SLOTS",
+      "want": "center",
+      "draws": 21,
+      "bad": 0
+    },
+    {
+      "row": "win200/deploy/align",
+      "needle": "ALWAYS ON",
+      "want": "center",
+      "draws": 21,
+      "bad": 0
+    },
+    {
+      "row": "win200/station/contrast",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "contrast": 4.431898032531383,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/station/contrast",
+      "needle": "WALLET",
+      "contrast": 5.074943680409202,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/station/contrast",
+      "needle": "FUEL",
+      "contrast": 4.834481080391084,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/station/contrast",
+      "needle": "CREW",
+      "contrast": 4.995883154394746,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/station/contrast",
+      "needle": "PARTS",
+      "contrast": 5.041548489444411,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/station/contrast",
+      "needle": "CLOSE",
+      "contrast": 7.64573335414609,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/station/align",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "want": "left",
+      "draws": 30,
+      "bad": 0
+    },
+    {
+      "row": "win200/station/align",
+      "needle": "WALLET",
+      "want": "left",
+      "draws": 30,
+      "bad": 0
+    },
+    {
+      "row": "win200/station/align",
+      "needle": "FUEL",
+      "want": "left",
+      "draws": 30,
+      "bad": 0
+    },
+    {
+      "row": "win200/station/align",
+      "needle": "CREW",
+      "want": "left",
+      "draws": 30,
+      "bad": 0
+    },
+    {
+      "row": "win200/station/align",
+      "needle": "PARTS",
+      "want": "left",
+      "draws": 30,
+      "bad": 0
+    },
+    {
+      "row": "win200/station/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 30,
+      "bad": 0
+    },
+    {
+      "row": "win200/outfit/contrast",
+      "needle": "ATTACK FRIGATE",
+      "contrast": 5.270331516847145,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/outfit/contrast",
+      "needle": "(UNARMED)",
+      "contrast": 4.854515068412401,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/outfit/contrast",
+      "needle": "OUTFIT",
+      "contrast": 7.6994883555419635,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/outfit/contrast",
+      "needle": "EDITING",
+      "contrast": 6.664907981065676,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/outfit/contrast",
+      "needle": "UNMOUNT",
+      "contrast": 7.83168427298734,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/outfit/align",
+      "needle": "ATTACK FRIGATE",
+      "want": "left",
+      "draws": 29,
+      "bad": 0
+    },
+    {
+      "row": "win200/outfit/align",
+      "needle": "(UNARMED)",
+      "want": "left",
+      "draws": 29,
+      "bad": 0
+    },
+    {
+      "row": "win200/outfit/align",
+      "needle": "OUTFIT",
+      "want": "left",
+      "draws": 116,
+      "bad": 0
+    },
+    {
+      "row": "win200/outfit/align",
+      "needle": "EDITING",
+      "want": "left",
+      "draws": 29,
+      "bad": 0
+    },
+    {
+      "row": "win200/outfit/align",
+      "needle": "UNMOUNT",
+      "want": "left",
+      "draws": 29,
+      "bad": 0
+    },
+    {
+      "row": "win200/missions/contrast",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "contrast": 4.431898032531383,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/missions/contrast",
+      "needle": "WOLFPACK BOUNTY",
+      "contrast": 5.210034710789595,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/missions/contrast",
+      "needle": "ACCEPT",
+      "contrast": 7.551562639672093,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/missions/contrast",
+      "needle": "CLOSE",
+      "contrast": 7.64573335414609,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/missions/align",
+      "needle": "STATION SERVICES \u2014 POSTED PRICES",
+      "want": "left",
+      "draws": 31,
+      "bad": 0
+    },
+    {
+      "row": "win200/missions/align",
+      "needle": "WOLFPACK BOUNTY",
+      "want": "left",
+      "draws": 31,
+      "bad": 0
+    },
+    {
+      "row": "win200/missions/align",
+      "needle": "ACCEPT",
+      "want": "left",
+      "draws": 31,
+      "bad": 0
+    },
+    {
+      "row": "win200/missions/align",
+      "needle": "CLOSE",
+      "want": "left",
+      "draws": 31,
+      "bad": 0
+    },
+    {
+      "row": "win200/hail/contrast",
+      "needle": "TRADE",
+      "contrast": 7.026017384651528,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/hail/contrast",
+      "needle": "TALK",
+      "contrast": 6.544395562988229,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/hail/contrast",
+      "needle": "THREATEN",
+      "contrast": 8.070660423719373,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/hail/contrast",
+      "needle": "LEAVE",
+      "contrast": 7.069627130000147,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/hail/align",
+      "needle": "TRADE",
+      "want": "left",
+      "draws": 58,
+      "bad": 0
+    },
+    {
+      "row": "win200/hail/align",
+      "needle": "TALK",
+      "want": "left",
+      "draws": 58,
+      "bad": 0
+    },
+    {
+      "row": "win200/hail/align",
+      "needle": "THREATEN",
+      "want": "left",
+      "draws": 58,
+      "bad": 0
+    },
+    {
+      "row": "win200/hail/align",
+      "needle": "LEAVE",
+      "want": "left",
+      "draws": 58,
+      "bad": 0
+    },
+    {
+      "row": "win200/endgame/contrast",
+      "needle": "REDEPLOY SECTOR",
+      "contrast": 6.884042804881874,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/endgame/contrast",
+      "needle": "SECTOR MAP",
+      "contrast": 8.068282835693998,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/endgame/contrast",
+      "needle": "CRITICAL DEFEAT",
+      "contrast": 2.7723903475029954,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/endgame/contrast",
+      "needle": "All friendly",
+      "contrast": 4.095236897429783,
+      "fontPx": 4.0,
+      "floor": 2.0
+    },
+    {
+      "row": "win200/endgame/align",
+      "needle": "REDEPLOY SECTOR",
+      "want": "left",
+      "draws": 19,
+      "bad": 0
+    },
+    {
+      "row": "win200/endgame/align",
+      "needle": "SECTOR MAP",
+      "want": "left",
+      "draws": 19,
+      "bad": 0
+    },
+    {
+      "row": "win200/endgame/align",
+      "needle": "CRITICAL DEFEAT",
+      "want": "center",
+      "draws": 19,
+      "bad": 0
+    },
+    {
+      "row": "win200/endgame/align",
+      "needle": "All friendly",
+      "want": "center",
+      "draws": 19,
+      "bad": 0
+    },
+    {
+      "row": "dpr-before",
+      "displaySize": 590,
+      "renderScale": 1,
+      "devicePx": 590,
+      "canvasWidth": 590,
+      "clientWidth": 590,
+      "offsetWidth": 592,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 1,
+      "uiTextPx": 12
+    },
+    {
+      "row": "dpr-after",
+      "displaySize": 590,
+      "renderScale": 2,
+      "devicePx": 1180,
+      "canvasWidth": 1180,
+      "clientWidth": 590,
+      "offsetWidth": 592,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 2,
+      "uiTextPx": 12
+    },
+    {
+      "row": "gs12-dpr1",
+      "displaySize": 758,
+      "renderScale": 1,
+      "devicePx": 758,
+      "canvasWidth": 758,
+      "clientWidth": 758,
+      "offsetWidth": 760,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 1,
+      "uiTextPx": 15,
+      "viewSpan": 5
+    },
+    {
+      "row": "gs12-dpr2",
+      "displaySize": 758,
+      "renderScale": 2,
+      "devicePx": 1516,
+      "canvasWidth": 1516,
+      "clientWidth": 758,
+      "offsetWidth": 760,
+      "boxSizing": "content-box",
+      "borderTop": "1px",
+      "dpr": 2,
+      "uiTextPx": 15,
+      "viewSpan": 5
+    },
+    {
+      "row": "gs12-cache",
+      "density": 2,
+      "tilePx": 1820,
+      "tiles": 1,
+      "visible": 1
+    },
+    {
+      "row": "gs12-mean-abs",
+      "meanAbsRgb": 0.47210058409507033,
+      "dpr1": [
+        379,
+        379
+      ],
+      "dpr2": [
+        758,
+        758
+      ]
+    }
+  ],
+  "out": "/tmp/hermes-verify-t_51ccdd2d/run4",
+  "port": 8147
+}
