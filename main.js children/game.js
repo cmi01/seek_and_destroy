@@ -61,6 +61,7 @@ let CombatMath = null;
 let Outfitting = null;
 let Factions = null;
 let Reputation = null;
+let Missions = null;
 let ReservePlacement = null;
 let EndgameStatus = null;
 // The pure game.js children (single job each, registered below at load time).
@@ -767,6 +768,8 @@ const Actions = {
               s = Object.assign({}, s, {
                 reputation: Reputation.ApplyEvent(s.reputation, "kill", "player", State.faction)
               });
+              // M6(d): battle losses count toward accepted "destroy" contracts.
+              s = Missions.Advance(s, "destroy", dead);
             }
           }
           // M3: the result folds back onto the map — the map screen returns,
@@ -1112,6 +1115,10 @@ function _mapTurnCommit(){
     return;
   }
   _patchMap({ turn: (typeof map.turn === "number") ? map.turn + 1 : 1 });
+  // M6(d): map turns count toward accepted patrol contracts.
+  const c0 = GetGameState().campaign;
+  const advanced = Missions ? Missions.Advance(c0, "turn", 1) : c0;
+  if (advanced !== c0) TryPatchGameState({ campaign: advanced });
   _mapClockTick();
   Hud.updateAll();
 }
@@ -1241,7 +1248,7 @@ function _stationBundle(){
   if (mode === "merchant"){
     if (tab !== "provisions" && tab !== "sell") tab = "provisions";
   } else {
-    if (["commodities", "hulls", "weapons", "services", "outfit"].indexOf(tab) === -1) tab = "commodities";
+    if (["commodities", "hulls", "weapons", "services", "outfit", "missions"].indexOf(tab) === -1) tab = "commodities";
   }
 
   const tabs = (mode === "merchant")
@@ -1254,7 +1261,8 @@ function _stationBundle(){
         { id: "hulls", label: "HULLS", active: tab === "hulls" },
         { id: "weapons", label: "WEAPONS", active: tab === "weapons" },
         { id: "services", label: "SERVICE", active: tab === "services" },
-        { id: "outfit", label: "OUTFIT", active: tab === "outfit" }
+        { id: "outfit", label: "OUTFIT", active: tab === "outfit" },
+        { id: "missions", label: "MISSIONS", active: tab === "missions" }
       ];
 
   const rows = [];
@@ -1324,6 +1332,43 @@ function _stationBundle(){
     });
     const outfitRows = (outfitModel && Array.isArray(outfitModel.rows)) ? outfitModel.rows : [];
     for (let i = 0; i < outfitRows.length; i++) rows.push(outfitRows[i]);
+  } else if (dock && tab === "missions"){
+    // M6(d): the mission board — the station's fixed contracts (Q9) with
+    // status, progress toward target, and the accept/complete action.
+    const board = (c && c.contracts) || {};
+    const activeIds = Array.isArray(board.active) ? board.active : [];
+    const doneIds = Array.isArray(board.done) ? board.done : [];
+    const prog = board.progress || {};
+    const all = Missions.Table();
+    for (let i = 0; i < all.length; i++){
+      const m = all[i];
+      if (!m || m.locationId !== locId) continue;
+      const isActive = activeIds.indexOf(m.id) !== -1;
+      const isDone = doneIds.indexOf(m.id) !== -1;
+      const made = prog[m.id] || {};
+      const target = m.target || {};
+      const tKeys = Object.keys(target);
+      let met = true;
+      const progParts = [];
+      for (let j = 0; j < tKeys.length; j++){
+        const k = tKeys[j];
+        const have = Number(made[k]) || 0;
+        if (have < (Number(target[k]) || 0)) met = false;
+        progParts.push(k.toUpperCase() + " " + have + "/" + target[k]);
+      }
+      rows.push({
+        id: m.id,
+        kind: "mission",
+        label: m.title,
+        sub: m.brief,
+        priceText: "PAYOUT " + m.payout + " ⒸB",
+        ownedText: isDone ? "COMPLETE" : (isActive ? ("ACTIVE // " + progParts.join(" ")) : String(m.faction || "").toUpperCase()),
+        actionId: isDone ? "" : (isActive ? ("MISSION_COMPLETE:" + m.id) : ("MISSION_ACCEPT:" + m.id)),
+        actionLabel: isDone ? "DONE" : (isActive ? "COMPLETE" : "ACCEPT"),
+        canAct: !isDone && (!isActive || met),
+        active: isActive
+      });
+    }
   } else if (dock && tab === "services"){
     for (let i = 0; i < fleet.length; i++){
       const e = fleet[i];
@@ -1761,6 +1806,47 @@ const InputProcessor = (() => {
       Hud.hideHailPanel();
       _patchMap({ pendingEncounter: null });
       GameAudio.play("ui.modal.close");
+    } else if (typeof btn.id === "string" && btn.id.indexOf("MISSION_ACCEPT:") === 0){
+      // M6(d): accept a posted contract (Q9) — it starts counting progress.
+      const mid = btn.id.slice("MISSION_ACCEPT:".length);
+      const cNow = GetGameState().campaign;
+      const accepted = Missions.Accept(cNow, mid);
+      if (accepted !== cNow){
+        TryPatchGameState({ campaign: accepted });
+        State.turnReportQueue.push("CONTRACT ACCEPTED // " + mid.toUpperCase() + " — see the mission board for progress.");
+        GameAudio.play("ui.select");
+      } else {
+        GameAudio.play("ui.invalid");
+      }
+      Hud.updateMapHud();
+      Hud.toggleStationModal(true);
+    } else if (typeof btn.id === "string" && btn.id.indexOf("MISSION_COMPLETE:") === 0){
+      // M6(d): settle a contract — payout into the wallet and the mission
+      // reputation event toward the offering faction (Q10: ±15); the final
+      // contract of the chain sets the campaign-complete state (Q9).
+      const mid = btn.id.slice("MISSION_COMPLETE:".length);
+      const cNow = GetGameState().campaign;
+      const settled = Missions.Complete(cNow, mid);
+      if (settled.completed){
+        let next = settled.state;
+        const row = Missions.Table().filter(function (mm){ return mm.id === mid; })[0] || null;
+        const party = row ? row.faction : null;
+        if (party && Reputation){
+          next = Object.assign({}, next, {
+            reputation: Reputation.ApplyEvent(next.reputation, "mission", "player", party)
+          });
+        }
+        TryPatchGameState({ campaign: next });
+        State.turnReportQueue.push("CONTRACT COMPLETE // " + (row ? row.title : mid) + " — PAID " + settled.payout + " ⒸB.");
+        if (settled.final){
+          State.turnReportQueue.push("CAMPAIGN COMPLETE // the final contract is closed. The sector is yours.");
+        }
+        GameAudio.play("ui.select");
+      } else {
+        GameAudio.play("ui.invalid");
+      }
+      Hud.updateMapHud();
+      Hud.toggleStationModal(true);
     } else if (btn.id === "STATION_OPEN"){
       Hud.toggleStationModal(true);
     } else if (btn.id === "STATION_CLOSE"){
@@ -2763,6 +2849,7 @@ const api = {
         "main.js children/game.js children/economy.js",
         "main.js children/game.js children/factions.js",
         "main.js children/game.js children/reputation.js",
+        "main.js children/game.js children/missions.js",
         "main.js children/game.js children/themes.js",
         "main.js children/game.js children/rulesConfig.js",
         "main.js children/game.js children/boardQueries.js",
@@ -2816,6 +2903,7 @@ const api = {
         economy:          typeof economy === "function" ? economy : null,
         factions:         typeof factions === "function" ? factions : null,
         reputation:       typeof reputation === "function" ? reputation : null,
+        missions:         typeof missions === "function" ? missions : null,
         boardQueries:     typeof boardQueries === "function" ? boardQueries : null,
         visionQueries:    typeof visionQueries === "function" ? visionQueries : null,
         actionLegality:   typeof actionLegality === "function" ? actionLegality : null
@@ -2842,6 +2930,7 @@ const api = {
         ["main.js children/game.js children/economy.js",                  kids.economy],
         ["main.js children/game.js children/factions.js",                 kids.factions],
         ["main.js children/game.js children/reputation.js",               kids.reputation],
+        ["main.js children/game.js children/missions.js",                 kids.missions],
         ["main.js children/game.js children/themes.js",                  kids.themes],
         ["main.js children/game.js children/rulesConfig.js",             kids.rulesConfig],
         ["main.js children/game.js children/boardQueries.js",            kids.boardQueries],
@@ -2948,6 +3037,9 @@ const api = {
       // M6(b) reputation seam: bands, stances, adjustments and the sensor
       // sharing policy over the frozen event-rate table.
       Reputation = kids.reputation(CAMPAIGN_DATA.campaign.reputation);
+      // M6(d) missions seam: the authored fixed-contract chain (Q9) over
+      // its post / settle / progress children.
+      Missions = kids.missions(CAMPAIGN_DATA.campaign.missions);
       // M6(a) faction seam: identity rows + doctrine-weighted fleet
       // composition over the frozen faction table and the roster. The
       // pair-band reader and the open-square finder arrive as injected
@@ -3570,6 +3662,37 @@ const api = {
       dialogueFor(encounter, talkCount){ return Factions.DialogueModel(GetGameState().campaign, encounter, talkCount); },
       hailPanelFor(encounter, talkCount){ return Hud.hailPanel(encounter, Factions.DialogueModel(GetGameState().campaign, encounter, talkCount)); },
       dialogueOutcome(encounter, choice, seed){ return Factions.ApplyDialogueOutcome(GetGameState().campaign, encounter, choice, mulberry32(seed)); },
+      // M6(d) missions seam (tests): the posted contracts, accept/settle,
+      // and progress tracking (the real flow incl. the reputation event).
+      missionTable(){ return Missions.Table(); },
+      missionNextAt(locId, seed){ return Missions.NextAt({ id: locId }, GetGameState().campaign, mulberry32(seed)); },
+      acceptContract(id){
+        const c = GetGameState().campaign;
+        const n = Missions.Accept(c, id);
+        if (n !== c) TryPatchGameState({ campaign: n });
+        return GetGameState().campaign;
+      },
+      completeContract(id){
+        const c = GetGameState().campaign;
+        const res = Missions.Complete(c, id);
+        if (res.completed){
+          let next = res.state;
+          const row = Missions.Table().filter(function (mm){ return mm.id === id; })[0] || null;
+          if (row && row.faction && Reputation){
+            next = Object.assign({}, next, {
+              reputation: Reputation.ApplyEvent(next.reputation, "mission", "player", row.faction)
+            });
+          }
+          TryPatchGameState({ campaign: next });
+        }
+        return res;
+      },
+      creditProgress(kind, n){
+        const c = GetGameState().campaign;
+        const nx = Missions.Advance(c, kind, n);
+        if (nx !== c) TryPatchGameState({ campaign: nx });
+        return GetGameState().campaign;
+      },
       transitionToPlayerTurn(){ return Actions.transitionToPlayerTurn(); },
       transitionToAITurn(){ return Actions.transitionToAITurn(); },
       defaultDeployChoice(){
@@ -3626,6 +3749,17 @@ const api = {
         row(id){ return Factions ? Factions.Row(id) : null; },
         rollFleet(id, budget, seed){ return Factions ? Factions.ComposeFleet(id, budget, mulberry32(seed)) : []; },
         hullThemesFor(id){ return _hullThemesNow(id); }
+      },
+      // M6(d) missions seam (browser evidence): table + progress crediting —
+      // accept/settle run through the real board buttons.
+      Missions: {
+        table(){ return Missions ? Missions.Table() : []; },
+        advance(kind, n){
+          const c = GetGameState().campaign;
+          const nx = Missions.Advance(c, kind, n);
+          if (nx !== c) TryPatchGameState({ campaign: nx });
+          return GetGameState().campaign;
+        }
       },
       // M5 loadout seam facade (browser evidence / test helpers): weapon
       // stats read through the loadout readers, never off unit fields.

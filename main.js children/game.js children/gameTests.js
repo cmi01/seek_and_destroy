@@ -1949,6 +1949,94 @@ const runGameTests = function (bridge, testName) {
       };
     },
 
+    // T-M6d-1 (M6): the station board posts the authored fixed contracts
+    // (Q9) — the next available one per location, with payout and
+    // offering faction — and accepting it moves it into progress.
+    testMissionBoard() {
+      const bad = [];
+      bridge.initializeCampaign();
+      // Regression guard: the facade must forward the pair-table builder,
+      // so the initialized campaign seeds player|factions (not the M1
+      // faction-pairs-only fallback).
+      const initRep = bridge.campaign["reputation"] || {};
+      if (initRep["player|Syndicate"] !== -20) bad.push("init-seed-synd=" + initRep["player|Syndicate"]);
+      if (initRep["player|Capital"] !== 20) bad.push("init-seed-capital=" + initRep["player|Capital"]);
+      const table = bridge.missionTable();
+      if (table.length !== 4) bad.push("table=" + table.length);
+      const c1 = bridge.missionNextAt("sol-gate", 1);
+      if (!c1 || c1.id !== "c1-wolfpack-bounty") bad.push("next=" + (c1 && c1.id));
+      if (!c1 || c1.payout !== 4000 || c1.faction !== "Capital") bad.push("payout/faction");
+      if (bridge.missionNextAt("khepri-station", 1) === null) bad.push("khepri-empty");
+      bridge.acceptContract(c1.id);
+      const after = bridge.campaign;
+      if (after.contracts.active.indexOf(c1.id) === -1) bad.push("not-active");
+      if (bridge.missionNextAt("sol-gate", 1) !== null) bad.push("still-posted");
+      bridge.acceptContract(c1.id);
+      if (bridge.campaign.contracts.active.length !== 1) bad.push("double-accept");
+      return {
+        name: "M6d-1 STATION BOARD + FIXED CONTRACTS (Q9)",
+        pass: bad.length === 0,
+        detail: "rows=" + table.length + " issues=[" + bad.join("; ") + "]"
+      };
+    },
+
+    // T-M6d-2 (M6): completion pays the payout into the wallet and moves
+    // reputation ±15 toward the offering faction (Q10) — and a contract
+    // whose target is unmet cannot settle.
+    testMissionPayout() {
+      const bad = [];
+      bridge.initializeCampaign();
+      const before = bridge.campaign;
+      bridge.acceptContract("c1-wolfpack-bounty");
+      const early = bridge.completeContract("c1-wolfpack-bounty");
+      if (early.completed) bad.push("settled-early");
+      bridge.creditProgress("destroy", 2);
+      const walletBefore = bridge.campaign.wallet;
+      const repBefore = (bridge.campaign["reputation"] || {})["player|Capital"] || 0;
+      const res = bridge.completeContract("c1-wolfpack-bounty");
+      const after = bridge.campaign;
+      if (!res.completed || res.payout !== 4000) bad.push("settle=" + JSON.stringify(res));
+      if (after.wallet !== walletBefore + 4000) bad.push("wallet " + walletBefore + "->" + after.wallet);
+      const repAfter = (after["reputation"] || {})["player|Capital"] || 0;
+      if (repAfter !== repBefore + 15) bad.push("rep " + repBefore + "->" + repAfter);
+      if (after.contracts.done.indexOf("c1-wolfpack-bounty") === -1) bad.push("not-done");
+      if (before.wallet === after.wallet) bad.push("wallet-unchanged");
+      return {
+        name: "M6d-2 CONTRACT PAYOUT + REPUTATION EVENT (Q10 +15)",
+        pass: bad.length === 0,
+        detail: "wallet " + walletBefore + "->" + after.wallet + " rep " + repBefore + "->" + repAfter + " issues=[" + bad.join("; ") + "]"
+      };
+    },
+
+    // T-M6d-3 (M6): the authored chain links through `next` and its final
+    // contract sets the campaign-complete state (Q9) — the acceptance
+    // fixture walks the whole chain.
+    testMissionChainComplete() {
+      const bad = [];
+      bridge.initializeCampaign();
+      const table = bridge.missionTable();
+      for (let i = 0; i < table.length - 1; i++){
+        if (table[i].next !== table[i + 1].id) bad.push("link " + table[i].id);
+      }
+      if (!table[table.length - 1].final) bad.push("last-not-final");
+      for (const m of table){
+        bridge.acceptContract(m.id);
+        const target = m.target || {};
+        for (const k of Object.keys(target)) bridge.creditProgress(k === "kills" ? "destroy" : "turn", target[k]);
+        const res = bridge.completeContract(m.id);
+        if (!res.completed) bad.push("did-not-settle " + m.id);
+        if (m.final && !res.final) bad.push("final-flag");
+      }
+      const done = bridge.campaign.contracts;
+      if (done.done.length !== 4) bad.push("done=" + done.done.length);
+      if (done.campaignComplete !== true) bad.push("campaign-not-complete");
+      return {
+        name: "M6d-3 AUTHORED CHAIN -> CAMPAIGN COMPLETE (Q9 fixture)",
+        pass: bad.length === 0,
+        detail: "done=" + done.done.length + " complete=" + done.campaignComplete + " issues=[" + bad.join("; ") + "]"
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -1984,7 +2072,8 @@ const runGameTests = function (bridge, testName) {
         this.testOutfitStationFlow(), this.testGeneratorLegalLoadoutSweep(), this.testOutfitModelRows(),
         this.testFactionFleetRolls(), this.testFactionDoctrineStats(), this.testFactionTableComplete(),
         this.testReputationBands(), this.testStanceAndSharing(), this.testReputationEvents(),
-        this.testDialogueModel(), this.testDialogueOutcome(), this.testHailPanel()
+        this.testDialogueModel(), this.testDialogueOutcome(), this.testHailPanel(),
+        this.testMissionBoard(), this.testMissionPayout(), this.testMissionChainComplete()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;

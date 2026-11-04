@@ -72,6 +72,40 @@ const campaignDataPayload = (() => ({
     reputation: {
       rates: { kill: -10, mission: 15, trade: 2 }
     },
+    // ---- missions (M6, Q9): the authored fixed-contract chain. Contracts
+    // are station-posted (destroy/patrol/escort), payouts are on the ×100
+    // money scale, and `next` chains them; the final contract sets the
+    // campaign-complete state. Targets count post-accept progress events
+    // ("destroy" = enemy ships destroyed, "patrol" = map turns elapsed).
+    // Chain content is authored placeholder writing (M6 acceptance).
+    missions: {
+      contracts: [
+        {
+          id: "c1-wolfpack-bounty", title: "WOLFPACK BOUNTY", kind: "destroy",
+          faction: "Capital", locationId: "sol-gate",
+          brief: "Authority patrols are stretched thin. Thin the wolfpacks — destroy 2 hostile hulls.",
+          target: { kills: 2 }, payout: 4000, next: "c2-wayfarer-survey"
+        },
+        {
+          id: "c2-wayfarer-survey", title: "WAYFARER SURVEY", kind: "patrol",
+          faction: "Freehold", locationId: "khepri-station",
+          brief: "The League wants traffic through the drift. Keep the lanes alive for 2 map turns.",
+          target: { turns: 2 }, payout: 6000, next: "c3-helios-convoy"
+        },
+        {
+          id: "c3-helios-convoy", title: "HELIOS CONVOY", kind: "escort",
+          faction: "Capital", locationId: "helix-yards",
+          brief: "A convoy waits on the yards. Clear the approach — destroy 3 hostile hulls.",
+          target: { kills: 3 }, payout: 9000, next: "c4-singularity-end"
+        },
+        {
+          id: "c4-singularity-end", title: "SINGULARITY END", kind: "destroy",
+          faction: "Armoury", locationId: "cold-anchor",
+          brief: "The citadel's masters have ruled long enough. Break the fleet holding it — destroy 4 hostile hulls.",
+          target: { kills: 4 }, payout: 25000, next: null, final: true
+        }
+      ]
+    },
     // ---- map (M3): the systems/stations table the map state is built from.
     // Money values are the ×100 economy scale (DESIGN §4.5): fuelUnitPrice is
     // 5 ⒸB per fuel unit. Locations carry their gravity well (destination

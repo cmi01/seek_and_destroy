@@ -58,6 +58,9 @@ const initializeCampaignState = function (campaignData, shipSpecs, buildMapFn, b
       weapons: {}
     },
     reputation: reputation,
+    // M6(d): contract progress (Q9) — accepted/done ids and the per-contract
+    // event counters the targets count against.
+    contracts: { active: [], done: [], progress: {}, campaignComplete: false },
     clock: { month: start.clock.month, year: start.clock.year },
     map: (typeof buildMapFn === "function")
       ? buildMapFn(campaignData, shipSpecs, null)

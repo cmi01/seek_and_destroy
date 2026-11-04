@@ -119,9 +119,10 @@ const buildStationModel = function (station, hudDeps){
         enabled: r.canRefit !== false,
         active: false
       });
-    } else if (r.kind === "outfit"){
+    } else if (r.kind === "outfit" || r.kind === "mission"){
       // M5(d): one action button per outfit row (select a ship, mount a
       // stock weapon, unmount a mounted one) — ids come with the row.
+      // M6(d): mission rows carry their accept/complete action the same way.
       const bw = Math.min(px(120), Math.floor(mw * 0.3));
       buttons.push({
         id: String(r.actionId || ""),

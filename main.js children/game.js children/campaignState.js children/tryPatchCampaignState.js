@@ -12,7 +12,7 @@
 // ============================================================
 
 const tryPatchCampaignState = function (state, patch){
-  const KNOWN_KEYS = ["fleet", "wallet", "cargo", "reputation", "clock", "map", "market"];
+  const KNOWN_KEYS = ["fleet", "wallet", "cargo", "reputation", "clock", "map", "market", "contracts"];
   if (!state || !patch || typeof patch !== "object" || Array.isArray(patch)) return { state: null };
   for (let i = 0; i < Object.keys(patch).length; i++){
     if (!KNOWN_KEYS.includes(Object.keys(patch)[i])) return { state: null };
