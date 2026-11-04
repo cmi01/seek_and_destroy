@@ -957,6 +957,106 @@ const runGameTests = function (bridge, testName) {  const suite = {
       };
     },
 
+    // ---- M4(a): seeded market + trade transforms ----------------------
+    // T-M4a-1: same seed ⇒ identical price table over goods/hulls/weapons
+    // x locations x times; a different seed yields a different table.
+    testMarketPriceDeterminism() {
+      function table(seed) {
+        const m = bridge.marketFromTable();
+        m.seed = seed;
+        const goods = ["goods", "fuel", "crew", "parts", "hull:Fighter", "weapon:Light Cannon"];
+        const locs = ["sol-gate", "khepri-station", ""];
+        const times = [1, 21, 41];
+        const rows = [];
+        for (let i = 0; i < goods.length; i++) {
+          for (let j = 0; j < locs.length; j++) {
+            for (let k = 0; k < times.length; k++) {
+              rows.push(goods[i] + "|" + locs[j] + "|" + times[k] + "=" + bridge.economyPrice(m, goods[i], locs[j], times[k]));
+            }
+          }
+        }
+        return rows.join(";");
+      }
+      const base = bridge.marketFromTable();
+      const a = table(base.seed);
+      const b = table(base.seed);
+      const c = table(base.seed + 1);
+      const pass = a === b && a !== c;
+      return {
+        name: "M4 SEEDED PRICE DETERMINISM (same seed = same table)",
+        pass: pass,
+        detail: "repeat identical: " + (a === b) + "; seed+1 differs: " + (a !== c)
+      };
+    },
+
+    // T-M4a-2: a buy-then-sell round-trip at one quote loses exactly the
+    // spread (M4 acceptance); buying nudges the local price for the next
+    // quote (DESIGN "buying moves the local price").
+    testSpreadRoundTrip() {
+      bridge.initializeCampaign();
+      const st = JSON.parse(JSON.stringify(bridge.campaign));
+      st.wallet = 100000;
+      const loc = "sol-gate";
+      const qty = 5;
+      const unit = bridge.economyQuote(st, "goods", loc, st.map.turn);
+      const buyRes = bridge.economyTrade(st, "goods", qty, loc, unit);
+      const sold = buyRes && buyRes.state ? bridge.economyTrade(buyRes.state, "goods", -qty, loc, unit) : null;
+      const gap = unit.buy - unit.sell;
+      const expectedLoss = qty * gap;
+      const loss = sold && sold.state ? st.wallet - sold.state.wallet : NaN;
+      const movedUp = Boolean(buyRes && buyRes.state && buyRes.state.market.prices[loc].goods > 1);
+      const spreadExact = gap === Math.round(unit.buy * st.market.spread);
+      const pass = Boolean(sold && sold.state && loss === expectedLoss && spreadExact && movedUp);
+      return {
+        name: "M4 BUY-THEN-SELL LOSES EXACTLY THE SPREAD",
+        pass: pass,
+        detail: "buy=" + unit.buy + " sell=" + unit.sell + " gap=" + gap + " loss=" + loss + "/" + expectedLoss + " localMoved=" + movedUp
+      };
+    },
+
+    // T-M4a-3: buying a hull updates wallet + fleet consistently (the
+    // browser acceptance criterion in pure form): wallet drops by the quote,
+    // the roster gains a full-crewed hull record.
+    testTradeHullConsistency() {
+      bridge.initializeCampaign();
+      const st = JSON.parse(JSON.stringify(bridge.campaign));
+      const loc = "sol-gate";
+      const unit = bridge.economyQuote(st, "hull:Fighter", loc, st.map.turn);
+      const before = st.fleet.length;
+      const res = bridge.economyTrade(st, "hull:Fighter", 1, loc, unit);
+      const s = res ? res.state : null;
+      const added = s && s.fleet.length === before + 1 ? s.fleet[s.fleet.length - 1] : null;
+      const spec = bridge.shipSpecs["Fighter"];
+      const pass = Boolean(s && s.wallet === st.wallet - unit.buy && added && added.hull === "Fighter" &&
+        added.hp === spec.hp && added.crew === spec.crew && added.maxCrew === spec.crew &&
+        JSON.stringify(s.cargo) === JSON.stringify(st.cargo));
+      return {
+        name: "M4 BUY A HULL UPDATES WALLET/CARGO/FLEET",
+        pass: pass,
+        detail: "wallet " + st.wallet + " -> " + (s ? s.wallet : "?") + " quote " + unit.buy + " fleet " + before + " -> " + (s ? s.fleet.length : "?")
+      };
+    },
+
+    // T-M4a-4: illegal trades return { state: null }: no funds, no stock,
+    // unknown good, and the flagship is never sold (permadeath locus).
+    testTradeRejections() {
+      bridge.initializeCampaign();
+      const st = JSON.parse(JSON.stringify(bridge.campaign));
+      const loc = "sol-gate";
+      const unit = bridge.economyQuote(st, "parts", loc, st.map.turn);
+      const poor = bridge.economyTrade({ wallet: 1, cargo: st.cargo, fleet: st.fleet, map: st.map, market: st.market }, "parts", 1, loc, unit);
+      const noStock = bridge.economyTrade(st, "goods", -3, loc, unit);
+      const badGood = bridge.economyTrade(st, "warp drives", 1, loc, unit);
+      const flagUnit = bridge.economyQuote(st, "hull:Flagship Battlecruiser", loc, st.map.turn);
+      const sellFlag = bridge.economyTrade(st, "hull:Flagship Battlecruiser", -1, loc, flagUnit);
+      const pass = poor.state === null && noStock.state === null && badGood.state === null && sellFlag.state === null;
+      return {
+        name: "M4 ILLEGAL TRADES REJECTED (funds/stock/unknown/flagship)",
+        pass: pass,
+        detail: "poor=" + (poor.state === null) + " noStock=" + (noStock.state === null) + " unknown=" + (badGood.state === null) + " flagship=" + (sellFlag.state === null)
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -977,7 +1077,9 @@ const runGameTests = function (bridge, testName) {  const suite = {
         this.testMapJumpUnfuelled(), this.testMapFrameDto(),
         this.testMapDetectionRadius(), this.testNebulaHidesBattles(),
         this.testMapEncounterOpensOnEntry(), this.testMapJoinNextTurnQ4(),
-        this.testMapEncounterNextTurnLaunch(), this.testMapHudAndHailModels()
+        this.testMapEncounterNextTurnLaunch(), this.testMapHudAndHailModels(),
+        this.testMarketPriceDeterminism(), this.testSpreadRoundTrip(),
+        this.testTradeHullConsistency(), this.testTradeRejections()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;

@@ -14,9 +14,11 @@
 // M3: the map-state builder arrives as a third injected argument (a sibling
 // transform — this file never names it); without one the map keeps its
 // pre-map anchor shape. The map builder's output is the whole map section.
+// M4: the seeded market builder arrives the same way as a fourth argument;
+// without one the section simply carries no market (pre-M4 shape).
 // ============================================================
 
-const initializeCampaignState = function (campaignData, shipSpecs, buildMapFn){
+const initializeCampaignState = function (campaignData, shipSpecs, buildMapFn, buildMarketFn){
   const start = campaignData.start;
   const factions = campaignData.factions;
 
@@ -34,7 +36,8 @@ const initializeCampaignState = function (campaignData, shipSpecs, buildMapFn){
       loadout: spec.defaultLoadout.slice(),
       hp: spec.hp,
       maxHp: spec.hp,
-      crew: spec.crew
+      crew: spec.crew,
+      maxCrew: spec.crew
     };
   });
 
@@ -45,12 +48,16 @@ const initializeCampaignState = function (campaignData, shipSpecs, buildMapFn){
       goods: start.cargo.goods,
       fuel: start.cargo.fuel,
       crew: start.cargo.crew,
-      parts: start.cargo.parts
+      parts: start.cargo.parts,
+      weapons: {}
     },
     reputation: reputation,
     clock: { month: start.clock.month, year: start.clock.year },
     map: (typeof buildMapFn === "function")
       ? buildMapFn(campaignData, shipSpecs, null)
-      : { locationId: start.map.locationId }
+      : { locationId: start.map.locationId },
+    market: (typeof buildMarketFn === "function")
+      ? buildMarketFn(campaignData, shipSpecs)
+      : null
   };
 };

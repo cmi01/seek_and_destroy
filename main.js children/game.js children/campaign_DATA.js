@@ -27,6 +27,44 @@ const campaignDataPayload = (() => ({
       clock: { month: 1, year: 2401 },
       map: { locationId: "sol-gate" }
     },
+    // ---- trade (M4): the economy's frozen rate table (R9 — prices and
+    // rates live here, never in verb bodies). Money values are the ×100
+    // economy scale (DESIGN §4.5): fuel is 5 ⒸB/unit at base, crew are paid
+    // wagePerCrewMonth per month (Q6), 1 month = 30 map turns (Q6 default).
+    // The seeded market state is built from this table + the rules roster
+    // (the economy subtree's market builder) and lives in campaign.market.
+    trade: {
+      seed: 20261104,
+      spread: 0.12,
+      wagePerCrewMonth: 5,
+      repairPartsPerHp: 1,
+      refitPartsPerSwap: 1,
+      // Trade lots: one station-modal click moves this many units.
+      lots: { goods: 10, fuel: 50, crew: 10, parts: 5 },
+      goods: {
+        goods: { base: 300, min: 120, max: 720 },
+        fuel:  { base: 5, min: 2, max: 12 },
+        crew:  { base: 150, min: 60, max: 360 },
+        parts: { base: 400, min: 160, max: 960 }
+      },
+      weaponPrices: {
+        "Light Cannon": 150,
+        "Dual Light Assault Cannon": 300,
+        "Dual Light Cannons": 350,
+        "Medium Cannon Battery": 700,
+        "Medium Assault Cannon Battery": 750,
+        "Heavy Cannon Battery": 1500,
+        "Light Railgun": 800,
+        "Heavy Railgun": 1200,
+        "Capital Railgun": 1800,
+        "Ultra Railgun": 3200,
+        "Unguided Torpedo": 600,
+        "Light Missile Battery": 500,
+        "Medium Missile Battery": 800,
+        "Heavy Missile Battery": 1400,
+        "Storm Missile Battery": 2800
+      }
+    },
     // ---- map (M3): the systems/stations table the map state is built from.
     // Money values are the ×100 economy scale (DESIGN §4.5): fuelUnitPrice is
     // 5 ⒸB per fuel unit. Locations carry their gravity well (destination

@@ -15,7 +15,12 @@
 // sibling builder and the saved anchor becomes the fleet's location. A
 // payload that already carries the map passes through untouched (the
 // round-trip contract is JSON identity).
-const restoreStateSave = function (DATA, stateBox, data, buildMapFn){
+// M4 market migration: a campaign section without a market (pre-M4 save)
+// gets the seeded market built by the second injected sibling builder;
+// roster entries missing maxCrew are backfilled from the market's hull rows
+// (the crew gate needs a manning maximum to judge). A payload that already
+// carries a market passes through untouched.
+const restoreStateSave = function (DATA, stateBox, data, buildMapFn, buildMarketFn){
   const PRE_M1_VERSION = "V58-1.0";
   const allowedKeys = new Set(Object.keys(DATA.initialState));
 
@@ -84,6 +89,23 @@ const restoreStateSave = function (DATA, stateBox, data, buildMapFn){
       }
     }
     if (built) st.campaign.map = built;
+  }
+
+  // M4 market migration (see header): backfill the market and roster
+  // manning maximums for pre-M4 payloads.
+  const c = st.campaign;
+  if (c && !c.market && typeof buildMarketFn === "function") {
+    c.market = buildMarketFn();
+  }
+  if (c && c.market && c.market.wares && Array.isArray(c.fleet)) {
+    for (let i = 0; i < c.fleet.length; i++) {
+      const e = c.fleet[i];
+      if (e && typeof e.maxCrew !== "number") {
+        const w = c.market.wares["hull:" + (e.hull || e.type)] || null;
+        c.fleet[i] = Object.assign({}, e, { maxCrew: (w && typeof w.crew === "number") ? w.crew : (e.crew || 0) });
+      }
+    }
+    if (c.cargo && !c.cargo.weapons) c.cargo = Object.assign({}, c.cargo, { weapons: {} });
   }
   return stateBox.current;
 };

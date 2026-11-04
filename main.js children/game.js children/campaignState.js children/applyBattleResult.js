@@ -39,7 +39,8 @@ const applyBattleResult = function (section, battleResult, shipSpecs, crewLostFn
       loadout: Array.isArray(src.loadout) ? src.loadout.slice() : (spec.defaultLoadout ? spec.defaultLoadout.slice() : []),
       hp: hp,
       maxHp: maxHp,
-      crew: crew
+      crew: crew,
+      maxCrew: (typeof src.maxCrew === "number") ? src.maxCrew : (spec.crew || 0)
     };
   }
 
@@ -99,7 +100,8 @@ const applyBattleResult = function (section, battleResult, shipSpecs, crewLostFn
     goods: prevCargo.goods || 0,
     fuel: prevCargo.fuel || 0,
     crew: (prevCargo.crew || 0) + crewToCargo,
-    parts: (prevCargo.parts || 0) + parts
+    parts: (prevCargo.parts || 0) + parts,
+    weapons: Object.assign({}, prevCargo.weapons || {})
   };
   events.push({ kind: "payout", parts: parts, credits: credits });
 
@@ -119,7 +121,8 @@ const applyBattleResult = function (section, battleResult, shipSpecs, crewLostFn
     cargo: cargo,
     reputation: section.reputation,
     clock: section.clock,
-    map: section.map
+    map: section.map,
+    market: section.market
   };
   return { state: next, events: events };
 };

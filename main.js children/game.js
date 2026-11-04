@@ -33,6 +33,7 @@ let InitializeGameState = null;
 let InitializeCampaign = null;
 let CampaignLib = null;
 let CampaignMapLib = null;
+let EconomyLib = null;
 let GetGameState = null;
 let TryPatchGameState = null;
 let GetStateLifetimes = null;
@@ -2178,6 +2179,7 @@ const api = {
         "main.js children/game.js children/gameState.js",
         "main.js children/game.js children/campaignState.js",
         "main.js children/game.js children/campaignMap.js",
+        "main.js children/game.js children/economy.js",
         "main.js children/game.js children/themes.js",
         "main.js children/game.js children/rulesConfig.js",
         "main.js children/game.js children/boardQueries.js",
@@ -2226,6 +2228,7 @@ const api = {
         gameState:        typeof gameState === "function" ? gameState : null,
         campaignState:    typeof campaignState === "function" ? campaignState : null,
         campaignMap:      typeof campaignMap === "function" ? campaignMap : null,
+        economy:          typeof economy === "function" ? economy : null,
         boardQueries:     typeof boardQueries === "function" ? boardQueries : null,
         visionQueries:    typeof visionQueries === "function" ? visionQueries : null,
         actionLegality:   typeof actionLegality === "function" ? actionLegality : null
@@ -2249,6 +2252,7 @@ const api = {
         ["main.js children/game.js children/gameState.js",               kids.gameState],
         ["main.js children/game.js children/campaignState.js",           kids.campaignState],
         ["main.js children/game.js children/campaignMap.js",             kids.campaignMap],
+        ["main.js children/game.js children/economy.js",                  kids.economy],
         ["main.js children/game.js children/themes.js",                  kids.themes],
         ["main.js children/game.js children/rulesConfig.js",             kids.rulesConfig],
         ["main.js children/game.js children/boardQueries.js",            kids.boardQueries],
@@ -2299,7 +2303,11 @@ const api = {
       // closure, injected wherever a sibling transform needs map state built
       // (campaign init and the pre-map save migration).
       const buildMapSection = () => CampaignMapLib.BuildMapState(CAMPAIGN_DATA.campaign, SHIP_SPECS, null);
-      DeserializeGameState = data => stateLib.DeserializeGameState(_stateBox, data, buildMapSection);
+      // M4: the seeded market builder bound over the frozen trade table +
+      // roster — one closure, injected where a sibling transform needs the
+      // market built (campaign init and the pre-M4 save migration).
+      const buildMarketSection = () => EconomyLib.BuildMarketState(CAMPAIGN_DATA.campaign.trade, SHIP_SPECS);
+      DeserializeGameState = data => stateLib.DeserializeGameState(_stateBox, data, buildMapSection, buildMarketSection);
 
       // M1 campaign state: pure children over the campaign section only.
       // initializeCampaign() rebuilds State.campaign from the frozen
@@ -2310,8 +2318,9 @@ const api = {
       const campaignLib = kids.campaignState();
       CampaignLib = campaignLib;
       CampaignMapLib = kids.campaignMap();
+      EconomyLib = kids.economy();
       InitializeCampaign = () => {
-        const fresh = campaignLib.InitializeCampaignState(CAMPAIGN_DATA.campaign, SHIP_SPECS, buildMapSection);
+        const fresh = campaignLib.InitializeCampaignState(CAMPAIGN_DATA.campaign, SHIP_SPECS, buildMapSection, buildMarketSection);
         if (!TryPatchGameState({ campaign: fresh })) {
           console.error("[S&D campaign] initializeCampaign: patch rejected.");
           return null;
@@ -2768,6 +2777,12 @@ const api = {
       hailModel(encounter){ return Hud.hailModel(encounter); },
       mapHudModel(mapState, extra){ return Hud.mapHudModel(mapState, extra); },
       merchantQuote(mapState, fleetId, reason){ return CampaignMapLib.MerchantOffer(mapState, fleetId, reason); },
+      // M4 economy seam: the seeded market and the pure trade transforms.
+      marketFromTable(){ return EconomyLib.BuildMarketState(CAMPAIGN_DATA.campaign.trade, SHIP_SPECS); },
+      tradeTable(){ return CAMPAIGN_DATA.campaign.trade; },
+      economyPrice(market, good, loc, time){ return EconomyLib.PriceAt(market, good, loc, time); },
+      economyQuote(state, good, loc, time){ return EconomyLib.Quote(state, good, loc, time); },
+      economyTrade(state, good, qty, loc, unit){ return EconomyLib.ApplyTrade(state, good, qty, loc, unit); },
       // M3(c) live-map seam (tests drive the orchestrator, not just the
       // pure children): set the map section, travel/jump the player through
       // the arrival check, commit a map turn (encounter → battle launch).

@@ -489,7 +489,10 @@ const GAME_LEAF_SCRIPTS = [
   "main.js children/game.js children/campaignMap.js children/hyperspaceJump.js",
   "main.js children/game.js children/campaignMap.js children/mapFrame.js",
   "main.js children/game.js children/campaignMap.js children/mapVisibility.js",
-  "main.js children/game.js children/campaignMap.js children/battleEventAt.js"
+  "main.js children/game.js children/campaignMap.js children/battleEventAt.js",
+  "main.js children/game.js children/economy.js children/buildMarketState.js",
+  "main.js children/game.js children/economy.js children/priceAt.js",
+  "main.js children/game.js children/economy.js children/applyTrade.js"
 ];
 
 async function startGame(){
@@ -653,7 +656,10 @@ async function startGame(){
       ["main.js children/game.js children/campaignMap.js children/hyperspaceJump.js", () => typeof hyperspaceJump === "function"],
       ["main.js children/game.js children/campaignMap.js children/mapFrame.js", () => typeof mapFrame === "function"],
       ["main.js children/game.js children/campaignMap.js children/mapVisibility.js", () => typeof mapVisibility === "function"],
-      ["main.js children/game.js children/campaignMap.js children/battleEventAt.js", () => typeof battleEventAt === "function"]
+      ["main.js children/game.js children/campaignMap.js children/battleEventAt.js", () => typeof battleEventAt === "function"],
+      ["main.js children/game.js children/economy.js children/buildMarketState.js", () => typeof buildMarketState === "function"],
+      ["main.js children/game.js children/economy.js children/priceAt.js", () => typeof priceAt === "function"],
+      ["main.js children/game.js children/economy.js children/applyTrade.js", () => typeof applyTrade === "function"]
     ]);
 
     await Game.load();
