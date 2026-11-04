@@ -636,6 +636,7 @@ const createHud = function (deps) {
     // Pure model reads (test/debug bridge): the two map children exposed as
     // data-in/data-out with no view mutation.
     hailModel(view, input, encounter) { return buildHailModel(encounter); },
+    outfitModel(input) { return buildOutfitModel(input); },
     mapHudModel(view, input, mapState, extra = null) {
       const d = (extra && typeof extra === "object") ? Object.assign({}, extra) : {};
       d.metrics = input.metrics;

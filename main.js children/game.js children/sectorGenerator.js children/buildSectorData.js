@@ -38,6 +38,40 @@ const buildSectorData = function (params) {
     return gx >= 0 && gx < gridSize && gy >= 0 && gy < gridSize;
   }
 
+  // M5(d) private variant machinery: a per-unit derived random stream (the
+  // sector's own rnd stream stays untouched) and a greedy multi-weapon
+  // variant builder that only keeps mounts the injected capacity verdict
+  // accepts — illegal loadouts cannot be emitted by construction.
+  function variantStream(seed){
+    let a = (Math.imul(seed | 0, 1103515245) + 12345) | 0;
+    return function (){
+      a = (Math.imul(a, 1664525) + 1013904223) | 0;
+      return (a >>> 0) / 4294967296;
+    };
+  }
+  function variantLoadout(type, base, R2){
+    if (typeof fitVerdict !== "function") return null;
+    const names = Array.isArray(weaponNames) ? weaponNames : [];
+    if (names.length === 0) return null;
+    if (R2() >= 0.35) return null;
+    const pool = names.slice();
+    for (let i = pool.length - 1; i > 0; i--){
+      const j = Math.floor(R2() * (i + 1));
+      const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+    }
+    // Rebuild from empty: defaults fill the capacity EXACTLY, so a pure add
+    // would always overflow — a mix only fits when built from scratch. Each
+    // add is checked against the injected capacity verdict, so every prefix
+    // (and the final state) is legal by construction.
+    const out = [];
+    for (let i = 0; i < pool.length && out.length < 3; i++){
+      const cand = out.concat([pool[i]]);
+      if (fitVerdict(cand, type).ok) out.push(pool[i]);
+    }
+    const same = Array.isArray(base) && out.length === base.length && out.every(function (n, i){ return n === base[i]; });
+    return (out.length > 0 && !same) ? out : null;
+  }
+
   const {
     levelId,
     campaignLevels,
@@ -46,7 +80,9 @@ const buildSectorData = function (params) {
     maxAp = 4,
     rnd,
     playerSpawnList,
-    enemySpawnList
+    enemySpawnList,
+    canFit: fitVerdict,
+    weaponNames
   } = params;
   const R = typeof rnd === "function" ? rnd : Math.random;
   const spec = campaignLevels.find(l => l.id === levelId) || campaignLevels[0];
@@ -63,6 +99,16 @@ const buildSectorData = function (params) {
   const getUnitAt = (gx, gy) => units.find(u => u.hp > 0 && u.x === gx && u.y === gy) || null;
   const spawnUnit = (type, team, x, y, applySpawnExhaustion = false) => {
     const u = makeUnitData(shipSpecs, nextUnitId++, type, team, x, y, applySpawnExhaustion);
+    // M5(d): some hostile hulls mount a seeded multi-weapon variant. The
+    // variant only ever ADDS mounts the injected capacity verdict accepts,
+    // so an illegal loadout cannot be emitted (the acceptance sweep pins
+    // this). The variant stream is derived from the unit id — the sector's
+    // own rnd stream is never touched, so terrain/placement stay identical
+    // to the pre-variant generator for the same seed.
+    if (team === 2){
+      const v = variantLoadout(type, u.loadout, variantStream(u.id * 2654435761 ^ 0x9E3779B9));
+      if (v) u.loadout = v;
+    }
     units.push(u);
     return u;
   };

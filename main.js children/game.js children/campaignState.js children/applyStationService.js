@@ -20,7 +20,7 @@
 // { state: null } and the caller keeps the previous state.
 // ============================================================
 
-const applyStationService = function (state, service){
+const applyStationService = function (state, service, deps){
   if (!state || !service || typeof service !== "object") return { state: null };
   const idx = Number(service.ship);
   const fleet = Array.isArray(state.fleet) ? state.fleet : [];
@@ -65,6 +65,41 @@ const applyStationService = function (state, service){
     cost = swaps * perSwap;
     if (swaps <= 0 || cost > parts) return { state: null };
     return next({ loadout: want.slice() });
+  }
+
+  if (service.kind === "outfit"){
+    // M5 (DESIGN §3.3): swap/mount/unmount within the hull's slot capacity.
+    // The capacity verdict travels in as the parent's injected reader (no
+    // sibling naming); spare weapons live in the cargo stock. One parts
+    // per swapped weapon position (the refit rate), paid on every change.
+    const fit = (deps && typeof deps.canFit === "function") ? deps.canFit : null;
+    const stock = Object.assign({}, prevCargo.weapons || {});
+    let nextHave = Array.isArray(entry.loadout) ? entry.loadout.slice() : [];
+    let swaps = 0;
+    if (typeof service.remove === "string"){
+      const at = nextHave.indexOf(service.remove);
+      if (at < 0) return { state: null };
+      nextHave = nextHave.slice(0, at).concat(nextHave.slice(at + 1));
+      stock[service.remove] = (stock[service.remove] || 0) + 1;
+      swaps++;
+    }
+    if (typeof service.add === "string"){
+      if ((stock[service.add] || 0) < 1) return { state: null };
+      const candidate = nextHave.concat([service.add]);
+      if (!fit || !fit(candidate, entry.hull || entry.type).ok) return { state: null };
+      stock[service.add] = stock[service.add] - 1;
+      nextHave = candidate;
+      swaps++;
+    }
+    const perSwap = (typeof market.refitPartsPerSwap === "number") ? market.refitPartsPerSwap : 1;
+    cost = swaps * perSwap;
+    if (swaps <= 0 || cost > parts) return { state: null };
+    return {
+      state: Object.assign({}, state, {
+        fleet: fleet.map(function (e, i){ return i === idx ? Object.assign({}, e, { loadout: nextHave }) : e; }),
+        cargo: Object.assign({}, prevCargo, { parts: parts - cost, weapons: stock })
+      })
+    };
   }
 
   return { state: null };

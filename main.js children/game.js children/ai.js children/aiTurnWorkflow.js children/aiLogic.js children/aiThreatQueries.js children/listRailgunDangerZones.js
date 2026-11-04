@@ -16,7 +16,7 @@ const listRailgunDangerZones = function (env, ctx){
     const lim = Math.min(ap, atks.length);
     let dmg = 0;
     for (let j = 0; j < lim; j++){
-      dmg += (e.flags.has("+shield") && !env.railOf(atks[j])) ? 1 : env.fpOf(atks[j]);
+      dmg += env.bestDmgOf(atks[j], e.flags.has("+shield"));
     }
     if (dmg >= e.hp + (e.flags.has("+shield") ? 1 : 0)) continue;
     zs.push({ enemy: e, radius: e.move + Math.max(1, env.rngOf(e)) });

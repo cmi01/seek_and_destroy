@@ -119,6 +119,20 @@ const buildStationModel = function (station, hudDeps){
         enabled: r.canRefit !== false,
         active: false
       });
+    } else if (r.kind === "outfit"){
+      // M5(d): one action button per outfit row (select a ship, mount a
+      // stock weapon, unmount a mounted one) — ids come with the row.
+      const bw = Math.min(px(120), Math.floor(mw * 0.3));
+      buttons.push({
+        id: String(r.actionId || ""),
+        label: String(r.actionLabel || ""),
+        x: mx + mw - pad - bw,
+        y: ry + px(2),
+        w: bw,
+        h: rowH - px(6),
+        enabled: r.canAct !== false,
+        active: Boolean(r.active)
+      });
     }
   }
 

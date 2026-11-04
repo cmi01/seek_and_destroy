@@ -1161,7 +1161,12 @@ function _mapClick(px, py, ds){
 // fleet/cargo stock and per-ship service costs — plain data for the HUD
 // child (it lays rows out; the prices were computed here). The effects
 // (trades, repair/refit, state patches) are applied here too.
-let _stationCtx = { tab: "commodities", mode: "station" };
+let _stationCtx = { tab: "commodities", mode: "station", outfitShip: -1 };
+// M5(d): the capacity verdict the roster transform needs, injected (the
+// transform child never names the seam or the roster table).
+const _outfitDeps = {
+  canFit(loadout, hullName){ return Outfitting.Validate(loadout, SHIP_SPECS[hullName] || null); }
+};
 
 // Docked = the player fleet sits inside a station's gravity well on the map
 // screen with no encounter pending (the storefront only exists at stations).
@@ -1219,7 +1224,7 @@ function _stationBundle(){
   if (mode === "merchant"){
     if (tab !== "provisions" && tab !== "sell") tab = "provisions";
   } else {
-    if (["commodities", "hulls", "weapons", "services"].indexOf(tab) === -1) tab = "commodities";
+    if (["commodities", "hulls", "weapons", "services", "outfit"].indexOf(tab) === -1) tab = "commodities";
   }
 
   const tabs = (mode === "merchant")
@@ -1231,7 +1236,8 @@ function _stationBundle(){
         { id: "commodities", label: "GOODS", active: tab === "commodities" },
         { id: "hulls", label: "HULLS", active: tab === "hulls" },
         { id: "weapons", label: "WEAPONS", active: tab === "weapons" },
-        { id: "services", label: "SERVICE", active: tab === "services" }
+        { id: "services", label: "SERVICE", active: tab === "services" },
+        { id: "outfit", label: "OUTFIT", active: tab === "outfit" }
       ];
 
   const rows = [];
@@ -1265,6 +1271,42 @@ function _stationBundle(){
         canSell: tab === "sell" && held >= lot
       });
     }
+  } else if (dock && tab === "outfit"){
+    // M5(d): the outfit tab — the fleet's ships, their mounts and the spare
+    // stock. Slot sizes and capacity verdicts come from the seam here; the
+    // hud child lays the plain rows out.
+    const sel = (typeof _stationCtx.outfitShip === "number") ? _stationCtx.outfitShip : -1;
+    const usedSlots = [], capacities = [];
+    for (let i = 0; i < fleet.length; i++){
+      const e = fleet[i];
+      const spec = SHIP_SPECS[e.hull || e.type] || {};
+      capacities.push(typeof spec.capacity === "number" ? spec.capacity : 0);
+      usedSlots.push(Outfitting.Validate(Array.isArray(e.loadout) ? e.loadout : [], spec).usedSlots);
+    }
+    const legalMounts = [];
+    if (sel >= 0 && sel < fleet.length){
+      const e = fleet[sel];
+      const spec = SHIP_SPECS[e.hull || e.type] || {};
+      const have = Array.isArray(e.loadout) ? e.loadout.slice() : [];
+      const stockKeys = Object.keys(cargo.weapons || {});
+      for (let k = 0; k < stockKeys.length; k++){
+        if (Outfitting.Validate(have.concat([stockKeys[k]]), spec).ok) legalMounts.push(stockKeys[k]);
+      }
+    }
+    const statRows = {};
+    const wt = RULES_DATA.weapons || {};
+    Object.keys(wt).forEach(function (n){ statRows[n] = { dmg: wt[n].dmg, range: wt[n].range, slots: wt[n].slots }; });
+    const outfitModel = HudLib.outfitModel({
+      fleet: fleet,
+      stock: (cargo.weapons || {}),
+      stats: statRows,
+      selected: sel,
+      usedSlots: usedSlots,
+      capacities: capacities,
+      legalMounts: legalMounts
+    });
+    const outfitRows = (outfitModel && Array.isArray(outfitModel.rows)) ? outfitModel.rows : [];
+    for (let i = 0; i < outfitRows.length; i++) rows.push(outfitRows[i]);
   } else if (dock && tab === "services"){
     for (let i = 0; i < fleet.length; i++){
       const e = fleet[i];
@@ -1374,10 +1416,10 @@ function _stationTrade(good, sign){
   Hud.toggleStationModal(true);
 }
 
-function _stationService(kind, idx){
+function _stationService(kind, idx, opts){
   const c = GetGameState().campaign;
   if (!c) { GameAudio.play("ui.invalid"); return; }
-  const res = CampaignLib.ApplyStationService(c, { kind: kind, ship: idx });
+  const res = CampaignLib.ApplyStationService(c, Object.assign({ kind: kind, ship: idx }, opts || {}), _outfitDeps);
   if (!res || !res.state) { GameAudio.play("ui.invalid"); return; }
   TryPatchGameState({ campaign: _mirrorMapFleet(res.state) });
   GameAudio.play("ui.select");
@@ -1671,6 +1713,19 @@ const InputProcessor = (() => {
       _stationService("repair", Number(btn.id.slice("STATION_REPAIR:".length)));
     } else if (typeof btn.id === "string" && btn.id.indexOf("STATION_REFIT:") === 0){
       _stationService("refit", Number(btn.id.slice("STATION_REFIT:".length)));
+    } else if (typeof btn.id === "string" && btn.id.indexOf("OUTFIT_SELECT:") === 0){
+      // M5(d): pick the ship to outfit (the tab re-renders with its mounts).
+      _stationCtx.outfitShip = Number(btn.id.slice("OUTFIT_SELECT:".length));
+      Hud.toggleStationModal(true);
+      GameAudio.play("ui.select");
+    } else if (typeof btn.id === "string" && btn.id.indexOf("OUTFIT_MOUNT:") === 0){
+      const rest = btn.id.slice("OUTFIT_MOUNT:".length);
+      const sep = rest.indexOf(":");
+      _stationService("outfit", Number(rest.slice(0, sep)), { add: rest.slice(sep + 1) });
+    } else if (typeof btn.id === "string" && btn.id.indexOf("OUTFIT_UNMOUNT:") === 0){
+      const rest = btn.id.slice("OUTFIT_UNMOUNT:".length);
+      const sep = rest.indexOf(":");
+      _stationService("outfit", Number(rest.slice(0, sep)), { remove: rest.slice(sep + 1) });
     } else if (btn.id === "CLOSE_MODAL"){
       if (_pendingDeploy){
         const lvlId = _pendingDeploy.levelId;
@@ -2369,7 +2424,11 @@ const SectorGenerator = {
       maxAp: MAX_AP,
       rnd: RND,
       playerSpawnList: playerHulls,
-      enemySpawnList: enemyHulls
+      enemySpawnList: enemyHulls,
+      // M5(d): the capacity verdict + weapon-name pool for the seeded
+      // multi-weapon variants (illegal loadouts cannot be emitted).
+      canFit: _outfitDeps.canFit,
+      weaponNames: Object.keys(RULES_DATA.weapons || {})
     });
 
     Rules.patchState(result.patch);
@@ -2883,6 +2942,20 @@ const api = {
           return false;
         },
         mountsOf(u){ return Outfitting.UnitWeapons(u); },
+        // M5(d): the best single shot this unit could fire — per-shot damage
+        // estimates key on the mount actually worth firing (a railgun-class
+        // mount keeps full damage through a bubble, anything else strips it
+        // for the shield hit). One mount yields exactly its own damage.
+        bestDmgOf(u, shielded){
+          const ws = Outfitting.UnitWeapons(u);
+          const sd = (RULES_DATA.combatRules && RULES_DATA.combatRules.shieldNonRailgunDamage) || 1;
+          let best = 0;
+          for (let i = 0; i < ws.length; i++){
+            const eff = (shielded && ws[i].class !== "railgun") ? sd : ws[i].dmg;
+            if (eff > best) best = eff;
+          }
+          return best;
+        },
         getPriorityActionAt(ctx, unitA, gx, gy, opts){ return Rules.getPriorityActionAt(ctx, unitA, gx, gy, opts); }
       });
 
@@ -3229,6 +3302,25 @@ const api = {
       stationClose(){ Hud.toggleStationModal(false); return Hud.getActiveModal(); },
       stationTradeLive(good, sign){ _stationTrade(good, sign); return GetGameState().campaign; },
       stationServiceLive(kind, idx){ _stationService(kind, idx); return GetGameState().campaign; },
+      // M5(d) outfit seam: the roster loadout transform + the outfit rows +
+      // a seeded generator pull (the sweep test reads every emitted loadout).
+      outfitShip(idx, opts){ _stationService("outfit", idx, opts); return GetGameState().campaign; },
+      outfitRows(input){ return HudLib.outfitModel(input); },
+      sectorUnits(levelId, seed){
+        const seg = SectorGeneratorLib.generateSectorData({
+          levelId: levelId,
+          campaignLevels: CAMPAIGN_LEVELS,
+          shipSpecs: SHIP_SPECS,
+          gridSize: GRID_SIZE,
+          maxAp: MAX_AP,
+          rnd: mulberry32(seed),
+          playerSpawnList: [],
+          enemySpawnList: [],
+          canFit: _outfitDeps.canFit,
+          weaponNames: Object.keys(RULES_DATA.weapons || {})
+        });
+        return (seg.patch && Array.isArray(seg.patch.units)) ? seg.patch.units : (seg.units || []);
+      },
       stationService(state, service){ return CampaignLib.ApplyStationService(state, service); },
       // M4(c) crew seam: manning verdicts, the deployment plan and the wage
       // clock transform (members renamed off the raw child stems — the

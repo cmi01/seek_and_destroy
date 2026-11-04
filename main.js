@@ -302,7 +302,8 @@ const HUD_WIDGET_SCRIPTS = [
   "main.js children/game.js children/hud.js children/hudBanner.js",
   "main.js children/game.js children/hud.js children/buildMapHudModel.js",
   "main.js children/game.js children/hud.js children/buildHailModel.js",
-  "main.js children/game.js children/hud.js children/buildStationModel.js"
+  "main.js children/game.js children/hud.js children/buildStationModel.js",
+  "main.js children/game.js children/hud.js children/buildOutfitModel.js"
 ];
 // The AI subtree is one function per file too, so its loading is an effect
 // that belongs here: every file below ai.js (its children, their children and

@@ -26,7 +26,7 @@ const computeUpdatedReservations = function (ctx, plan, focusFireEnabled, env){
     // double-counting already-applied damage in committedDmg.
     const cur = nx.get(st0.target.id) || { committedDmg: 0, killers: [] };
     const prevPending = cur.killers.includes(plan.unitId)
-      ? ((tgt.flags && tgt.flags.has("+shield") && u && !env.railOf(u)) ? 1 : (u ? env.fpOf(u) : 0))
+      ? (u ? env.bestDmgOf(u, Boolean(tgt.flags && tgt.flags.has("+shield"))) : 0)
       : 0;
     nx.set(st0.target.id, {
       committedDmg: Math.max(0, cur.committedDmg - prevPending),
@@ -35,7 +35,7 @@ const computeUpdatedReservations = function (ctx, plan, focusFireEnabled, env){
   } else if (st0 && st0.kind === "MOVE" && st1 && st1.kind === "SHOOT" && st1.target){
     const tgt = ((ctx && ctx.units) || []).find(x => x.id === st1.target.id) || st1.target;
     const cur = nx.get(st1.target.id) || { committedDmg: 0, killers: [] };
-    const effDmg = (tgt.flags && tgt.flags.has("+shield") && u && !env.railOf(u)) ? 1 : (u ? env.fpOf(u) : 0);
+    const effDmg = u ? env.bestDmgOf(u, Boolean(tgt.flags && tgt.flags.has("+shield"))) : 0;
     nx.set(st1.target.id, {
       committedDmg: cur.committedDmg + effDmg,
       killers: cur.killers.includes(plan.unitId) ? cur.killers.slice() : cur.killers.concat([plan.unitId])

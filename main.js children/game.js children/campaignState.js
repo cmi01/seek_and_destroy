@@ -20,7 +20,7 @@ const campaignState = function (){
     RosterOf(section, filter){ return rosterOf(section, filter); },
     BeginBattle(section, encounter, deployFn){ return beginBattle(section, encounter, deployFn); },
     ApplyBattleResult(section, battleResult, shipSpecs, crewLostFn){ return applyBattleResult(section, battleResult, shipSpecs, crewLostFn); },
-    ApplyStationService(state, service){ return applyStationService(state, service); },
+    ApplyStationService(state, service, deps){ return applyStationService(state, service, deps); },
     BuildEncounter(levelSpec, shipSpecs, opts){ return buildEncounterFromLevel(levelSpec, shipSpecs, opts); },
     CollectResult(units, reserve, snapshot, status){ return collectBattleResult(units, reserve, snapshot, status); }
   };

@@ -190,6 +190,7 @@ PARENT_OF = {
     "main.js children/game.js children/outfitting.js children/unitFirepower.js": "main.js children/game.js children/outfitting.js",
     "main.js children/game.js children/outfitting.js children/unitRange.js": "main.js children/game.js children/outfitting.js",
     "main.js children/game.js children/outfitting.js children/unitWeapons.js": "main.js children/game.js children/outfitting.js",
+    "main.js children/game.js children/hud.js children/buildOutfitModel.js": "main.js children/game.js children/hud.js",
     "main.js children/game.js children/actionLegality.js children/crewStatus.js": "main.js children/game.js children/actionLegality.js",
     "main.js children/game.js children/hud.js children/buildMapHudModel.js": "main.js children/game.js children/hud.js",
     "main.js children/game.js children/hud.js children/buildHailModel.js": "main.js children/game.js children/hud.js",

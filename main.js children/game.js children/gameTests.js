@@ -1593,6 +1593,87 @@ const runGameTests = function (bridge, testName) {
       };
     },
 
+    // ---- M5(d): station outfitting + legal generation -----------------
+    // T-M5d-1: the station outfit flow — unmount to stock, mount from
+    // stock within capacity, over-capacity rejected, parts per swap.
+    testOutfitStationFlow() {
+      bridge.initializeCampaign();
+      const st = bridge.state.campaign;
+      st.cargo.parts = 10;
+      st.cargo.weapons = { "Unguided Torpedo": 1 };
+      st.fleet[0] = { hull: "Missile Destroyer", loadout: ["Medium Missile Battery"], hp: 4, maxHp: 4, crew: 15, maxCrew: 15 };
+      let c = bridge.outfitShip(0, { remove: "Medium Missile Battery" });
+      const unmounted = Boolean(c && c.fleet[0].loadout.length === 0 &&
+        c.cargo.weapons["Medium Missile Battery"] === 1 && c.cargo.parts === 9);
+      c = bridge.outfitShip(0, { add: "Unguided Torpedo" });
+      const mounted = Boolean(c && c.fleet[0].loadout[0] === "Unguided Torpedo" &&
+        c.cargo.weapons["Unguided Torpedo"] === 0 && c.cargo.parts === 8);
+      c.cargo.weapons["Ultra Railgun"] = 1;
+      const before = JSON.stringify({ loadout: c.fleet[0].loadout, parts: c.cargo.parts });
+      const rejected = bridge.outfitShip(0, { add: "Ultra Railgun" });
+      const after = JSON.stringify({ loadout: rejected.fleet[0].loadout, parts: rejected.cargo.parts });
+      const noStock = bridge.outfitShip(0, { add: "Storm Missile Battery" });
+      const ok = unmounted && mounted && before === after &&
+        noStock.fleet[0].loadout[0] === "Unguided Torpedo" && noStock.cargo.parts === 8;
+      return {
+        name: "M5d-1 STATION OUTFIT: SWAP/MOUNT WITHIN CAPACITY, PARTS PER SWAP",
+        pass: ok,
+        detail: "unmounted=" + unmounted + " mounted=" + mounted + " overCapRejected=" + (before === after) +
+          " loadout=" + JSON.stringify(rejected.fleet[0].loadout) + " parts=" + rejected.cargo.parts
+      };
+    },
+
+    // T-M5d-2: the generator NEVER emits an illegal loadout — seeded sweep
+    // across levels/seeds; multi-weapon variants do appear and every one
+    // passes the capacity verdict.
+    testGeneratorLegalLoadoutSweep() {
+      let checked = 0, multi = 0, bad = "";
+      for (let seed = 1; seed <= 40; seed++){
+        const us = bridge.sectorUnits(101, seed);
+        for (let i = 0; i < us.length; i++){
+          const u = us[i];
+          const spec = bridge.shipSpecs[u.type] || {};
+          const v = bridge.loadoutCheck(Array.isArray(u.loadout) ? u.loadout : [], spec);
+          if (!v.ok) bad += "s" + seed + ":" + u.type + " " + v.reason + "; ";
+          if ((u.loadout || []).length > (spec.defaultLoadout || []).length) multi++;
+          checked++;
+        }
+      }
+      return {
+        name: "M5d-2 GENERATOR SEEDED SWEEP: EVERY LOADOUT LEGAL (40 seeds)",
+        pass: bad === "" && checked > 50 && multi > 0,
+        detail: "checked=" + checked + " multiWeaponUnits=" + multi + " illegal=[" + bad + "]"
+      };
+    },
+
+    // T-M5d-3: the outfit rows show ships, mounts and stock with the fit
+    // verdicts on the action buttons.
+    testOutfitModelRows() {
+      const model = bridge.outfitRows({
+        fleet: [{ hull: "Fighter", loadout: ["Dual Light Assault Cannon"] }],
+        stock: { "Light Cannon": 2 },
+        stats: {
+          "Light Cannon": { dmg: 1, range: 1, slots: 1 },
+          "Dual Light Assault Cannon": { dmg: 2, range: 2, slots: 4 }
+        },
+        selected: 0,
+        usedSlots: [4], capacities: [4], legalMounts: []
+      });
+      const rows = (model && model.rows) || [];
+      const shipRow = rows.find(r => r.id === "outfit-ship:0");
+      const mountRow = rows.find(r => r.id === "outfit-slot:0:Dual Light Assault Cannon");
+      const stockRow = rows.find(r => r.id === "outfit-stock:Light Cannon");
+      const pass = Boolean(shipRow && shipRow.active && shipRow.actionId === "OUTFIT_SELECT:0" &&
+        mountRow && mountRow.actionId === "OUTFIT_UNMOUNT:0:Dual Light Assault Cannon" &&
+        stockRow && stockRow.actionId === "OUTFIT_MOUNT:0:Light Cannon" &&
+        stockRow.actionLabel === "NO FIT" && stockRow.canAct === false);
+      return {
+        name: "M5d-3 OUTFIT MODEL: SHIP/MOUNT/STOCK ROWS + FIT VERDICTS",
+        pass: pass,
+        detail: "rows=" + rows.length + " shipActive=" + (shipRow && shipRow.active) + " stockLabel=" + (stockRow && stockRow.actionLabel)
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -1624,7 +1705,8 @@ const runGameTests = function (bridge, testName) {
         this.testOutfitSlotFormula(), this.testOutfitValidationCapacity(),
         this.testOutfitDefaultsFit(), this.testOutfitReaderParity(), this.testOutfitReaderCopies(),
         this.testBattleUnitLoadoutTruth(), this.testWeaponClassShieldBreak(), this.testSaveLoadoutMigration(),
-        this.testMultiWeaponFire(), this.testRedNumbersChosenWeapon(), this.testRedNumbersShieldedTarget()
+        this.testMultiWeaponFire(), this.testRedNumbersChosenWeapon(), this.testRedNumbersShieldedTarget(),
+        this.testOutfitStationFlow(), this.testGeneratorLegalLoadoutSweep(), this.testOutfitModelRows()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;

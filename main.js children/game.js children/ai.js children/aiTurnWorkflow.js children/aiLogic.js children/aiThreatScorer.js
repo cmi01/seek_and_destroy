@@ -154,7 +154,10 @@ function aiThreatScorer(){
       }
       const sh = target.flags.has("+shield"), rg = attacker && env.railOf(attacker);
       const shEffDmg = kcCfg.shieldedNonRailgunEffectiveDamage !== undefined ? kcCfg.shieldedNonRailgunEffectiveDamage : 1;
-      const ed = (sh && !rg) ? shEffDmg : (attacker ? env.fpOf(attacker) : 0);
+      // M5(d): the shot's own damage estimate keys on the mount worth firing
+      // (best single shot through/around the bubble) — one mount yields
+      // exactly its own damage.
+      const ed = attacker ? env.bestDmgOf(attacker, sh) : 0;
       const res = o.reserved || 0;
       const hasFocusHistory = Boolean(o.hasFocusHistory);
       if (target.hp <= ed){

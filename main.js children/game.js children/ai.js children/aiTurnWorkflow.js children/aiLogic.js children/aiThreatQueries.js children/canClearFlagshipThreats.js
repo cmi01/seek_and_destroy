@@ -16,7 +16,7 @@ const canClearFlagshipThreats = function (env, ctx){
     let need = th.hp + (th.flags.has("+shield") ? 1 : 0);
     for (let a = 0; a < atks.length; a++){
       if (ap <= 0) break;
-      need -= (th.flags.has("+shield") && !env.railOf(atks[a])) ? 1 : env.fpOf(atks[a]);
+      need -= env.bestDmgOf(atks[a], th.flags.has("+shield"));
       ap -= 1;
     }
     if (need > 0) return false;
