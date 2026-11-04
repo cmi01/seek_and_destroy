@@ -597,8 +597,129 @@ green (see run log). Ad-hoc harness kept on disk:
   ellipsis. Resolving this is a design tradeoff (font floor + accepted
   ellipsis at the floor, or raising the canvas minimum to ≈300 where
   `textPx` ≥ 6) and belongs to the scaling strategy, not this defect card.
+  **Resolved 2026-11-04 (card `t_8c5a6325`) — Decision record below: option
+  3, canvas minimum raised 200 → 300.**
 - **M4–M6 modal surfaces (station/outfit, hail/dialogue, mission board).**
   The GS-14 root cause is already fixed for them (leak contained at the
   source; their draws pinned alignment at birth). The remainder is
   instrument coverage: their labels are not in the pinned list. Cheap
   follow-up: extend `PINS` with their labels.
+
+## Decision record — DS 200 4px-glyph legibility (2026-11-04)
+
+**Decided: Option 3 — raise the canvas minimum 200 → 300.** Decision-only
+card `t_8c5a6325`; no game code changed here. The implementation is specced
+below for a follow-up card.
+
+### The tradeoff
+
+At the 200px hard floor `textPx` is 4 (`round(15 × 200/768)` = 4) and
+measured pixel contrast is 2.77–5.0 (worst: the red accent `CRITICAL DEFEAT`,
+Verification v165) — at the edge of human legibility regardless of contrast.
+Fully-drawn AND legible cannot both hold below DS ≈ 282: at DS 200 the
+`REINFORCEMENTS` button budget is 37px (button 42px) while the label needs
+14 × 6 × 0.64 = 53.8px at a 6px legible floor, so any font floor re-creates
+GS-07's ellipsis at the smallest cells. The v108 proportional design
+deliberately chose whole-over-large (removed the `Math.max(8, …)` floor) to
+keep the GS-07 bar.
+
+### Options weighed
+
+| Option | Verdict | Evidence |
+|---|---|---|
+| 1. Accept 4px at the hard floor (status quo) | Rejected | Leaves a known legibility defect reachable — 4px at contrast 2.77–5.0 is legible-with-effort at best; v165 already filed it as root-cause candidate 4. Documentation alone does not make it readable. |
+| 2. Font floor `max(6, round(15·uiScale))`, accept ellipsis < DS ~300 | Rejected | Breaks the v165 "no ellipsis at any matrix cell" bar exactly where it would help: at DS 200 `REINFORCEMENTS` needs 53.8px in a 37px budget → `REINFO…`. Between DS 200–282 users get *both* truncated labels and small chrome — strictly less than option 3 delivers, and it costs an acceptance-bar amendment. |
+| **3. Canvas minimum 200 → 300** | **Chosen** | At DS 300 `textPx` is 6 (15 × 300/768 = 5.86 → 6) and the full GS layout battery measures ALL PASS at ds282/ds300 (evidence below). Smallest change that makes every label whole AND ≥ 6px; keeps every acceptance bar intact. |
+| 4. Zoom-independent HUD text (constant CSS px) | Rejected here | Contradicts the standing "UI never changes scale relative to the game" requirement (strategy §2 rejects browser-zoom-scaled UI and DOM/CSS chrome alike) and is a near-rewrite of the HUD draw path. Unnecessary once option 3 removes 4px text from the reachable range; if the requirement ever changes, the sketch belongs in `gui-scaling-strategy.md` §5. |
+
+This matches strategy §2 "What would change my mind": a minimum legible UI
+size is a *policy* implemented centrally (here: the shell's canvas floor),
+never as widget floors.
+
+### Measured evidence (this card)
+
+`gui_scale_layout_check.js` battery run at ds200/ds282/ds300/ds400 from an
+uncommitted copy (`/tmp/hermes-verify-ds200-decision/layout_check_ds300.js`,
+size list substituted; the repo script and all game code are unchanged):
+
+- `textPx`: ds200 → 4, ds282 → 6, ds300 → 6. DS 282 is the first integer
+  where `round(15·DS/768)` reaches 6 (boundary DS ≥ 281.6).
+- **ds282 and ds300: ALL PASS** on every GS row (GS-04…GS-11, GS-15 incl.
+  deploy rows) — not just the font rows. GS-07 at `textPx` 6:
+  `REINFORCEMENTS` budget 55px vs estimate 53.8px (button 62px) — whole
+  label, fits. GS-15 `CONFIRM DEPLOYMENT` budget 71 vs 69.1 at ds300.
+- ds200 at proportional `textPx` 4: budget 37 vs 35.8 (status quo). Under
+  option 2's 6px floor the same button would need 53.8 in 37 — the
+  quantitative GS-07 break.
+- Label budgets at ds282 and ds300 are identical (both `textPx` 6 after
+  rounding), so label fit does not discriminate the two; **300 is chosen over
+  282 for margin**: `textPx` stays 6 even if the 15px design size is later
+  reduced to 14.1px, whereas 282 sits exactly on the rounding boundary (any
+  design-size reduction drops it to 5px).
+
+### Spec — new canvas minimum (for the implementation card)
+
+- **Value: 300 CSS px** (displaySize floor; `textPx` = 6 at the floor).
+- **Location:** `main.js`, `computeLayoutMetrics()` (L155) — the three
+  `Math.max(200, …)` literals at L163–165 (availW, availH, size).
+  Implementation: hoist one `const MIN_CANVAS = 300;` used by all three and
+  update the L159–161 comment ("The 200px floor is the engine minimum
+  canvas, applied once here"). Single central place, per the shell/resolver
+  ownership rule (strategy §3); no widget floors touched.
+- **Expected window-behavior change below the floor:** the canvas element is
+  `DS + 2` (1px border outset) and fits the viewport iff `innerW ≥ DS + 2`;
+  `#battle-canvas` has no overflow policy, so an oversized canvas scrolls in
+  the document (already today's behavior for windows < 202). After the
+  change: windows **202–301px** (either dimension) — which today show a
+  fitted DS 200–291 canvas — show a 300px canvas overflowing the viewport by
+  up to 100px (scroll/clip); windows **302–309px** show a fitted 300px
+  canvas; windows ≥ 310px are unchanged (`DS = inner − 10`). The minimum
+  canvas cell convention moves from "window 208×208 → DS 200" to "**window
+  308×308 → DS 300**" (smallest exactly-fitting window: 302×302).
+
+### Acceptance bars after this decision
+
+- **GS-07** ("labels shrink with `uiScale` and stay whole"): re-scoped from
+  DS 200 to **DS 300 (the new minimum canvas)**. DS 200 rows are unreachable
+  as a real page size after the floor change and stand as historical record
+  (v105–v165 rows untouched).
+- **v165 "no ellipsis at any matrix cell": unchanged as a bar** — option 3
+  keeps it whole, which is why it beats option 2. The matrix's minimum cell
+  moves from window 208×208 (DS 200) to window 308×308 (DS 300); every cell
+  of the updated matrix must still show every label full.
+- **Contrast gate bands** (`gui_scale_browser_check.py` `CONTRAST_FLOOR` 3.0
+  / `CONTRAST_FLOOR_TINY` 2.0): after the floor change no draw can land in
+  the 4px band, so `CONTRAST_FLOOR_TINY` becomes unreachable — keep as a
+  dead guard or retire it in the implementation card; the live gate is 3.0
+  (≥ 6px glyphs) at every matrix cell.
+
+### Follow-up implementation note
+
+Files to touch:
+
+1. `main.js` `computeLayoutMetrics()` — `MIN_CANVAS = 300` (three literals
+   L163–165 + comment L159–161).
+2. `dev/scripts/gui_scale_layout_check.js` — size list `["ds200", 200, 1]`
+   → `["ds300", 300, 1]` (the `textPx` expectation auto-checks 6).
+3. `dev/scripts/gui_scale_browser_check.py` — `boot_at(208, 208, 1.0)` →
+   `boot_at(308, 308, 1.0)`; `win200` row + `expected 200` assertion (L563–
+   576) → `win300` / `expected 300`; decide keep/retire
+   `CONTRAST_FLOOR_TINY`.
+4. Release note: the window-behavior paragraph above (windows 202–301 now
+   see a scrolling 300px canvas).
+5. Docs: a Verification section for the implementation citing the updated
+   matrix; historical rows untouched.
+
+Acceptance criteria:
+
+- `computeLayoutMetrics` returns `displaySize ≥ 300` for every window size
+  (layout row `ds300` + browser row `win300` assert it).
+- Browser check ALL PASS at the updated matrix incl. minimum cell 308×308:
+  every pinned label full (0 ellipsized — the v165 bar), align 0 bad,
+  contrast ≥ 3.0 (no 4px-band rows).
+- Layout check ALL PASS incl. `ds300` (GS-07 budget 55 ≥ estimate 53.8 at
+  `textPx` 6).
+- GS-08…GS-11 and GS-15 re-verified at the new minimum cell (panel on-canvas,
+  CLOSE on-canvas, deploy rows clear the wrapped cap block).
+- Standing gates at baseline (`node --check`, structure audit, reference
+  audit vs parent tree), in-page suites green, playwright green.

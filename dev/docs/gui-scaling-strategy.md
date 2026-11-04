@@ -215,6 +215,17 @@ land on half device pixels, so 1-px edges can look slightly soft. Fixing it
 would require widgets to know `RS` (violates rule 3); accept unless the audit
 shows it as user-visible.
 
+**Decision (DS-200 4px-glyph legibility, 2026-11-04, card `t_8c5a6325`):** the
+canvas minimum is raised 200 → 300 (`main.js` `computeLayoutMetrics`, one
+constant) so `textPx` ≥ 6 at the smallest reachable canvas — a central shell
+policy exactly as §2 "What would change my mind" prescribes, never widget
+floors. The v165 "no ellipsis at any matrix cell" bar stands; the matrix
+minimum cell moves to window 308×308 → DS 300. Full decision record with the
+measured evidence (GS battery ALL PASS at ds282/ds300) and the follow-up
+implementation spec: `gui-scaling-audit.md` → "Decision record — DS 200
+4px-glyph legibility". Option 4 (zoom-independent HUD text) was evaluated and
+rejected there; if that requirement ever changes, the sketch belongs in §5.
+
 ## 6. Architecture-compliance risks
 
 1. **Renderer re-derives HUD geometry** (R2) — breaks the pure view-model /
