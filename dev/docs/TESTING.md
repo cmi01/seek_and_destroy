@@ -59,8 +59,8 @@ export default defineConfig({
   testDir: './tests/specs',
   fullyParallel: true,
   workers: 2,
-  timeout: 30_000,                 // per test
-  expect: { timeout: 5_000 },      // auto-retrying assertions
+  timeout: 60_000,                 // per test (30s had zero load margin on the shared box; v151)
+  expect: { timeout: 10_000 },     // auto-retrying assertions (5s→10s; v151)
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://127.0.0.1:8123',
