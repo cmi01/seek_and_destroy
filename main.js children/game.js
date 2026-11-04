@@ -84,6 +84,21 @@ let FrameUnits = null;
 let FrameOverlay = null;
 let FrameCursor = null;
 let FrameStatus = null;
+// The pure leaf children (v162 decomposition): one captured function each.
+let UnitHasFlag = null;
+let ChooseWeaponName = null;
+let ResolveActiveWeapon = null;
+let ActiveWeaponStats = null;
+let ResolveWeaponFxType = null;
+let BuildUnitDTO = null;
+let HitTestCanvasButton = null;
+let HitTestHudPanel = null;
+let ToCanvasPx = null;
+let FindFlagshipLocus = null;
+let IndexOfReserveEntry = null;
+let MapDeployedIndices = null;
+let FreezeDeep = null;
+let DeepCopy = null;
 // Frozen plain-data facade of the pure rule queries, handed to the AI on the
 // snapshot DTO instead of the Rules module identity (built once in load()).
 let PURE_RULES = null;
@@ -413,10 +428,6 @@ const Selection = {
 // (combatMath.js). Each evidence object mirrors
 // the checks the pre-split rule queries evaluated inline, so every decision
 // is the same conjunction of the same facts.
-function _hasFlag(unit, flag){
-  if (!unit || !unit.flags) return false;
-  return typeof unit.flags.has === "function" ? unit.flags.has(flag) : unit.flags.includes(flag);
-}
 function _moveEvidence(ctx, unitA, B){
   if (!unitA || !B) return {};
   const occ = BoardQueries.getUnitAt(ctx, B.x, B.y);
@@ -427,46 +438,23 @@ function _moveEvidence(ctx, unitA, B){
     occSpotted: occ ? VisionQueries.isUnitSpottedByTeam(ctx, occ, unitA.team) : false
   };
 }
-// M5 adoption: the firing weapon resolved from the unit's loadout through
-// the seam. One attack per turn (DESIGN §2.1). M5(c) Q8: the player's
-// per-shot choice (the weapon-picker buttons) wins when it names a mount on
-// this unit; otherwise the first mount fires. Null for an unarmed unit.
+// Firing-weapon choice glue (v162): gathers the seam rows and the pending
+// pick, delegates the choice to the pure child.
 function _chosenName(unitA){
   if (!unitA) return null;
-  const ws = Outfitting ? Outfitting.UnitWeapons(unitA) : [];
-  if (ws.length === 0) return null;
-  if (_pendingWeapon.unitId === unitA.id && _pendingWeapon.name){
-    for (let i = 0; i < ws.length; i++){
-      if (ws[i].name === _pendingWeapon.name) return _pendingWeapon.name;
-    }
-  }
-  return ws[0].name;
+  return ChooseWeaponName({ unitId: unitA.id, weaponNames: Outfitting ? Outfitting.UnitWeapons(unitA) : [], pendingWeapon: _pendingWeapon });
 }
 function _activeWeapon(unitA){
   if (!unitA || !Outfitting) return null;
-  const name = _chosenName(unitA);
-  if (!name) return null;
-  const ws = Outfitting.UnitWeapons(unitA);
-  for (let i = 0; i < ws.length; i++){
-    if (ws[i].name === name) return ws[i];
-  }
-  return null;
+  const rows = Outfitting.UnitWeapons(unitA);
+  return ResolveActiveWeapon({ weaponRows: rows, chosenName: ChooseWeaponName({ unitId: unitA.id, weaponNames: rows, pendingWeapon: _pendingWeapon }) });
 }
-// The chosen weapon's own damage/range — the red numbers and the SHOOT
-// affordance radius show THIS weapon only (Q8), never a sum/max.
+// The chosen weapon's own damage/range — glue over the pure stats child.
 function _activeDamage(unitA){
-  const w = _activeWeapon(unitA);
-  return w ? w.dmg : 0;
+  return ActiveWeaponStats(_activeWeapon(unitA)).damage;
 }
 function _activeRange(unitA){
-  const w = _activeWeapon(unitA);
-  return w ? w.range : 0;
-}
-// Render/audio style key for a weapon row: the animation and audio channels
-// keep their historical pdc/missile/railgun spelling.
-function _weaponFxType(weapon){
-  if (!weapon) return "pdc";
-  return weapon.class === "cannon" ? "pdc" : weapon.class;
+  return ActiveWeaponStats(_activeWeapon(unitA)).range;
 }
 function _shootEvidence(ctx, unitA, B){
   if (!unitA || !B) return {};
@@ -660,7 +648,7 @@ const Actions = {
         if (ws[i].name===weaponName){ weapon=ws[i]; _pendingWeapon={unitId:unitA.id,name:weaponName}; break; }
       }
     }
-    const wType=_weaponFxType(weapon);
+    const wType=ResolveWeaponFxType(weapon);
 
     if(isAI&&visStartOrEnd) State.historicalVectors.push({kind:"shoot",from:origin,to:dest,team:unitA.team});
     GameAudio.play("weapon.fire", {from:origin, to:dest, team:unitA.team, unitType:unitA.type, targetType:target.type, wType, isVisible:visStartOrEnd});
@@ -728,18 +716,11 @@ const Actions = {
     let locus=capitalUnit;
     if (!locus || !locus.flags || !locus.flags.has("!flagship")){
       const us=State.units||[];
-      locus=null;
-      for (let i=0;i<us.length;i++){
-        const u=us[i];
-        if (u.hp>0 && u.team===team && u.flags.has("!flagship")){ locus=u; break; }
-      }
+      locus=FindFlagshipLocus({ units: us, team });
     }
     const validCells=locus ? this.getValidWarpCells(locus,radius) : [];
     const reserve=Array.isArray(State.battleReserve) ? State.battleReserve : [];
-    let ri=-1;
-    for (let i=0;i<reserve.length;i++){
-      if ((reserve[i].hull||reserve[i].type)===shipType){ ri=i; break; }
-    }
+    const ri=IndexOfReserveEntry({ reserve, shipType });
     if(!spec||ri<0||validCells.length===0){
       if(!isAI) GameAudio.play("ui.invalid", {});
       return false;
@@ -923,23 +904,7 @@ const Actions = {
 // the host. The hud child never sees a module handle or live state.
 function _unitDTO(u){
   if (!u) return null;
-  return {
-    id: u.id,
-    type: u.type,
-    team: u.team,
-    x: u.x,
-    y: u.y,
-    hp: u.hp,
-    maxHp: u.maxHp,
-    move: u.move,
-    // M5 adoption: weapon stats are seam-derived from the unit's loadout.
-    loadout: Outfitting.LoadoutOf(u),
-    firepower: Outfitting.UnitFirepower(u),
-    range: Outfitting.UnitRange(u),
-    scan: u.scan,
-    cost: u.cost,
-    flags: new Set(u.flags)
-  };
+  return BuildUnitDTO({ unit: u, weaponStats: { loadout: Outfitting.LoadoutOf(u), firepower: Outfitting.UnitFirepower(u), range: Outfitting.UnitRange(u) } });
 }
 
 // D2 fix: the single place a dead hull leaves State.units. Each removed hull
@@ -1670,29 +1635,14 @@ const InputProcessor = (() => {
   let _isMouseInsideCanvas = false;
   let _cursor = "crosshair";
 
-  function _pointInRect(px, py, r){
-    return Boolean(r && px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h);
-  }
-
   function _hitTestCanvasButton(px, py){
-    const btns = Array.isArray(State.canvasButtons) ? State.canvasButtons : [];
-    for (let i = 0; i < btns.length; i++){
-      const b = btns[i];
-      if (_pointInRect(px, py, b)) return b;
-    }
-    return null;
+    return HitTestCanvasButton({ px: px, py: py, buttons: State.canvasButtons });
   }
 
   function _hitTestHudPanel(px, py){
     const panels = Hud.getPanelRects();
     if (!panels) return null;
-    if (Hud.isIntelVisible() && _pointInRect(px, py, panels.intelOverlay)) return "intelOverlay";
-    if (_pointInRect(px, py, panels.menu)) return "menu";
-    if (_pointInRect(px, py, panels.minimap)) return "minimap";
-    if (_pointInRect(px, py, panels.topBar)) return "topBar";
-    if (_pointInRect(px, py, panels.selectedCard)) return "selectedCard";
-    if (_pointInRect(px, py, panels.hoveredCard)) return "hoveredCard";
-    return null;
+    return HitTestHudPanel({ px: px, py: py, panels: panels, isIntelVisible: Hud.isIntelVisible() });
   }
 
   function _getHoverContext(cell){
@@ -1977,10 +1927,7 @@ const InputProcessor = (() => {
     } else if (typeof btn.id === "string" && btn.id.indexOf("RESERVE_SUMMON:") === 0){
       const shipName = btn.id.slice("RESERVE_SUMMON:".length);
       const us = State.units || [];
-      let flag = null;
-      for (let i = 0; i < us.length; i++){
-        if (us[i].hp > 0 && us[i].team === 1 && us[i].flags.has("!flagship")){ flag = us[i]; break; }
-      }
+      const flag = FindFlagshipLocus({ units: us, team: 1 });
       // M4 (DESIGN §4.5): an under-crewed reserve hull cannot deploy to the
       // battle — summoning is a deployment.
       let crewOk = true;
@@ -2043,11 +1990,7 @@ const InputProcessor = (() => {
 
   function _toCanvasPx(evt){
     const ds = (_host && _host.metrics && _host.metrics.displaySize) ? _host.metrics.displaySize : 768;
-    return {
-      px: evt.u * ds,
-      py: evt.v * ds,
-      ds
-    };
+    return ToCanvasPx({ evt: evt, displaySize: ds });
   }
 
   function _handleEvent(evt){
@@ -2471,7 +2414,7 @@ const AI = {
       lastSeenEnemies: new Map(State.lastSeenEnemies),
       reservations: (State.aiPlan && State.aiPlan.reservations) ? new Map(State.aiPlan.reservations) : new Map(),
       aiEmergencyMode: State.aiEmergencyMode,
-      aiScoreTrace: deepCopy(State.aiScoreTrace),
+      aiScoreTrace: DeepCopy(State.aiScoreTrace),
       gameOver: State.gameOver,
       rolls,
       roll: withRolls ? RND() : 1,
@@ -2480,7 +2423,7 @@ const AI = {
     };
     // One-way boundary: the DTO is deep-frozen, so the AI tree can only read
     // it — it returns a result object instead of decorating the snapshot.
-    return deepFreeze(snap);
+    return FreezeDeep(snap);
   },
   getAIAction(snap){
     return getAIAction(snap);
@@ -2810,25 +2753,6 @@ function _loadTests(){
 }
 
 // Data modules are deep-frozen at receipt: every consumer shares sealed data.
-function deepFreeze(o){
-  if (o && typeof o === "object" && !Object.isFrozen(o)) {
-    Object.freeze(o);
-    Object.values(o).forEach(deepFreeze);
-  }
-  return o;
-}
-
-// Plain-data deep copy (arrays and plain objects) for DTO handoffs.
-function deepCopy(o){
-  if (Array.isArray(o)) return o.map(deepCopy);
-  if (o && typeof o === "object") {
-    const out = {};
-    const ks = Object.keys(o);
-    for (let i = 0; i < ks.length; i++) out[ks[i]] = deepCopy(o[ks[i]]);
-    return out;
-  }
-  return o;
-}
 
 // ---- Frame DTO copies (v78) -------------------------------------------------
 // Render frames are plain data: nothing in a frame may alias live State.
@@ -2845,12 +2769,12 @@ function frameCopy(src){
   if (!src || typeof src !== "object") return src;
   const hit = _frameCopyCache.get(src);
   if (hit) return hit;
-  const copy = deepFreeze(deepCopy(src));
+  const copy = FreezeDeep(DeepCopy(src));
   _frameCopyCache.set(src, copy);
   return copy;
 }
 function freshCopy(src){
-  return (src && typeof src === "object") ? deepFreeze(deepCopy(src)) : src;
+  return (src && typeof src === "object") ? FreezeDeep(DeepCopy(src)) : src;
 }
 
 
@@ -2946,6 +2870,20 @@ const api = {
         "main.js children/game.js children/hud.js",
         "main.js children/game.js children/sectorGenerator.js",
         "main.js children/game.js children/ai.js",
+        "main.js children/game.js children/unitHasFlag.js",
+        "main.js children/game.js children/chooseWeaponName.js",
+        "main.js children/game.js children/resolveActiveWeapon.js",
+        "main.js children/game.js children/activeWeaponStats.js",
+        "main.js children/game.js children/resolveWeaponFxType.js",
+        "main.js children/game.js children/buildUnitDTO.js",
+        "main.js children/game.js children/hitTestCanvasButton.js",
+        "main.js children/game.js children/hitTestHudPanel.js",
+        "main.js children/game.js children/toCanvasPx.js",
+        "main.js children/game.js children/findFlagshipLocus.js",
+        "main.js children/game.js children/indexOfReserveEntry.js",
+        "main.js children/game.js children/mapDeployedIndices.js",
+        "main.js children/game.js children/freezeDeep.js",
+        "main.js children/game.js children/deepCopy.js",
       ]);
 
       // The flattened children expose one plain pure function each at script
@@ -2980,7 +2918,21 @@ const api = {
         missions:         typeof missions === "function" ? missions : null,
         boardQueries:     typeof boardQueries === "function" ? boardQueries : null,
         visionQueries:    typeof visionQueries === "function" ? visionQueries : null,
-        actionLegality:   typeof actionLegality === "function" ? actionLegality : null
+        actionLegality:   typeof actionLegality === "function" ? actionLegality : null,
+        unitHasFlag: typeof unitHasFlag === "function" ? unitHasFlag : null,
+        chooseWeaponName: typeof chooseWeaponName === "function" ? chooseWeaponName : null,
+        resolveActiveWeapon: typeof resolveActiveWeapon === "function" ? resolveActiveWeapon : null,
+        activeWeaponStats: typeof activeWeaponStats === "function" ? activeWeaponStats : null,
+        resolveWeaponFxType: typeof resolveWeaponFxType === "function" ? resolveWeaponFxType : null,
+        buildUnitDTO: typeof buildUnitDTO === "function" ? buildUnitDTO : null,
+        hitTestCanvasButton: typeof hitTestCanvasButton === "function" ? hitTestCanvasButton : null,
+        hitTestHudPanel: typeof hitTestHudPanel === "function" ? hitTestHudPanel : null,
+        toCanvasPx: typeof toCanvasPx === "function" ? toCanvasPx : null,
+        findFlagshipLocus: typeof findFlagshipLocus === "function" ? findFlagshipLocus : null,
+        indexOfReserveEntry: typeof indexOfReserveEntry === "function" ? indexOfReserveEntry : null,
+        mapDeployedIndices: typeof mapDeployedIndices === "function" ? mapDeployedIndices : null,
+        freezeDeep: typeof freezeDeep === "function" ? freezeDeep : null,
+        deepCopy: typeof deepCopy === "function" ? deepCopy : null
       };
       // DATA payloads + the two remaining registrar children (hud, ai):
       // parent-captures-child-at-load, no registrar handshake.
@@ -3026,16 +2978,46 @@ const api = {
         ["main.js children/game.js children/frameStatus.js",             kids.frameStatus],
         ["main.js children/game.js children/hud.js",                     _modules.hud && typeof _modules.hud.createHud === "function"],
         ["main.js children/game.js children/sectorGenerator.js",         kids.sectorGenerator],
-        ["main.js children/game.js children/ai.js",                        typeof _modules.ai === "function" && typeof _modules.ai.load === "function"]
+        ["main.js children/game.js children/ai.js",                        typeof _modules.ai === "function" && typeof _modules.ai.load === "function"],
+        ["main.js children/game.js children/unitHasFlag.js",                              kids.unitHasFlag],
+        ["main.js children/game.js children/chooseWeaponName.js",                         kids.chooseWeaponName],
+        ["main.js children/game.js children/resolveActiveWeapon.js",                      kids.resolveActiveWeapon],
+        ["main.js children/game.js children/activeWeaponStats.js",                        kids.activeWeaponStats],
+        ["main.js children/game.js children/resolveWeaponFxType.js",                      kids.resolveWeaponFxType],
+        ["main.js children/game.js children/buildUnitDTO.js",                             kids.buildUnitDTO],
+        ["main.js children/game.js children/hitTestCanvasButton.js",                      kids.hitTestCanvasButton],
+        ["main.js children/game.js children/hitTestHudPanel.js",                          kids.hitTestHudPanel],
+        ["main.js children/game.js children/toCanvasPx.js",                               kids.toCanvasPx],
+        ["main.js children/game.js children/findFlagshipLocus.js",                        kids.findFlagshipLocus],
+        ["main.js children/game.js children/indexOfReserveEntry.js",                      kids.indexOfReserveEntry],
+        ["main.js children/game.js children/mapDeployedIndices.js",                       kids.mapDeployedIndices],
+        ["main.js children/game.js children/freezeDeep.js",                               kids.freezeDeep],
+        ["main.js children/game.js children/deepCopy.js",                                 kids.deepCopy]
       ].filter(c => !c[1]).map(c => c[0]);
       if (missing.length > 0) {
         throw new Error("These scripts loaded but did not register their module (see earlier errors):\n  " + missing.join("\n  "));
       }
+      // The pure leaf children (v162 decomposition): one captured function
+      // each — the logic extracted from this file's former inline helpers.
+      UnitHasFlag = kids.unitHasFlag;
+      ChooseWeaponName = kids.chooseWeaponName;
+      ResolveActiveWeapon = kids.resolveActiveWeapon;
+      ActiveWeaponStats = kids.activeWeaponStats;
+      ResolveWeaponFxType = kids.resolveWeaponFxType;
+      BuildUnitDTO = kids.buildUnitDTO;
+      HitTestCanvasButton = kids.hitTestCanvasButton;
+      HitTestHudPanel = kids.hitTestHudPanel;
+      ToCanvasPx = kids.toCanvasPx;
+      FindFlagshipLocus = kids.findFlagshipLocus;
+      IndexOfReserveEntry = kids.indexOfReserveEntry;
+      MapDeployedIndices = kids.mapDeployedIndices;
+      FreezeDeep = kids.freezeDeep;
+      DeepCopy = kids.deepCopy;
 
-      RULES_DATA = deepFreeze(_modules.rulesData);
-      CAMPAIGN_DATA = deepFreeze(_modules.campaignData);
-      BEGINNING_GAME_STATE_DATA = deepFreeze(_modules.beginningGameStateData);
-      THEME_DATA = deepFreeze(_modules.themesData);
+      RULES_DATA = FreezeDeep(_modules.rulesData);
+      CAMPAIGN_DATA = FreezeDeep(_modules.campaignData);
+      BEGINNING_GAME_STATE_DATA = FreezeDeep(_modules.beginningGameStateData);
+      THEME_DATA = FreezeDeep(_modules.themesData);
 
       GRID_SIZE = RULES_DATA.gridSize;
       SPAWN_RADIUS = RULES_DATA.spawnRadius;
@@ -3193,7 +3175,7 @@ const api = {
         terrainAt(ctx, gx, gy){ return BoardQueries.terrainAt(ctx, gx, gy); },
         getUnitAt(ctx, gx, gy){ return BoardQueries.getUnitAt(ctx, gx, gy); },
         buildUnitIndex(units){ return BoardQueries.buildUnitIndex(units); },
-        hasFlag(unit, flag){ return _hasFlag(unit, flag); },
+        hasFlag(unit, flag){ return UnitHasFlag(unit, flag); },
         hasLineOfSight(ctx, x0, y0, x1, y1, mode){ return LineOfSight.hasLineOfSight(ctx, x0, y0, x1, y1, mode); },
         effectiveScan(ctx, unit){ return VisionQueries.effectiveScan(ctx, unit); },
         isCellVisibleToTeam(ctx, gx, gy, team){ return VisionQueries.isCellVisibleToTeam(ctx, gx, gy, team); },
@@ -3215,12 +3197,12 @@ const api = {
       // Frozen plain facade of the pure rule queries + copied rule data,
       // built once here: this is what crosses into the AI snapshot DTO —
       // the Rules module identity never leaves game.js.
-      PURE_RULES = deepFreeze({
+      PURE_RULES = FreezeDeep({
         gridSize: Rules.gridSize,
         spawnRadius: Rules.spawnRadius,
         defaultDifficulty: Rules.defaultDifficulty,
-        difficultyProfiles: deepCopy(Rules.difficultyProfiles),
-        shipSpecs: deepCopy(Rules.shipSpecs),
+        difficultyProfiles: DeepCopy(Rules.difficultyProfiles),
+        shipSpecs: DeepCopy(Rules.shipSpecs),
         dist(a, b){ return Rules.dist(a, b); },
         inBounds(ctx, gx, gy){ return Rules.inBounds(ctx, gx, gy); },
         terrainAt(ctx, gx, gy){ return Rules.terrainAt(ctx, gx, gy); },
@@ -3268,9 +3250,9 @@ const api = {
       // identities cross the boundary). _hudView/_hudCache stay game-owned.
       _hudView = _modules.hud.createInitialView();
       HudLib = _modules.hud.createHud({
-        campaignLevels: deepCopy(CAMPAIGN_LEVELS),
-        shipSpecs: deepCopy(SHIP_SPECS),
-        flagDescriptions: deepCopy(Rules.flagDescriptions || {}),
+        campaignLevels: DeepCopy(CAMPAIGN_LEVELS),
+        shipSpecs: DeepCopy(SHIP_SPECS),
+        flagDescriptions: DeepCopy(Rules.flagDescriptions || {}),
         getUnitAt(gx, gy){ return _unitDTO(MathGrid.getUnitAt(gx, gy)); },
         terrainAt(gx, gy){
           const st = GetGameState();
@@ -3338,10 +3320,7 @@ const api = {
       CAMPAIGN_DATA.campaign.start.battle && CAMPAIGN_DATA.campaign.start.battle.cornerCapacity) || 4;
     const fleet = (section && Array.isArray(section.fleet)) ? section.fleet : [];
     const split = ReservePlacement.splitOverflow(fleet, cap);
-    const selected = [];
-    for (let i = 0; i < fleet.length; i++){
-      if (split.deployed.indexOf(fleet[i]) !== -1) selected.push(i);
-    }
+    const selected = MapDeployedIndices({ fleet, deployed: split.deployed });
     _pendingDeploy = { levelId: levelId, fleet: fleet, capacity: cap, selected: selected, encounter: (opts && opts.encounter) || null };
     Hud.toggleDeployModal(true);
   },
@@ -3781,10 +3760,7 @@ const api = {
           CAMPAIGN_DATA.campaign.start.battle && CAMPAIGN_DATA.campaign.start.battle.cornerCapacity) || 4;
         const fleet = (section && section.fleet) || [];
         const split = ReservePlacement.splitOverflow(fleet, cap);
-        const selected = [];
-        for (let i = 0; i < fleet.length; i++){
-          if (split.deployed.indexOf(fleet[i]) !== -1) selected.push(i);
-        }
+        const selected = MapDeployedIndices({ fleet, deployed: split.deployed });
         return { capacity: cap, selected: selected, overflow: split.overflow.length };
       }
     };
@@ -3794,11 +3770,11 @@ const api = {
     // Frozen plain-data snapshot of the theme table (order + palettes) — the
     // live themes module identity never leaves game.js. Switching themes goes
     // through setTheme()/getTheme() below.
-    const themeSnapshot = deepFreeze({
+    const themeSnapshot = FreezeDeep({
       order: Themes.ORDER.slice(),
       palettes: (() => {
         const p = {};
-        Themes.ORDER.forEach(t => { p[t] = deepCopy(Themes.palette(t)); });
+        Themes.ORDER.forEach(t => { p[t] = DeepCopy(Themes.palette(t)); });
         return p;
       })()
     });

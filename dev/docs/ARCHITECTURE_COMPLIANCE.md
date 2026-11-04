@@ -366,7 +366,21 @@ lands; the Surface column says how far each file is from the bar.
 | File | Role today | Surface today | Work needed |
 |---|---|---|---|
 | `main.js` | wiring root + frame loop | wiring | **exempt — imperative shell** (grows: state container, hardware, all effects, central loader) |
-| `main.js children/game.js` | rules + turn flow + state executors | core | scheduled — logic becomes pure `state → state` files; state + effects → `main.js` |
+| `main.js children/game.js` | rules + turn flow + state executors | core | scheduled — logic becomes pure `state → state` files; state + effects → `main.js` (v162–: pure leaf helpers extracted to the single-function children below; glue wrappers gather closure data and delegate) |
+| `main.js children/game.js children/unitHasFlag.js` | flag-membership predicate | `unitHasFlag` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/chooseWeaponName.js` | firing-mount name choice | `chooseWeaponName` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/resolveActiveWeapon.js` | chosen weapon row lookup | `resolveActiveWeapon` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/activeWeaponStats.js` | chosen weapon damage/range | `activeWeaponStats` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/resolveWeaponFxType.js` | weapon FX/audio key | `resolveWeaponFxType` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/buildUnitDTO.js` | HUD unit DTO builder | `buildUnitDTO` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/hitTestCanvasButton.js` | canvas-button hit test | `hitTestCanvasButton` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/hitTestHudPanel.js` | HUD-panel hit test | `hitTestHudPanel` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/toCanvasPx.js` | event coords → canvas pixels | `toCanvasPx` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/findFlagshipLocus.js` | first living non-flagship unit | `findFlagshipLocus` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/indexOfReserveEntry.js` | reserve-entry index by hull | `indexOfReserveEntry` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/mapDeployedIndices.js` | deployed roster indices | `mapDeployedIndices` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/freezeDeep.js` | recursive data freeze | `freezeDeep` | 1 fn ✓ — flatten shape |
+| `main.js children/game.js children/deepCopy.js` | recursive plain-data copy | `deepCopy` | 1 fn ✓ — flatten shape |
 | `main.js children/game.js children/gameState.js` | state-store operations | 6 fns | scheduled — pure `state → state/data` fns, one per file |
 | `main.js children/inputs.js` | hardware → input events | core | scheduled — pure translate fns; listeners → `main.js` |
 | `main.js children/game.js children/sectorGenerator.js` | sector/unit generation | 2 fns | scheduled |
