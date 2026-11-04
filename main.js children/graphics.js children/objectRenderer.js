@@ -3,7 +3,7 @@
 // objectRenderer.js — job: draw the frame's board-object layer.
 // Owner: graphics.js. Holds no state unless it is a core.
 // ============================================================
-(() => {
+const buildObjectLayer = (() => {
   const _hasFlag = (u, f) => Boolean(u && u.flags && (typeof u.flags.has === "function" ? u.flags.has(f) : Array.isArray(u.flags) && u.flags.includes(f)));
 
   const TAU = Math.PI * 2;
@@ -356,14 +356,17 @@
     ctx.restore();
   }
 
-  const layerApi = {
-    spriteKey,
-    getSpriteSlice,
-    drawBattleWarpArcs,
-    drawBattleObjects,
-    drawBattleTacticalOverlays,
-    drawMinimapUnits,
-    drawMapObjects
+  // C5: one argument-dispatch surface; member names kept verbatim as op values.
+  return function (cmd) {
+    switch (cmd.op) {
+      case "spriteKey": return spriteKey(cmd.unit, cmd.cellPx, cmd.tKey);
+      case "getSpriteSlice": return getSpriteSlice(cmd.unit, cmd.tKey, cmd.spriteConfig);
+      case "drawBattleWarpArcs": return drawBattleWarpArcs(cmd);
+      case "drawBattleObjects": return drawBattleObjects(cmd);
+      case "drawBattleTacticalOverlays": return drawBattleTacticalOverlays(cmd);
+      case "drawMinimapUnits": return drawMinimapUnits(cmd);
+      case "drawMapObjects": return drawMapObjects(cmd);
+      default: throw new Error("buildObjectLayer: unknown op " + String(cmd && cmd.op));
+    }
   };
-  globalThis.objectLayerApi = layerApi;
 })();

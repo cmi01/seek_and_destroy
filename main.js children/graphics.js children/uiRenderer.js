@@ -4,7 +4,7 @@
 // uiRenderer.js — job: draw the frame's UI layer.
 // Owner: graphics.js. Holds no state unless it is a core.
 // ============================================================
-(() => {
+const buildUiLayer = (() => {
   let _ui = null;
   let _stroke = { hairline: 1, thin: 1.2, mid: 1.4, regular: 1.5, heavy: 2, focus: 2.2 };
   function _armUi(metrics) {
@@ -1219,10 +1219,13 @@
     }
   }
 
-  const layerApi = {
-    drawBattleWorldReticles,
-    drawHud,
-    drawMinimapUi
+  // C5: one argument-dispatch surface; member names kept verbatim as op values.
+  return function (cmd) {
+    switch (cmd.op) {
+      case "drawBattleWorldReticles": return drawBattleWorldReticles(cmd);
+      case "drawHud": return drawHud(cmd);
+      case "drawMinimapUi": return drawMinimapUi(cmd);
+      default: throw new Error("buildUiLayer: unknown op " + String(cmd && cmd.op));
+    }
   };
-  globalThis.uiLayerApi = layerApi;
 })();

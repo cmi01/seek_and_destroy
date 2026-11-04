@@ -7,7 +7,12 @@
 // The effects layer is exactly one pure draw function: a draw-command DTO and
 // one animation record in, canvas draw calls out. Nothing is held between
 // calls, so the composing parent captures this binding when it loads the file.
-const drawAnimation = function (cmd, anim) {
+const drawAnimation = (function () {
+// Private helper: the cell's centre in pixels (serves this file's one job).
+function _cellCenter(gx, gy, CP) {
+  return { x: (gx + 0.5) * CP, y: (gy + 0.5) * CP };
+}
+return function (cmd, anim) {
   const { ctx, now, CP, TS, fontHelper, TC: rawTC } = cmd;
   const TC = typeof rawTC === "function" ? rawTC : (c => c);
   if (!anim) return;
@@ -114,8 +119,4 @@ const drawAnimation = function (cmd, anim) {
     ctx.fillText(`[WARP IN: ${anim.shipType}]`, c.x - 28 * TS, c.y - 10 * TS - t * 8 * TS);
   }
 };
-
-// Private helper: the cell's centre in pixels (serves this file's one job).
-function _cellCenter(gx, gy, CP) {
-  return { x: (gx + 0.5) * CP, y: (gy + 0.5) * CP };
-}
+})();

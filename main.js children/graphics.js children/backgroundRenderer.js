@@ -3,7 +3,7 @@
 // backgroundRenderer.js — job: draw the frame's background layer.
 // Owner: graphics.js. Holds no state unless it is a core.
 // ============================================================
-(() => {
+const buildBackgroundLayer = (() => {
   // ---- Plain-data helpers (local re-implementations over frame data) -------
   const _spottedBy = (u, team) => Boolean(u && (u.team === team || u.spottedByPlayer));
   const _effScanOf = u => (u && typeof u.effectiveScan === "number") ? u.effectiveScan : (u ? (u.scan || 0) : 0);
@@ -313,12 +313,15 @@
     }
   }
 
-  const layerApi = {
-    paintTerrain,
-    drawBattleGridAndTerrain,
-    drawBattleFog,
-    drawMinimapBackground,
-    drawMapBackground
+  // C5: one argument-dispatch surface; member names kept verbatim as op values.
+  return function (cmd) {
+    switch (cmd.op) {
+      case "paintTerrain": return paintTerrain(cmd);
+      case "drawBattleGridAndTerrain": return drawBattleGridAndTerrain(cmd);
+      case "drawBattleFog": return drawBattleFog(cmd);
+      case "drawMinimapBackground": return drawMinimapBackground(cmd);
+      case "drawMapBackground": return drawMapBackground(cmd);
+      default: throw new Error("buildBackgroundLayer: unknown op " + String(cmd && cmd.op));
+    }
   };
-  globalThis.backgroundLayerApi = layerApi;
 })();

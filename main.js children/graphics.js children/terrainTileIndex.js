@@ -95,5 +95,3 @@ const terrainTileIndex = function (input) {
     keep: keep
   };
 };
-
-globalThis.terrainTileIndex = terrainTileIndex;

@@ -336,7 +336,7 @@ const Graphics = (() => {
   // Resolves a unit to sheet+rect drawing material (the Image plus its source
   // rect) — the material layers use for their own ctx.drawImage calls.
   function _sliceMaterial(unit) {
-    const slice = _layers.object.getSpriteSlice(unit, _activeTheme, _spriteConfig());
+    const slice = _layers.object({ op: "getSpriteSlice", unit, tKey: _activeTheme, spriteConfig: _spriteConfig() });
     if (!slice) return null;
     const sheet = _atlasState.images[slice.sheetKey] || null;
     if (!sheet) return null;
@@ -664,7 +664,8 @@ const Graphics = (() => {
     const pxW = Math.max(1, Math.ceil((endGx - originGx) * paintCP));
     const pxH = Math.max(1, Math.ceil((endGy - originGy) * paintCP));
     const canvas = _createCanvas(pxW, pxH);
-    _layers.background.paintTerrain({
+    _layers.background({
+      op: "paintTerrain",
       canvas, state, bp, gridSize, CP: paintCP, FS: paintFS,
       shapes, TC: _themeColor,
       originGx, originGy, gx0: originGx, gy0: originGy, gx1: endGx, gy1: endGy
@@ -779,11 +780,11 @@ const Graphics = (() => {
     },
 
     spriteKey(unit, cellPx) {
-      return _layers.object.spriteKey(unit, cellPx, _activeTheme);
+      return _layers.object({ op: "spriteKey", unit, cellPx, tKey: _activeTheme });
     },
 
     spriteGet(unit) {
-      return _layers.object.getSpriteSlice(unit, _activeTheme, _spriteConfig());
+      return _layers.object({ op: "getSpriteSlice", unit, tKey: _activeTheme, spriteConfig: _spriteConfig() });
     },
 
     blitSprite(ctx, sprite, cx, cy, targetCellPx) {
@@ -865,7 +866,8 @@ const Graphics = (() => {
 
       // Skip world-space board rendering when an opaque full-screen modal is open (ISS-030).
       if (isOpaqueFullModal) {
-        _layers.ui.drawHud({
+        _layers.ui({
+          op: "drawHud",
           ctx, now, state, bp, theme: _activeTheme,
           DS, US,
           metrics: _graphicsBridge.metrics,
@@ -888,7 +890,8 @@ const Graphics = (() => {
 
       // 1. Background grid & terrain (core-owned terrain tile canvases)
       const terrainPack = _ensureTerrainTiles(state, _activeTheme, bp, gridSize, CP, FS, DX0, DX1, DY0, DY1);
-      _layers.background.drawBattleGridAndTerrain({
+      _layers.background({
+        op: "drawBattleGridAndTerrain",
         ctx, visMatrix, state, bp, gridSize,
         CP, FS, DX0, DX1, DY0, DY1,
         terrainTiles: terrainPack.tiles,
@@ -896,7 +899,8 @@ const Graphics = (() => {
       });
 
       // 2. Warp perimeter arcs
-      _layers.object.drawBattleWarpArcs({
+      _layers.object({
+        op: "drawBattleWarpArcs",
         ctx, state, CP, TS, DX0, DX1, DY0, DY1,
         spawnRadius: _graphicsBridge.SPAWN_RADIUS,
         fontHelper: _cFont,
@@ -914,7 +918,8 @@ const Graphics = (() => {
       ctx.clip();
 
       // 3. Sensor circles, radar wedge & historical vectors
-      _layers.object.drawBattleObjects({
+      _layers.object({
+        op: "drawBattleObjects",
         ctx, now, state, bp, CP, DX0, DX1, DY0, DY1,
         TC: _themeColor
       });
@@ -942,20 +947,23 @@ const Graphics = (() => {
       ctx.restore(); // Remove clip
 
       // 5. Fog of War
-      _layers.background.drawBattleFog({
+      _layers.background({
+        op: "drawBattleFog",
         ctx, visMatrix, state, bp, CP, DX0, DX1, DY0, DY1,
         TC: _themeColor
       });
 
       // 6. Tactical overlays (Move/Shoot/Capture/Shield indicators)
-      _layers.object.drawBattleTacticalOverlays({
+      _layers.object({
+        op: "drawBattleTacticalOverlays",
         ctx, state, bp, CP, FS,
         fontHelper: _worldFont,
         TC: _themeColor
       });
 
       // 7. World-space UI reticles (Selection brackets & Hovered cell brackets)
-      _layers.ui.drawBattleWorldReticles({
+      _layers.ui({
+        op: "drawBattleWorldReticles",
         ctx, now, state, bp, CP, FS, DX0, DX1, DY0, DY1,
         fonts: _uiFonts(US),
         colors: _uiColors()
@@ -963,7 +971,8 @@ const Graphics = (() => {
 
       // 8. Screen-space HUD, Minimap, Telemetry, Intel, Modals & Canvas Buttons (driven by state.buttonHovered)
       ctx.setTransform(RS, 0, 0, RS, 0, 0);
-      _layers.ui.drawHud({
+      _layers.ui({
+        op: "drawHud",
         ctx, now, state, bp, theme: _activeTheme,
         DS, US,
         metrics: _graphicsBridge.metrics,
@@ -988,11 +997,12 @@ const Graphics = (() => {
       const map = _graphicsBridge.map || {};
       const colors = _mapColors();
       ctx.setTransform(RS, 0, 0, RS, 0, 0);
-      _layers.background.drawMapBackground({ ctx, DS, map, colors });
-      _layers.object.drawMapObjects({ ctx, DS, map, colors });
+      _layers.background({ op: "drawMapBackground", ctx, DS, map, colors });
+      _layers.object({ op: "drawMapObjects", ctx, DS, map, colors });
       const uiHud = _graphicsBridge.uiHud || null;
       const US = metrics.uiScale || 1;
-      _layers.ui.drawHud({
+      _layers.ui({
+        op: "drawHud",
         ctx, now, state: _graphicsBridge.state || {}, bp: _boardPalette(), theme: _activeTheme,
         DS, US,
         metrics,
@@ -1022,16 +1032,19 @@ const Graphics = (() => {
       const bp = _boardPalette();
       const visMatrix = visCache || Array.from({ length: gridSize }, () => Array(gridSize).fill(true));
 
-      _layers.background.drawMinimapBackground({
+      _layers.background({
+        op: "drawMinimapBackground",
         ctx, visMatrix, state, bp, gridSize, mmSize, cellPx,
         TC: _themeColor
       });
 
-      _layers.object.drawMinimapUnits({
+      _layers.object({
+        op: "drawMinimapUnits",
         ctx, state, bp, cellPx
       });
 
-      _layers.ui.drawMinimapUi({
+      _layers.ui({
+        op: "drawMinimapUi",
         ctx, state, bp, cellPx, now,
         metrics: metrics,
         colors: _uiColors()
@@ -1110,20 +1123,16 @@ const Graphics = (() => {
     if (_loadPromise) return _loadPromise;
     _loadPromise = (async () => {
       await _loadScripts(GRAPHICS_CHILDREN);
-      // Parent captures each child at load. Renderer children publish a layer
-      // object onto a neutral global (they name no parent binding); the
-      // animation child is a script-scope function; the atlas pack still uses
-      // the load-time registrar because its container is not a scanned script.
-      // A missing capture fails exactly where an unregistered module did.
-      if (globalThis.backgroundLayerApi) _layers.background = globalThis.backgroundLayerApi;
-      if (globalThis.objectLayerApi) _layers.object = globalThis.objectLayerApi;
-      if (globalThis.uiLayerApi) _layers.ui = globalThis.uiLayerApi;
-      if (typeof globalThis.terrainTileIndex === "function") _indexTerrainTiles = globalThis.terrainTileIndex;
-      delete globalThis.backgroundLayerApi;
-      delete globalThis.objectLayerApi;
-      delete globalThis.uiLayerApi;
-      delete globalThis.terrainTileIndex;
-      _layers.vfx = typeof drawAnimation === "function" ? drawAnimation : null;
+      // Parent captures each child BY NAME at composition (C4): each child
+      // exposes exactly one script-scope binding; load order (the manifest)
+      // guarantees it exists. The atlas pack still uses the load-time
+      // registrar because its container is not a scanned script. A missing
+      // capture fails exactly where an unregistered module did.
+      _layers.background = (typeof buildBackgroundLayer === "function") ? buildBackgroundLayer : null;
+      _layers.object = (typeof buildObjectLayer === "function") ? buildObjectLayer : null;
+      _layers.ui = (typeof buildUiLayer === "function") ? buildUiLayer : null;
+      _indexTerrainTiles = (typeof terrainTileIndex === "function") ? terrainTileIndex : null;
+      _layers.vfx = (typeof drawAnimation === "function") ? drawAnimation : null;
       _registrationOpen = false;
       delete api._registerLayer;
       const missing = [
