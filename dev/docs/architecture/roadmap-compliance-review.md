@@ -327,3 +327,135 @@ Roadmap §7 Q4–Q11, Q12 (planning-doc home), Q13 (cadence) remain requester-co
 - Re-ran browser suites on a **new** port (55921), not the implementers’ 55869/55903.
 - `git merge-tree` of `e9229a5` vs `origin/main`.
 - Dirty `v105` checkout left as found.
+
+---
+
+## 9. Gate review — M3 campaign map (2026-11-03)
+
+**Date:** 2026-11-03 · **Reviewer:** kanban task `t_e5937bed` (spec `t_f15523c0`, superseded duplicate) ·
+**Implementation under review:** `t_ab74f8de` — v126 (a), v129 (b), v130 (c) on `origin/main` @ `0fca1ec`.
+
+**Verdict: MET.** Every roadmap §4 M3 deliverable and acceptance criterion is
+implemented on `origin/main`, verified by re-execution against the tree (detached
+review worktree at `0fca1ec`), the live `/v130/` deployment, and an independent
+browser traverse. No blocking findings. Deviations are recorded below and are
+justified.
+
+### 9.1 Standing gates re-run (review worktree @ 0fca1ec, not the implementer's runs)
+
+| Gate | Result |
+|------|--------|
+| `node --check` all `.js` | all pass |
+| `structure_audit.py` | 0 violations / 19 warnings / one-function 0 |
+| `reference_audit.py` | legacy 6, child-names 0, doc-window 27, import-direction 2 = exact baseline |
+| `reference_policy_check.py` | 0 violations |
+| In-page suites, fresh port 58412 (`?test`) | 45/45 (40 game + 5 sprite) + 5/5 audio |
+| Live `https://seek-and-destroy.abacusai.cloud/v130/?test&bust=gate1` | 45/45 + 5/5 |
+| Playwright `npx playwright test` (worktree) | 28/28 (incl. both M3 acceptance specs `11-campaign-map.spec.ts`) |
+| Deploy | root 302 → `/v130/`; `/v130/` 200; `/v130/?test` 200 |
+| Release refs | v126–v130 each: branch + tag + `main` pushed, `git ls-remote` parity verified (`main` = `v130` = `0fca1ec`) |
+
+### 9.2 M3 traverse re-run independently (measurements, not report quotes)
+
+Single clean chain on a fresh boot (screenshots under the review card's evidence
+dir; in-page state read via `SD.Map.*` / `SD.getRawState()`):
+
+1. **Map-first boot.** `levelTag "MAP // SOL GATE STATION"`, screen `map`, no modal;
+   player fleet 5 ships (Flagship Battlecruiser `flagship:true`, crew 88 = ⌈8750/100⌉ —
+   Q6/Q7 rules intact), fuel 500.
+2. **Fuel formula, normal space.** Move (41,24)→(45,24), distance 4:
+   fuel 500→480 = 5 ships × 4 × 1 exactly (roadmap: "proportional to ship count").
+3. **Hyperspace jump (Q5).** `jump → aurora-prime`: `fleetJumped` event, departure
+   on sol-gate's well edge (distance to well center = 6.000 = `wellRadius`), arrival
+   on aurora-prime's edge; cost **144.4996 = 5 × 9.6333 × 3** (hyperspace ×3, edge-to-edge
+   distance); deep space refused at both ends (`unknown-target` / `no-jump-point`),
+   same-well refused (`already-there`) — pinned by `M3 JUMP POINTS AT EDGES, WELLS ONLY (Q5)`.
+4. **Red render at two resolutions.** 1200px + 768px screenshots: dark-red/maroon
+   SC2-style palette, gravity-well reticle nodes + labels only (no star/ship clutter),
+   page dark from first paint, no flash, no modal.
+5. **Encounter opens on entry + Q4 edge.** Arriving inside aurora-prime's well opens
+   `pendingEncounter {kind:"location", locationId:"aurora-prime", encounterFaction:"garrison",
+   entry:{edge:"W"}, joinNextTurn:true}` — the entry is the well edge nearest the
+   approach (came from the west) ✓.
+6. **Hailing shell.** `buildHailModel`: speaker `LOCAL GARRISON`, placeholder voice
+   lines (M6 banks noted), options `talk/threaten/leave`; rendered with
+   HAIL_TALK/HAIL_THREATEN/HAIL_LEAVE buttons.
+7. **Battle next turn via the M2 seam.** `endTurn()` with the encounter open → deploy
+   modal (`DEPLOY_LOCK` forced flagship row disabled-ON + player pick toggles + CONFIRM)
+   → battle: 16 units, screen `battle`, `battleActive: true`, map frozen (Q4),
+   `pendingEncounter` consumed. The forced flagship deployed carrying `!flagship` (F6
+   contract holds on the map path).
+8. **Victory folds back.** `checkEndgame()` → campaign fold: screen `map`,
+   `battleActive: false`, player fleet mirrored 5/5 hulls intact;
+   `gameOver: true` + victory modal after 450 ms are the designed M2 fold semantics
+   (asserted by `11-campaign-map.spec.ts` lines 66–82 — the fold lands beneath the modal).
+
+Probe note (reviewer artifact, not a defect): running the traverse on a `?test` page
+AFTER `SD.runTests()` executes produces damaged leftover state (a partial deploy was
+once observed). All figures above come from clean boots with no prior test-harness run.
+
+### 9.3 Roadmap §4 M3 deliverables and acceptance — verdicts
+
+| Item | Verdict | Evidence |
+|------|---------|----------|
+| Turn-based map movement; real space + hyperspace; fleets/locations single map units; speed = slowest ship | met | `moveFleet.js` (slowest-ship cap test `M3` map tests green); traverse steps 2–3 |
+| Fuel: consumption ∝ ship count, hyperspace ×3; blocked move → merchant event | met | step 2–3 measurements; `M3` fuel/rejection/merchant tests green |
+| Map visibility: N squares = N ships; nebula hides battles | met | `mapVisibility.js`; MapHud `detection: 5` for a 5-ship fleet; `M3` detection/nebula tests green |
+| Entering a fleet/location opens it; battle next turn; hailing shell (voice placeholder) | met | traverse steps 5–7; `buildHailModel.js` |
+| Hyperspace rendering: red SC2-style, gravity wells only | met | step 4 screenshots at two resolutions |
+| Pure tests: fuel formula, unfuelled rejection + merchant event, detection radius | met | in-page M3 test block green in my run (45/45) |
+| Browser evidence: system → hyperspace → system with fuel decrements + red render at two resolutions | met | step 2–4 (independent re-run) |
+| Save migration of M2-era saves (v126 schema bump) | met | `M3` save round-trip + migration test green ("a pre-map (M2-era) save migrates onto the map schema with the saved anchor kept as the fleet's location") |
+
+### 9.4 Design §4.3 / §5.3 / D1 / D5 / D6
+
+- **§4.3 module map:** all nine named files exist with the specified parents —
+  `campaignMap.js` stem under `game.js children/` with children `buildMapState`,
+  `moveFleet`, `hyperspaceJump`, `fuelCost`, `merchantOffer`, `mapVisibility`,
+  `battleEventAt`, `mapFrame`; `hud.js` children `buildMapHudModel`, `buildHailModel`.
+- **§5.3 interfaces:** shapes verified live or by green pure tests — `fuelCost`
+  (ships × distance × 1, hyperspace ×3), `moveFleet`/`hyperspaceJump` →
+  `{mapState, events}`, `battleEventAt` → `BattleSetup | null`, `mapVisibility` →
+  detection set, `merchantOffer` (placeholder offer model), `mapFrame` →
+  `MapFrameDTO` (`kind:"map"`, `hyperspace` flag, 12 locations), `buildMapHudModel`,
+  `buildHailModel({speaker, lines, options})`.
+- **Contrast pair (justified deviation):** standard says `battleEventAt(mapState,
+  locationId)` (two args) / code does `battleEventAt(mapState, locationId, entering?)`
+  — the optional third argument computes the Q4 nearest-edge entry; the documented
+  two-arg call shape is preserved and the header records the M3 interface. Accept;
+  update §5.3's signature line when the doc is next touched.
+- **D1** map subtree parents under `game.js` ✓. **D5** faction-keyed from birth: zero
+  `team` keys in `campaignMap.js children/` (fleets keyed `faction:
+  "player"/"Syndicate"/"Freehold"`, encounters by `encounterFaction`) ✓. **D6** born
+  compliant: every new file one pure function (one-function check 0) with
+  `— job:` / `Owner: campaignMap.js (pure)` headers ✓.
+
+### 9.5 M1/M2 non-regression and release discipline
+
+- All M1/M2 in-page tests green in my 45/45 run (roster conformance, round-trip,
+  v99 migration, summon/mirage/flagship/carry-over, live-path, credits-frozen,
+  deployment-forced, T-1…T-9, zoom, shield re-raise); Playwright 07/08/10 specs green.
+- v126–v130: all three refs pushed and parity-verified via `git ls-remote`;
+  `main` tip = `v130` = `0fca1ec`; `/v130/` snapshotted and serving. The v129
+  release-number collision (origin/main moved mid-task; local v129 pre-claimed) was
+  resolved per the runbook's collision rule (cherry-picked onto the new tip, next
+  free number used, renumber instructions flagged on `t_d8a27d0d`) — recorded, not blocking.
+
+### 9.6 Non-blocking observations (for the next lanes)
+
+1. HUD label clipping at narrow canvases: at a 768×768 emulation the top-right panel
+   text clips ("REINFORCEMENTS" → "ORCEMENTS"); the implementer's 768px evidence clips
+   the same panel's border. Cosmetic; the M3 render acceptance (red, wells-only, two
+   resolutions) is met. Fold into the GUI-scaling (GS) lane. Likewise the hail panel's
+   dialogue text truncates at small canvases.
+2. `merchantOffer` remains the placeholder offer model by design — M4 wires the real
+   service (roadmap M3 scope note: "service wiring completes in M4").
+3. `game.js`, `hud.js`, `campaign_DATA.js`, `main.js` remain shared-file hotspots for
+   M4/M5/M6 (roadmap §5.4); keep updates small and rebased.
+
+**Method (not rubber-stamped):** detached review worktree at `origin/main` 0fca1ec;
+all gates re-executed by the reviewer on fresh ports and against live `/v130/`;
+the M3 traverse re-driven end-to-end through the real map ops (`SD.Map.travel/jump/
+endTurn`, canvas-button deploy click, `SD.Actions.checkEndgame`) with fuel numbers
+measured from live state, not quoted; Playwright suite re-run (`npx playwright test`,
+28/28); dirty `v105` main checkout left untouched.
