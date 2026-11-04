@@ -297,8 +297,9 @@ regenerated at 256px tiles in v132 and the dpr-1 vs dpr-2 detail comparison
 is verified in v133 (see its Verification section). Remaining:
 
 - https://github.com/cmi01/seek_and_destroy/issues/3 — higher-resolution
-  sprite atlas: content landed (v132) and verified (v133); closing the
-  issue is tracked by the wrap-up card.
+  sprite atlas: content landed (v132), verified (v133) and wrapped up in
+  v136 (full suites green + the two sprite-art contracts restored);
+  issue #3 closed by the v136 wrap-up.
 
 The optional `Math.max` floor checker is still not in `structure_audit.py`.
 
