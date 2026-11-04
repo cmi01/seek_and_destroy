@@ -23,6 +23,9 @@ const buildTelemetryCardRects = function (input, view, chrome, mmRect) {
     let rows = 2;
     if (model.kind === "unit") {
       if (inspectMode) rows += 1 + (model.locusTag ? 1 : 0);
+      // M5(c) Q8: one row per mounted weapon on multi-weapon hulls (the
+      // picker buttons live in those rows).
+      rows += Array.isArray(model.weaponRows) ? model.weaponRows.length : 0;
     } else {
       rows += 1 + (Array.isArray(model.lines) ? model.lines.length : 0);
     }
@@ -62,5 +65,28 @@ const buildTelemetryCardRects = function (input, view, chrome, mmRect) {
     hovRect = { x: cardX, y: hy, w: cardW, h: hh };
   }
 
-  return { selectedCard: selRect, hoveredCard: hovRect };
+  // M5(c) Q8: the weapon-picker buttons fill the selected card's weapon
+  // rows (one per mount on a multi-weapon hull) — plain button rects, the
+  // generic button renderer draws them.
+  const weaponButtons = [];
+  if (selRect && view.selectedTelemetry && Array.isArray(view.selectedTelemetry.weaponRows)) {
+    const rowsW = view.selectedTelemetry.weaponRows;
+    const lineH = ((input.metrics.ui && input.metrics.ui.lineMd) || Math.round(17 * US));
+    const padY = Math.round(6 * US);
+    for (let i = 0; i < rowsW.length; i++) {
+      const r = rowsW[i];
+      weaponButtons.push({
+        id: r.id,
+        label: r.name + "  D:" + r.dmg + " R:" + r.range,
+        x: selRect.x + padY,
+        y: selRect.y + selRect.h - padY - (rowsW.length - i) * lineH,
+        w: selRect.w - padY * 2,
+        h: Math.max(Math.round(8 * US), lineH - Math.round(2 * US)),
+        enabled: true,
+        active: Boolean(r.active)
+      });
+    }
+  }
+
+  return { selectedCard: selRect, hoveredCard: hovRect, weaponButtons: weaponButtons };
 };

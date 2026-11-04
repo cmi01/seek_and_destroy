@@ -23,6 +23,10 @@ let _hudView = null;
 let _hudCache = { priorityKey: "", priorityLabel: null, hoveredSpotted: false };
 let _battleSnapshot = null;
 let _pendingDeploy = null;
+// M5(c) per-shot weapon choice (Q8): the player picks which mounted weapon
+// fires on a unit's one attack per turn. Game-owned transient UI state (like
+// _hudView): keyed by unit id so switching selection never loses a choice.
+let _pendingWeapon = { unitId: null, name: null };
 
 let RULES_DATA = null;
 let CAMPAIGN_DATA = null;
@@ -393,12 +397,39 @@ function _moveEvidence(ctx, unitA, B){
   };
 }
 // M5 adoption: the firing weapon resolved from the unit's loadout through
-// the seam. One attack per turn (DESIGN §2.1); until the per-shot choice
-// (M5c) the active weapon is the first mount. Null for an unarmed unit.
+// the seam. One attack per turn (DESIGN §2.1). M5(c) Q8: the player's
+// per-shot choice (the weapon-picker buttons) wins when it names a mount on
+// this unit; otherwise the first mount fires. Null for an unarmed unit.
+function _chosenName(unitA){
+  if (!unitA) return null;
+  const ws = Outfitting ? Outfitting.UnitWeapons(unitA) : [];
+  if (ws.length === 0) return null;
+  if (_pendingWeapon.unitId === unitA.id && _pendingWeapon.name){
+    for (let i = 0; i < ws.length; i++){
+      if (ws[i].name === _pendingWeapon.name) return _pendingWeapon.name;
+    }
+  }
+  return ws[0].name;
+}
 function _activeWeapon(unitA){
   if (!unitA || !Outfitting) return null;
+  const name = _chosenName(unitA);
+  if (!name) return null;
   const ws = Outfitting.UnitWeapons(unitA);
-  return ws.length > 0 ? ws[0] : null;
+  for (let i = 0; i < ws.length; i++){
+    if (ws[i].name === name) return ws[i];
+  }
+  return null;
+}
+// The chosen weapon's own damage/range — the red numbers and the SHOOT
+// affordance radius show THIS weapon only (Q8), never a sum/max.
+function _activeDamage(unitA){
+  const w = _activeWeapon(unitA);
+  return w ? w.dmg : 0;
+}
+function _activeRange(unitA){
+  const w = _activeWeapon(unitA);
+  return w ? w.range : 0;
 }
 // Render/audio style key for a weapon row: the animation and audio channels
 // keep their historical pdc/missile/railgun spelling.
@@ -411,7 +442,7 @@ function _shootEvidence(ctx, unitA, B){
   const occ = BoardQueries.getUnitAt(ctx, B.x, B.y);
   const active = _activeWeapon(unitA);
   return {
-    inWeaponRange: BoardQueries.inRange(unitA, B, Outfitting.UnitRange(unitA)),
+    inWeaponRange: BoardQueries.inRange(unitA, B, _activeRange(unitA)),
     armed: Boolean(active),
     occ,
     occSpotted: occ ? VisionQueries.isUnitSpottedByTeam(ctx, occ, unitA.team) : false,
@@ -443,7 +474,7 @@ function _priorityEvidence(ctx, unitA, gx, gy){
       occSpotted
     },
     shoot: {
-      inWeaponRange: BoardQueries.inRange(unitA, B, Outfitting.UnitRange(unitA)),
+      inWeaponRange: BoardQueries.inRange(unitA, B, _activeRange(unitA)),
       losClear: LineOfSight.hasLineOfSight(ctx, unitA.x, unitA.y, gx, gy, "WEAPON"),
       occ,
       occSpotted
@@ -460,7 +491,7 @@ function _shootableEvidence(ctx, u, dest, target){
   const wp = _activeWeapon(u);
   const ready = Boolean(u && target && target.hp > 0 && wp);
   return {
-    inRange: ready && BoardQueries.inRange(dest, target, Outfitting.UnitRange(u)),
+    inRange: ready && BoardQueries.inRange(dest, target, _activeRange(u)),
     spotted: ready && VisionQueries.isUnitSpottedByTeam(ctx, target, u.team),
     losClear: ready && LineOfSight.hasLineOfSight(ctx, dest.x, dest.y, target.x, target.y, "WEAPON")
   };
@@ -583,13 +614,21 @@ const Actions = {
     this.consumeAPAndCheckTurn(isAI,apCost);
   },
 
-  executeShoot(unitA,target,isAI=false,apCost=1){
+  executeShoot(unitA,target,isAI=false,apCost=1,weaponName){
     const origin={x:unitA.x,y:unitA.y};
     const dest={x:target.x,y:target.y};
     const visStartOrEnd=Visibility.isCellVisibleToTeam(origin.x,origin.y,1)||Visibility.isCellVisibleToTeam(dest.x,dest.y,1);
     // M5 adoption: the shot's stats come from the firing weapon row (the
-    // unit's loadout through the seam), never off unit fields.
-    const weapon=_activeWeapon(unitA);
+    // unit's loadout through the seam), never off unit fields. M5(c) Q8:
+    // an explicit weaponName picks the firing mount for this shot and
+    // becomes the unit's pending choice (numbers stay in step with it).
+    let weapon=_activeWeapon(unitA);
+    if (weaponName && Outfitting){
+      const ws=Outfitting.UnitWeapons(unitA);
+      for(let i=0;i<ws.length;i++){
+        if (ws[i].name===weaponName){ weapon=ws[i]; _pendingWeapon={unitId:unitA.id,name:weaponName}; break; }
+      }
+    }
     const wType=_weaponFxType(weapon);
 
     if(isAI&&visStartOrEnd) State.historicalVectors.push({kind:"shoot",from:origin,to:dest,team:unitA.team});
@@ -1613,6 +1652,17 @@ const InputProcessor = (() => {
       _stationCtx.tab = btn.id.slice("STATION_TAB:".length);
       Hud.toggleStationModal(true);
       GameAudio.play("ui.select");
+    } else if (typeof btn.id === "string" && btn.id.indexOf("WEAPON_PICK:") === 0){
+      // M5(c) Q8: the per-shot weapon pick (the red numbers follow it).
+      const selUnit = Selection.getUnit();
+      const wName = btn.id.slice("WEAPON_PICK:".length);
+      if (selUnit && selUnit.team === 1){
+        _pendingWeapon = { unitId: selUnit.id, name: wName };
+        Hud.updateAll();
+        GameAudio.play("ui.select");
+      } else {
+        GameAudio.play("ui.invalid");
+      }
     } else if (typeof btn.id === "string" && btn.id.indexOf("STATION_BUY:") === 0){
       _stationTrade(btn.id.slice("STATION_BUY:".length), 1);
     } else if (typeof btn.id === "string" && btn.id.indexOf("STATION_SELL:") === 0){
@@ -2733,7 +2783,9 @@ const api = {
         // M5 adoption: frame unit stats are seam-derived from the loadout.
         fpOf: u => Outfitting.UnitFirepower(u),
         rngOf: u => Outfitting.UnitRange(u),
-        mountsOf: u => Outfitting.UnitWeapons(u)
+        mountsOf: u => Outfitting.UnitWeapons(u),
+        // M5(c) Q8: the per-shot choice (null = first mount).
+        chosenOf: u => _chosenName(u)
       };
       const frameOverlayDeps = {
         buildUnitIndex: units => Rules.buildUnitIndex(units),
@@ -2746,9 +2798,10 @@ const api = {
         getSpottedEnemyAt: (gx, gy, team) => Visibility.getSpottedEnemyAt(gx, gy, team),
         canCapture: (unitA, B) => Actions.canCapture(unitA, B),
         canShield: (unitA, B) => Actions.canShield(unitA, B),
-        // M5 adoption: overlay numbers read the loadout through the seam.
-        fpOf: u => Outfitting.UnitFirepower(u),
-        rngOf: u => Outfitting.UnitRange(u)
+        // M5(c) Q8: the red numbers show the CHOSEN weapon's exact damage and
+        // reach only — never a sum/max over the loadout.
+        fpOf: u => _activeDamage(u),
+        rngOf: u => _activeRange(u)
       };
       FrameBoard = { build: p => kids.frameBoard(p, frameBoardDeps) };
       FrameUnits = { build: p => kids.frameUnits(p, frameUnitDeps) };
@@ -2855,6 +2908,9 @@ const api = {
         // M5 adoption: hud stat lines read weapon stats through the seam.
         fpOf(unit){ return Outfitting.UnitFirepower(unit); },
         rngOf(unit){ return Outfitting.UnitRange(unit); },
+        mountsOf(unit){ return Outfitting.UnitWeapons(unit); },
+        // M5(c) Q8: the per-shot choice (null = first mount).
+        chosenOf(unit){ return _chosenName(unit); },
         priorityAction(unit, gx, gy){ return Actions.getPriorityActionAt(unit, gx, gy); },
         renderedViewport(){
           const vp = MathGrid.getRenderedViewport();
@@ -3190,6 +3246,12 @@ const api = {
       unitFp(unit){ return Outfitting.UnitFirepower(unit); },
       unitRng(unit){ return Outfitting.UnitRange(unit); },
       unitArsenal(unit){ return Outfitting.UnitWeapons(unit); },
+      // M5(c) per-shot choice + the red-number cells (Q8 evidence).
+      pickWeapon(unit, name){ _pendingWeapon = { unitId: unit.id, name: name }; return _chosenName(unit); },
+      chosenWeapon(unit){ return _chosenName(unit); },
+      overlayCells(){ return api.buildFrame().state.tacticalOverlays; },
+      selectUnit(unit){ Selection.select(unit); return Selection.getUnit(); },
+      canShootAt(unit, B){ return Actions.canShoot(unit, B); },
       // M3(c) live-map seam (tests drive the orchestrator, not just the
       // pure children): set the map section, travel/jump the player through
       // the arrival check, commit a map turn (encounter → battle launch).
@@ -3209,8 +3271,8 @@ const api = {
       executeWarpIn(unit, shipType, isAI, apCost, opts){
         return Actions.executeWarpIn(unit, shipType, isAI, apCost, opts);
       },
-      executeShoot(unit, target, isAI, apCost){
-        return Actions.executeShoot(unit, target, isAI, apCost);
+      executeShoot(unit, target, isAI, apCost, weaponName){
+        return Actions.executeShoot(unit, target, isAI, apCost, weaponName);
       },
       executeShield(unit, isAI, apCost){
         return Actions.executeShield(unit, isAI, apCost);
@@ -3314,8 +3376,18 @@ const api = {
         rngOf(u){ return Outfitting.UnitRange(u); },
         mountsOf(u){ return Outfitting.UnitWeapons(u); },
         slotsOf(w){ return Outfitting.SlotSize(w); },
-        checkOf(loadout, hull){ return Outfitting.Validate(loadout, hull); }
+        checkOf(loadout, hull){ return Outfitting.Validate(loadout, hull); },
+        // M5(c) Q8: the per-shot pick on the selected unit + its choice.
+        pick(name){
+          const u = Selection.getUnit();
+          if (!u) return null;
+          _pendingWeapon = { unitId: u.id, name: name };
+          Hud.updateAll();
+          return _chosenName(u);
+        },
+        chosen(u){ return _chosenName(u); }
       },
+      overlayNumbers(){ return api.buildFrame().state.tacticalOverlays; },
       // M4 station storefront facade (browser evidence / probes).
       Station: {
         docked(){ return Boolean(_stationDock()); },

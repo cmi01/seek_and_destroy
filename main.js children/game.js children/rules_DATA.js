@@ -81,7 +81,7 @@ const rulesDataPayload = (() => ({
   flagDescriptions: {
     "!flagship": "Command Locus: Losing all friendly !flagship units triggers immediate defeat. Immune to #space marines boarding capture.",
     "#capital ship": "Capital hull: no warp role. Only the !flagship anchors a 1 AP reserve summon (visible empty cell within 3).",
-    "#railgun": "Hyper-Velocity Spinal Mount: Breaks enemy +shield bubbles and deals full firepower to hull HP.",
+    "#railgun": "Hyper-Velocity Spinal Mount: railgun-class weapons break enemy +shield bubbles and deal full damage through them; every other weapon hits a raised bubble for 1.",
     "#space marines": "Boarding Contingent: Can capture adjacent (d <= 1) spotted non-flagship enemy vessels.",
     "#shield generator": "Deflector Array: Can spend 1 AP (S badge on self) to raise +shield. No cooldown: a stripped bubble can be raised again later in the same turn (1 AP each).",
     "+shield": "Active Octagon Bubble: Reduces non-railgun hit to 1 HP damage and collapses. Drops when firing.",

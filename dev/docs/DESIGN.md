@@ -33,6 +33,10 @@ on missions. Battles are won through information, positioning and planning.
   2 ships or 50 ships, a faction still gets 4 actions per turn.
 - Action types: **move**, **attack** (fire one weapon), **board**, **raise shield**,
   **summon a reserve ship** (warp-in), **retreat**.
+- **Multi-weapon fire (Q8 ruling):** when a ship mounts several weapons (§3.3),
+  the player **picks which weapon fires** on that ship's one attack per turn —
+  still one attack per turn regardless of how many weapons are mounted. The pick
+  is per shot and stays with the ship until it is changed.
 - Each ship may perform **each type of action at most once per turn**: it can move
   and attack and board and raise a shield in one turn, but it cannot move twice or
   attack twice.
@@ -57,6 +61,12 @@ Red damage numbers (the exact damage the attack would deal):
 
 - When a weapon-capable ship that **can still attack this turn** is selected, red
   numbers are shown across **its weapon radius**.
+- **Chosen-weapon numbers (Q8 ruling):** when the firing ship mounts several
+  weapons, the red numbers show **the chosen weapon only** — its exact
+  pre-commit damage and its own radius — never a damage sum or the longest
+  mounted range. Each cell still shows the exact damage against that specific
+  target (the shield rules key on the chosen weapon's class). Picking another
+  weapon redraws the numbers at once.
 - The number is **faded** on cells that hold no visible target, and **not shown**
   on asteroid-occupied cells or cells with no line of sight (asteroid LOS rules).
 - Trigger rules:

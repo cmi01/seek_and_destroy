@@ -1506,6 +1506,93 @@ const runGameTests = function (bridge, testName) {
       };
     },
 
+    // ---- M5(c): per-shot weapon choice + Q8 red numbers ----------------
+    // T-M5c-1: a hull mounting two different weapons fires each with its
+    // own damage/range (DESIGN 2.1 one attack, Q8 chosen weapon).
+    testMultiWeaponFire() {
+      this.clearBoard();
+      const st = bridge.state;
+      st.ap = 4;
+      const spec = bridge.shipSpecs["Missile Destroyer"];      // capacity 16
+      const a1 = bridge.createUnit("Missile Destroyer", 1, 10, 10, false);
+      a1.loadout = ["Light Cannon", "Unguided Torpedo"];       // 1 + 7 = 8 slots
+      const t1 = bridge.createUnit("Attack Frigate", 2, 11, 10, false);
+      bridge.executeShoot(a1, t1, false, 1, "Light Cannon");
+      const lightHp = t1.hp;                                    // 4 - 1
+      const chosenA = bridge.chosenWeapon(a1);
+      t1.hp = t1.maxHp = 4;
+      const a2 = bridge.createUnit("Missile Destroyer", 1, 13, 10, false);
+      a2.loadout = ["Light Cannon", "Unguided Torpedo"];
+      bridge.executeShoot(a2, t1, false, 1, "Unguided Torpedo");
+      const torpHp = t1.hp;                                     // 4 - 7 -> dead
+      const chosenB = bridge.chosenWeapon(a2);
+      const legal = bridge.loadoutCheck(a1.loadout, spec);
+      const pass = legal.ok && lightHp === 3 && torpHp === 0 && chosenA === "Light Cannon" && chosenB === "Unguided Torpedo";
+      return {
+        name: "M5c-1 TWO WEAPONS, TWO DAMAGE/RANGE PROFILES (chosen per shot)",
+        pass: pass,
+        detail: "lightHp=" + lightHp + " torpHp=" + torpHp + " chosenA=" + chosenA + " chosenB=" + chosenB + " legal=" + legal.ok
+      };
+    },
+
+    // T-M5c-2: the red numbers show the CHOSEN weapon's exact pre-commit
+    // damage and reach only (Q8) — flipping the pick moves the numbers.
+    testRedNumbersChosenWeapon() {
+      this.clearBoard();
+      const st = bridge.state;
+      st.ap = 4;
+      st.viewX = 11; st.viewY = 10; st.viewSpan = 10;
+      const u = bridge.createUnit("Missile Destroyer", 1, 10, 10, false);
+      u.loadout = ["Light Missile Battery", "Unguided Torpedo"];  // dmg 1/rg 8 + dmg 7/rg 1
+      const near = bridge.createUnit("Bomber", 2, 11, 10, false);          // d=1
+      const far = bridge.createUnit("Attack Frigate", 2, 12, 10, false);   // d=2
+      bridge.selectUnit(u);
+      bridge.pickWeapon(u, "Unguided Torpedo");
+      let ov = bridge.overlayCells();
+      const cellAt = (x, y) => (ov.cells || []).find(c => c.gx === x && c.gy === y) || null;
+      const nearT = cellAt(11, 10), farT = cellAt(12, 10);
+      const torpOk = Boolean(ov.active && nearT && nearT.canShoot && nearT.spottedEnemyDmg === 7 &&
+        (!farT || !farT.canShoot));
+      bridge.pickWeapon(u, "Light Missile Battery");
+      ov = bridge.overlayCells();
+      const nearM = cellAt(11, 10), farM = cellAt(12, 10);
+      const misOk = Boolean(nearM && nearM.canShoot && nearM.spottedEnemyDmg === 1 &&
+        farM && farM.canShoot && farM.spottedEnemyDmg === 1 && farM.firepower === 1);
+      return {
+        name: "M5c-2 RED NUMBERS = CHOSEN WEAPON ONLY (dmg + radius, Q8)",
+        pass: torpOk && misOk,
+        detail: "torp(nearDmg=" + (nearT ? nearT.spottedEnemyDmg : null) + " far=" + (farT ? farT.canShoot : null) +
+          ") missile(nearDmg=" + (nearM ? nearM.spottedEnemyDmg : null) + " farDmg=" + (farM ? farM.spottedEnemyDmg : null) + ")"
+      };
+    },
+
+    // T-M5c-3: the shielded-target number stays the chosen weapon's exact
+    // pre-commit damage (yellow 1 for non-railgun, full red for railgun).
+    testRedNumbersShieldedTarget() {
+      this.clearBoard();
+      const st = bridge.state;
+      st.ap = 4;
+      st.viewX = 11; st.viewY = 10; st.viewSpan = 10;
+      const u = bridge.createUnit("Missile Destroyer", 1, 10, 10, false);
+      u.loadout = ["Light Cannon", "Light Railgun"];              // dmg 1 cannon + dmg 3 railgun
+      const e = bridge.createUnit("Attack Frigate", 2, 11, 10, false);
+      e.flags.add("+shield");
+      bridge.selectUnit(u);
+      bridge.pickWeapon(u, "Light Cannon");
+      let ov = bridge.overlayCells();
+      let c = (ov.cells || []).find(x => x.gx === 11 && x.gy === 10) || null;
+      const cannonNum = c ? c.spottedEnemyDmg : null;             // shield strip = 1
+      bridge.pickWeapon(u, "Light Railgun");
+      ov = bridge.overlayCells();
+      c = (ov.cells || []).find(x => x.gx === 11 && x.gy === 10) || null;
+      const railNum = c ? c.spottedEnemyDmg : null;               // full 3 through the bubble
+      return {
+        name: "M5c-3 SHIELDED NUMBERS KEYED ON CHOSEN WEAPON CLASS (1 vs 3)",
+        pass: cannonNum === 1 && railNum === 3,
+        detail: "cannon=" + cannonNum + " railgun=" + railNum
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -1536,7 +1623,8 @@ const runGameTests = function (bridge, testName) {
         this.testMerchantFlowRescue(), this.testMerchantSaleDiscount(),
         this.testOutfitSlotFormula(), this.testOutfitValidationCapacity(),
         this.testOutfitDefaultsFit(), this.testOutfitReaderParity(), this.testOutfitReaderCopies(),
-        this.testBattleUnitLoadoutTruth(), this.testWeaponClassShieldBreak(), this.testSaveLoadoutMigration()
+        this.testBattleUnitLoadoutTruth(), this.testWeaponClassShieldBreak(), this.testSaveLoadoutMigration(),
+        this.testMultiWeaponFire(), this.testRedNumbersChosenWeapon(), this.testRedNumbersShieldedTarget()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;

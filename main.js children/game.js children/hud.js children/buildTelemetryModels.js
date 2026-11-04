@@ -46,6 +46,20 @@ const buildTelemetryModels = function (deps, input) {
       maxHp: unit.maxHp,
       stats: `MOV:${unit.move}  SCN:${effScan}${inNebula ? "(N)" : ""}  FP:${deps.fpOf(unit)}  RNG:${deps.rngOf(unit)}`,
       flags,
+      // M5(c) Q8: per-mount pick rows (only for multi-weapon hulls) — the
+      // picker buttons and the red numbers follow the active row.
+      weaponRows: (() => {
+        const mounts = deps.mountsOf(unit);
+        if (mounts.length < 2) return [];
+        const chosen = deps.chosenOf(unit);
+        return mounts.map(m => ({
+          id: "WEAPON_PICK:" + m.name,
+          name: m.name,
+          dmg: m.dmg,
+          range: m.range,
+          active: m.name === chosen
+        }));
+      })(),
       lines: []
     };
   };

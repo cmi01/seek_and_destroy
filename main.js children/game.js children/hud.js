@@ -259,7 +259,7 @@ const createHud = function (deps) {
       intelOverlay: intelRect,
       menu: menu.menuRect
     };
-    return { view: w, buttons: chrome.topButtons.concat(menu.buttons, chrome.bottomButtons) };
+    return { view: w, buttons: chrome.topButtons.concat(menu.buttons, chrome.bottomButtons, cards.weaponButtons || []) };
   }
 
   // ---- M3 map HUD + hailing shell --------------------------------------

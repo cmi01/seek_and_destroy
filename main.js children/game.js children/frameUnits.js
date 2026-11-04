@@ -49,6 +49,8 @@ const buildUnitSlice = function (p, deps){
     firepower: deps.fpOf(u),
     range: deps.rngOf(u),
     weapons: deps.mountsOf(u),
+    // M5(c) Q8: which mount fires this turn's shot (null = first mount).
+    activeWeapon: deps.chosenOf(u),
     scan: u.scan,
     effectiveScan: deps.getEffectiveScan(u),
     spottedByPlayer: deps.isUnitSpottedByTeam(u, 1),
