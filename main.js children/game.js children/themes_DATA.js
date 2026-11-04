@@ -9,7 +9,8 @@
 // resolution. Every consumer derives from spriteAtlas.tilePx below (the
 // object layer's slice math and the graphics core's blit contract), so a
 // regenerated atlas (GS-12 sprite half, issue #3) is consumed by changing
-// this one value.
+// this one value. The shipped 256px atlas is generated from the dev sprite
+// pipeline (sources under dev/art/, tooling and regeneration doc in dev/).
 //
 // Sizing contract: a board sprite draws at 2.2 × cellPx CSS px under the
 // renderScale world transform — 2.2 × cellPx × renderScale device px,
@@ -24,7 +25,7 @@
 // 8×21 embedded atlas cannot hold, so the residual upscale there stays an
 // accepted limitation (the atlas refactor's acceptance covers
 // viewSpan >= 16 at RS 2).
-const SPRITE_ATLAS_TILE_PX = 106;
+const SPRITE_ATLAS_TILE_PX = 256;
 
 const themesDataPayload = (() => ({
   version: "V58-1.0",
