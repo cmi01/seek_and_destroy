@@ -274,6 +274,14 @@ const Graphics = (() => {
     return null;
   }
 
+  // Transitional seam: executes a built draw list on a ctx the shell handed
+  // us (the executor itself lives in the central shell, C2).
+  function _exec(ctx, ops) {
+    if (_canvasProvider && typeof _canvasProvider.executeDrawList === "function") {
+      _canvasProvider.executeDrawList(ctx, ops);
+    }
+  }
+
   function _cFont(weight, sizePx) {
     const s = (_graphicsBridge && _graphicsBridge.metrics) ? _graphicsBridge.metrics.textScale : 1;
     const size = Math.min(16, Math.max(5, Math.round(sizePx * s)));
@@ -633,16 +641,17 @@ const Graphics = (() => {
     const pxW = Math.max(1, Math.ceil((endGx - originGx) * paintCP));
     const pxH = Math.max(1, Math.ceil((endGy - originGy) * paintCP));
     return cache.ensure(key, {
+      key,
       gx0: spec.gx0, gy0: spec.gy0,
       cellsX: spec.cellsX, cellsY: spec.cellsY,
       originGx, originGy, pxW, pxH
-    }, (canvas) => {
-      _layers.background({
+    }, (ctx) => {
+      _exec(ctx, _layers.background({
         op: "paintTerrain",
-        canvas, state, bp, gridSize, CP: paintCP, FS: paintFS,
+        state, bp, gridSize, CP: paintCP, FS: paintFS,
         shapes, TC: _themeColor,
         originGx, originGy, gx0: originGx, gy0: originGy, gx1: endGx, gy1: endGy
-      });
+      }));
     });
   }
 
@@ -811,15 +820,20 @@ const Graphics = (() => {
 
       const visMatrix = visCache || Array.from({ length: gridSize }, () => Array(gridSize).fill(true));
 
-      // 1. Background grid & terrain (core-owned terrain tile canvases)
+      // 1. Background grid & terrain (tile canvases live in the shell's cache;
+      // the builder sees plain tile specs referencing tiles BY KEY)
       const terrainPack = _ensureTerrainTiles(state, _activeTheme, bp, gridSize, CP, FS, DX0, DX1, DY0, DY1);
-      _layers.background({
+      _exec(ctx, _layers.background({
         op: "drawBattleGridAndTerrain",
-        ctx, visMatrix, state, bp, gridSize,
+        visMatrix, state, bp, gridSize,
         CP, FS, DX0, DX1, DY0, DY1,
-        terrainTiles: terrainPack.tiles,
+        terrainTiles: terrainPack.tiles.map(t => ({
+          key: t.key, gx0: t.gx0, gy0: t.gy0,
+          cellsX: t.cellsX, cellsY: t.cellsY,
+          originGx: t.originGx, originGy: t.originGy
+        })),
         terrainDensity: terrainPack.density
-      });
+      }));
 
       // 2. Warp perimeter arcs
       _layers.object({
@@ -870,11 +884,11 @@ const Graphics = (() => {
       ctx.restore(); // Remove clip
 
       // 5. Fog of War
-      _layers.background({
+      _exec(ctx, _layers.background({
         op: "drawBattleFog",
-        ctx, visMatrix, state, bp, CP, DX0, DX1, DY0, DY1,
+        visMatrix, state, bp, CP, DX0, DX1, DY0, DY1,
         TC: _themeColor
-      });
+      }));
 
       // 6. Tactical overlays (Move/Shoot/Capture/Shield indicators)
       _layers.object({
@@ -920,7 +934,7 @@ const Graphics = (() => {
       const map = _graphicsBridge.map || {};
       const colors = _mapColors();
       ctx.setTransform(RS, 0, 0, RS, 0, 0);
-      _layers.background({ op: "drawMapBackground", ctx, DS, map, colors });
+      _exec(ctx, _layers.background({ op: "drawMapBackground", DS, map, colors }));
       _layers.object({ op: "drawMapObjects", ctx, DS, map, colors });
       const uiHud = _graphicsBridge.uiHud || null;
       const US = metrics.uiScale || 1;
@@ -955,11 +969,11 @@ const Graphics = (() => {
       const bp = _boardPalette();
       const visMatrix = visCache || Array.from({ length: gridSize }, () => Array(gridSize).fill(true));
 
-      _layers.background({
+      _exec(ctx, _layers.background({
         op: "drawMinimapBackground",
-        ctx, visMatrix, state, bp, gridSize, mmSize, cellPx,
+        visMatrix, state, bp, gridSize, mmSize, cellPx,
         TC: _themeColor
-      });
+      }));
 
       _layers.object({
         op: "drawMinimapUnits",

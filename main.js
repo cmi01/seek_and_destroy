@@ -87,7 +87,8 @@ function makeTextMetrics() {
 // Paint values (`fill` / `stroke`) are a colour string or a plain paint
 // spec: { color, dash? } for dashed strokes, or
 // { gradient: { type: "linear"|"radial", ...coords, stops: [[t, colour], …] } }
-// — plain data, so gradients survive the pure-builder boundary.
+// — plain data, so gradients survive the pure-builder boundary. A `path`
+// point may carry `move: true` to start a new subpath (batched strokes).
 // `arc` traces the arc itself: `fill` fills the closed span (full circles in
 // practice), `stroke` strokes the arc; pie wedges are emitted as `path`.
 // ============================================================
@@ -158,7 +159,13 @@ function executeDrawList(ctx, cmds) {
         if (cmd.alpha != null) ctx.save(), ctx.globalAlpha = cmd.alpha;
         ctx.beginPath();
         ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        // A point with `move: true` starts a new subpath (the old moveTo/lineTo
+        // batches stay one stroke call, so crossing segments composite once,
+        // exactly as the batched beginPath()/stroke() did).
+        for (let i = 1; i < pts.length; i++) {
+          if (pts[i].move) ctx.moveTo(pts[i].x, pts[i].y);
+          else ctx.lineTo(pts[i].x, pts[i].y);
+        }
         if (cmd.close) ctx.closePath();
         if (cmd.fill) { drawPaint(ctx, cmd.fill, false); ctx.fill(); }
         if (cmd.stroke) { drawPaint(ctx, cmd.stroke, true); ctx.lineWidth = cmd.lineWidth == null ? 1 : cmd.lineWidth; ctx.stroke(); }
@@ -272,7 +279,7 @@ const TerrainTiles = {
       const canvas = document.createElement("canvas");
       canvas.width = meta.pxW;
       canvas.height = meta.pxH;
-      paint(canvas);
+      paint(canvas.getContext("2d"));
       tile = Object.assign({ canvas }, meta);
       this.map.set(key, tile);
     }
