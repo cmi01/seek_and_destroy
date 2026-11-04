@@ -21,6 +21,16 @@ const planDeployment = function (deployable, capacity, choice){
     return hull.indexOf("Flagship") !== -1;
   }
 
+  // M4 (DESIGN §4.5): a non-flagship hull under 50% crew cannot be
+  // deployed to a battle ("insufficient crew"); the flagship ALWAYS deploys
+  // (Q2 — it is the warp locus and the permadeath target, so an
+  // incapacitated crew still rides along and simply cannot act).
+  function crewBlocked(entry){
+    if (!entry || isFlag(entry)) return false;
+    const max = (typeof entry.maxCrew === "number") ? entry.maxCrew : -1;
+    return max > 0 && (entry.crew || 0) < max * 0.5;
+  }
+
   const taken = new Array(list.length);
   for (let i = 0; i < taken.length; i++) taken[i] = false;
   const deployed = [];
@@ -28,6 +38,7 @@ const planDeployment = function (deployable, capacity, choice){
   function take(idx){
     if (idx < 0 || idx >= list.length || taken[idx]) return false;
     if (deployed.length >= cap) return false;
+    if (crewBlocked(list[idx])) return false;
     taken[idx] = true;
     deployed.push(list[idx]);
     return true;

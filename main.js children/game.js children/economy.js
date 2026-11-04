@@ -39,6 +39,7 @@ const economy = function (){
       // caller hands one in, the trade pays exactly that posted price.
       const u = unit || quote(state && state.market, good, location, (state && state.map && state.map.turn) || 1);
       return applyTrade(state, good, qty, location, { unit: u });
-    }
+    },
+    PayWages(state){ return payWages(state); }
   };
 };

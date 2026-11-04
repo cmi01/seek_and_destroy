@@ -16,12 +16,17 @@ const buildDeploymentModel = function (deps, input) {
     const hull = entry.hull || entry.type || "?";
     const locked = entry.flagship === true || String(hull).indexOf("Flagship") !== -1;
     const on = locked || selected.indexOf(i) !== -1;
+    // M4 (DESIGN §4.5): a non-flagship hull under 50% crew cannot deploy
+    // ("insufficient crew"); the flagship always deploys (Q2 — warp locus).
+    const maxCrew = (typeof entry.maxCrew === "number") ? entry.maxCrew : -1;
+    const insufficient = !locked && maxCrew > 0 && (entry.crew || 0) < maxCrew * 0.5;
     rows.push({
       index: i,
       hull: hull,
       flagship: locked,
-      selected: on,
-      locked: locked
+      selected: on && !insufficient,
+      locked: locked,
+      insufficient: insufficient
     });
   }
   let onCount = 0;

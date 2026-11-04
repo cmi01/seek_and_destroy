@@ -661,6 +661,12 @@ const Actions = {
     State.battleReserve=nextReserve;
     const spawned=SectorGenerator.createUnit(shipType,team,pick.x,pick.y,true);
     spawned.kind="mirage";
+    // M4 manning: the summoned hull enters with its roster entry's crew (the
+    // incapacitation gate reads it), not a fresh full crew.
+    if (typeof reserve[ri].crew === "number") {
+      spawned.crew = reserve[ri].crew;
+      if (typeof reserve[ri].maxCrew === "number") spawned.maxCrew = reserve[ri].maxCrew;
+    }
     Visibility.invalidate();
     Visibility.ensureCache();
     const vis=Visibility.isCellVisibleToTeam(pick.x,pick.y,1);
@@ -962,6 +968,7 @@ function _mapTravel(dest){
       // Arrival is the fleet's ACTUAL position (travel may cap at the
       // slowest ship), not the requested destination.
       _mapArrival(next, pf ? { x: pf.x, y: pf.y } : null);
+      _mapClockTick();
     }
   }
   Hud.updateAll();
@@ -982,6 +989,7 @@ function _mapJump(target){
       const next = _mapSection();
       const pf = next.fleets.find(function (f){ return f.faction === "player"; });
       _mapArrival(next, pf ? { x: pf.x, y: pf.y } : null);
+      _mapClockTick();
     }
   }
   Hud.updateAll();
@@ -998,7 +1006,26 @@ function _mapTurnCommit(){
     return;
   }
   _patchMap({ turn: (typeof map.turn === "number") ? map.turn + 1 : 1 });
+  _mapClockTick();
   Hud.updateAll();
+}
+
+// M4: the campaign month clock ticks with every committed map turn; on a
+// month rollover the pure wage transform runs (the wage tick, Q6) and an
+// unpaid bill surfaces as a turn report. The transform returns the same
+// state when no month rolled, so this is a no-op turn to turn.
+function _mapClockTick(){
+  const c = GetGameState().campaign;
+  if (!c) return null;
+  const res = EconomyLib.PayWages(c);
+  if (!res || !res.state) return null;
+  if (res.state !== c){
+    TryPatchGameState({ campaign: res.state });
+    if (res.unpaid > 0){
+      State.turnReportQueue.push("PAYROLL: wages unpaid (" + res.unpaid + " ⒸB) — crew deserted the most expensive hulls.");
+    }
+  }
+  return res;
 }
 
 function _launchEncounterBattle(setup){
@@ -1494,7 +1521,18 @@ const InputProcessor = (() => {
       for (let i = 0; i < us.length; i++){
         if (us[i].hp > 0 && us[i].team === 1 && us[i].flags.has("!flagship")){ flag = us[i]; break; }
       }
-      if (flag){
+      // M4 (DESIGN §4.5): an under-crewed reserve hull cannot deploy to the
+      // battle — summoning is a deployment.
+      let crewOk = true;
+      const reserve = Array.isArray(State.battleReserve) ? State.battleReserve : [];
+      for (let i = 0; i < reserve.length; i++){
+        const e = reserve[i];
+        if ((e.hull || e.type) === shipName){
+          crewOk = ActionLegality.CrewStatus(e) !== "incapacitated";
+          break;
+        }
+      }
+      if (flag && crewOk){
         Hud.toggleBridgeModal(false);
         Actions.executeWarpIn(flag, shipName, false);
       } else {
@@ -2166,6 +2204,25 @@ const SectorGenerator = {
 
     Rules.patchState(result.patch);
     Rules.patchState({ battleReserve: setup.overflow.slice() });
+
+    // M4 manning: the deployed roster entries' crew rides onto the spawned
+    // player units (matched by hull in deploy order) so the incapacitation
+    // gate sees the real manning all battle long; the fold reads the same
+    // numbers back.
+    const deployedEntries = _battleSnapshot.deployed;
+    const mannedIdx = [];
+    for (let di = 0; di < deployedEntries.length; di++){
+      const hull = deployedEntries[di].hull || deployedEntries[di].type;
+      const us = State.units;
+      for (let uj = 0; uj < us.length; uj++){
+        if (us[uj].team === 1 && us[uj].type === hull && mannedIdx.indexOf(uj) === -1){
+          mannedIdx.push(uj);
+          if (typeof deployedEntries[di].crew === "number") us[uj].crew = deployedEntries[di].crew;
+          if (typeof deployedEntries[di].maxCrew === "number") us[uj].maxCrew = deployedEntries[di].maxCrew;
+          break;
+        }
+      }
+    }
 
     if (result.selectedUnitId !== null){
       const sel = State.units.find(u => u.id === result.selectedUnitId) || null;
@@ -2965,6 +3022,13 @@ const api = {
       stationTradeLive(good, sign){ _stationTrade(good, sign); return GetGameState().campaign; },
       stationServiceLive(kind, idx){ _stationService(kind, idx); return GetGameState().campaign; },
       stationService(state, service){ return CampaignLib.ApplyStationService(state, service); },
+      // M4(c) crew seam: manning verdicts, the deployment plan and the wage
+      // clock transform (members renamed off the raw child stems — the
+      // audit counts raw text).
+      crewVerdict(unit, maxCrew){ return ActionLegality.CrewStatus(unit, maxCrew); },
+      deployPlan(fleet, cap, choice){ return ReservePlacement.splitOverflow(fleet, cap, choice); },
+      wageTick(state){ return EconomyLib.PayWages(state); },
+      clockTick(){ return _mapClockTick(); },
       // M3(c) live-map seam (tests drive the orchestrator, not just the
       // pure children): set the map section, travel/jump the player through
       // the arrival check, commit a map turn (encounter → battle launch).

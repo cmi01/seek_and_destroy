@@ -28,12 +28,12 @@ const buildDeploymentButtons = function (input, modal) {
     const r = rows[i];
     buttons.push({
       id: r.locked ? ("DEPLOY_LOCK:" + r.index) : ("DEPLOY_TOGGLE:" + r.index),
-      label: (r.selected ? "[ON] " : "[  ] ") + r.hull + (r.flagship ? "  (FLAGSHIP)" : ""),
+      label: (r.selected ? "[ON] " : "[  ] ") + r.hull + (r.flagship ? "  (FLAGSHIP)" : "") + (r.insufficient ? "  (LOW CREW)" : ""),
       x: mx + pad,
       y: y,
       w: mw - pad * 2,
       h: rowH,
-      enabled: !r.locked,
+      enabled: !r.locked && !r.insufficient,
       active: Boolean(r.selected)
     });
     y += rowH + gap;

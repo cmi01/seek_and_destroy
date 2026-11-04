@@ -22,6 +22,11 @@ const buildUnitRecord = function (shipSpecs, nextId, type, team, x, y, applySpaw
     y,
     hp: spec.hp,
     maxHp: spec.hp,
+    // M4 manning (DESIGN §4.5): battle units carry crew/maxCrew so the
+    // 50% incapacitation gate can judge them; default is a full crew (the
+    // deploy/warp-in seams overlay the roster entry's actual crew).
+    crew: spec.crew,
+    maxCrew: spec.crew,
     move: spec.move,
     firepower: spec.firepower,
     range: spec.range,

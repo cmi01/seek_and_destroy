@@ -1135,6 +1135,97 @@ const runGameTests = function (bridge, testName) {  const suite = {
       };
     },
 
+    // ---- M4(c): crew model — casualties, incapacitation, wages --------
+    // T-M4c-1: casualties = half the HP-lost percentage (DESIGN §4.5, the
+    // combat-math casualty transform); a fully crewed ship cannot be
+    // incapacitated in one battle (100% damage leaves exactly 50% crew —
+    // strictly-under gate).
+    testCrewCasualtyFormula() {
+      const a = bridge.crewKilled(10, 10, 20);
+      const b = bridge.crewKilled(5, 10, 20);
+      const c = bridge.crewKilled(0, 10, 20);
+      const d = bridge.crewKilled(1, 10, 5);
+      const after = { crew: 20 - a, maxCrew: 20 };
+      const pass = a === 10 && b === 5 && c === 0 && d === 0 && bridge.crewVerdict(after) === "ok";
+      return {
+        name: "M4 CREW CASUALTY FORMULA (half the HP-lost percentage)",
+        pass: pass,
+        detail: "100%->" + a + " 50%->" + b + " 0%->" + c + " tiny->" + d + " fullCrewedPost=" + bridge.crewVerdict(after)
+      };
+    },
+
+    // T-M4c-2: the 50% incapacitation gate — a ship under 50% crew cannot
+    // act in battle (verdicts refuse it) or be deployed (the plan excludes
+    // it even when picked); the flagship ALWAYS deploys (Q2) but cannot act.
+    testCrewStatusGate() {
+      this.clearBoard();
+      bridge.state.activeTeam = 1;
+      bridge.state.ap = 4;
+      const u = bridge.createUnit("Attack Frigate", 1, 16, 16, false);
+      u.flags.delete("+shield");
+      const okFull = bridge.canShield(u, { x: 16, y: 16 });
+      u.crew = Math.floor(u.maxCrew * 0.49);
+      const okLow = bridge.canShield(u, { x: 16, y: 16 });
+      u.crew = u.maxCrew * 0.5;
+      const okHalf = bridge.canShield(u, { x: 16, y: 16 });
+      const fleet = [
+        { hull: "Flagship Battlecruiser", crew: 5, maxCrew: 60, flagship: true },
+        { hull: "Fighter", crew: 2, maxCrew: 5 },
+        { hull: "Probe", crew: 5, maxCrew: 5 }
+      ];
+      const plan = bridge.deployPlan(fleet, 3, [1]);
+      const deployedHulls = plan.deployed.map(e => e.hull).join(",");
+      const pass = Boolean(okFull && !okLow && okHalf &&
+        plan.deployed.length === 2 && plan.deployed[0].flagship === true &&
+        deployedHulls.indexOf("Probe") !== -1 && plan.overflow.length === 1 && plan.overflow[0].hull === "Fighter");
+      return {
+        name: "M4 CREW 50% GATE: ACT + DEPLOY (flagship deploys, Q2)",
+        pass: pass,
+        detail: "act full=" + okFull + " low=" + okLow + " half=" + okHalf + " deployed=" + deployedHulls + " overflow=" + plan.overflow.map(e => e.hull).join(",")
+      };
+    },
+
+    // T-M4c-3: wages on the campaign clock — 5 ⒸB/crew/month rounding up
+    // (87.5 -> 88), month = 30 map turns (Q6), year rollover, and unpaid
+    // bills desert crew from the most expensive hulls first.
+    testWagesMonthTick() {
+      bridge.initializeCampaign();
+      const st = JSON.parse(JSON.stringify(bridge.campaign));
+      st.fleet = [{ hull: "Fighter", loadout: [], hp: 2, maxHp: 2, crew: 17.5, maxCrew: 5 }];
+      st.cargo.crew = 0;
+      st.wallet = 1000;
+      st.map.turn = 31;
+      const res = bridge.wageTick(st);
+      const rounded = res.state.wallet === 1000 - 88 && res.unpaid === 0 && res.state.clock.month === 2;
+
+      const st2 = JSON.parse(JSON.stringify(bridge.campaign));
+      st2.fleet = [
+        { hull: "Battleship", loadout: [], hp: 1, maxHp: 1, crew: 10, maxCrew: 20 },
+        { hull: "Fighter", loadout: [], hp: 2, maxHp: 2, crew: 10, maxCrew: 5 }
+      ];
+      st2.cargo.crew = 0;
+      st2.wallet = 50;
+      st2.map.turn = 31;
+      const res2 = bridge.wageTick(st2);
+      const desert = res2.unpaid === 50 && res2.state.wallet === 0 &&
+        res2.state.fleet[0].crew === 0 && res2.state.fleet[1].crew === 10;
+
+      const st3 = JSON.parse(JSON.stringify(bridge.campaign));
+      st3.fleet = [];
+      st3.cargo.crew = 0;
+      st3.wallet = 0;
+      st3.clock = { month: 12, year: 2401 };
+      st3.map.turn = 391;
+      const res3 = bridge.wageTick(st3);
+      const rollover = res3.state.clock.year === 2402 && res3.state.clock.month === 2;
+      const pass = Boolean(rounded && desert && rollover);
+      return {
+        name: "M4 WAGES MONTH TICK (87.5 -> 88; desertion; year rollover)",
+        pass: pass,
+        detail: "bill88=" + rounded + " desert=" + desert + " (unpaid " + res2.unpaid + " battleship " + res2.state.fleet[0].crew + " fighter " + res2.state.fleet[1].crew + ") year=" + res3.state.clock.year + "/" + res3.state.clock.month
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -1159,7 +1250,9 @@ const runGameTests = function (bridge, testName) {  const suite = {
         this.testMarketPriceDeterminism(), this.testSpreadRoundTrip(),
         this.testTradeHullConsistency(), this.testTradeRejections(),
         this.testStationModel(), this.testRepairRefitParts(),
-        this.testStationHullBuySaveRoundTrip()
+        this.testStationHullBuySaveRoundTrip(),
+        this.testCrewCasualtyFormula(), this.testCrewStatusGate(),
+        this.testWagesMonthTick()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;

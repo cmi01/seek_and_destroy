@@ -181,6 +181,8 @@ PARENT_OF = {
     "main.js children/game.js children/economy.js children/buildMarketState.js": "main.js children/game.js children/economy.js",
     "main.js children/game.js children/economy.js children/priceAt.js": "main.js children/game.js children/economy.js",
     "main.js children/game.js children/economy.js children/applyTrade.js": "main.js children/game.js children/economy.js",
+    "main.js children/game.js children/economy.js children/payWages.js": "main.js children/game.js children/economy.js",
+    "main.js children/game.js children/actionLegality.js children/crewStatus.js": "main.js children/game.js children/actionLegality.js",
     "main.js children/game.js children/hud.js children/buildMapHudModel.js": "main.js children/game.js children/hud.js",
     "main.js children/game.js children/hud.js children/buildHailModel.js": "main.js children/game.js children/hud.js",
     "main.js children/game.js children/hud.js children/buildStationModel.js": "main.js children/game.js children/hud.js",

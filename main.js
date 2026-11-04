@@ -494,7 +494,9 @@ const GAME_LEAF_SCRIPTS = [
   "main.js children/game.js children/campaignMap.js children/battleEventAt.js",
   "main.js children/game.js children/economy.js children/buildMarketState.js",
   "main.js children/game.js children/economy.js children/priceAt.js",
-  "main.js children/game.js children/economy.js children/applyTrade.js"
+  "main.js children/game.js children/economy.js children/applyTrade.js",
+  "main.js children/game.js children/economy.js children/payWages.js",
+  "main.js children/game.js children/actionLegality.js children/crewStatus.js"
 ];
 
 async function startGame(){
@@ -663,7 +665,9 @@ async function startGame(){
       ["main.js children/game.js children/campaignMap.js children/battleEventAt.js", () => typeof battleEventAt === "function"],
       ["main.js children/game.js children/economy.js children/buildMarketState.js", () => typeof buildMarketState === "function"],
       ["main.js children/game.js children/economy.js children/priceAt.js", () => typeof priceAt === "function"],
-      ["main.js children/game.js children/economy.js children/applyTrade.js", () => typeof applyTrade === "function"]
+      ["main.js children/game.js children/economy.js children/applyTrade.js", () => typeof applyTrade === "function"],
+      ["main.js children/game.js children/economy.js children/payWages.js", () => typeof payWages === "function"],
+      ["main.js children/game.js children/actionLegality.js children/crewStatus.js", () => typeof crewStatus === "function"]
     ]);
 
     await Game.load();
