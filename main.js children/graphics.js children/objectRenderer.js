@@ -292,6 +292,11 @@
     const C = cmd.colors || {};
     if (!ctx || !DS) return;
 
+    // Draw-state discipline: every text draw owns its alignment. This layer
+    // centers its labels; save/restore keeps that choice local so later
+    // layers never inherit it (left-anchored text drawn with a leaked
+    // "center" state half-shifts off its anchor and clips).
+    ctx.save();
     const span = map.span || 64;
     const scale = DS / span;
     const labelPx = Math.max(9, Math.round(DS * 0.016));
@@ -348,6 +353,7 @@
       ctx.fillStyle = C.label || "rgba(255, 214, 196, 0.9)";
       ctx.fillText(String(f.ships || 0), cx, cy + pip * 2.8 + labelPx * 0.4);
     }
+    ctx.restore();
   }
 
   const layerApi = {

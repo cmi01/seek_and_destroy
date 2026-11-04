@@ -74,6 +74,7 @@
 
     ctx.save();
     ctx.font = F["bold"];
+    ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     _drawChamferedRect(ctx, b.x, b.y, b.w, b.h, cut);
 
@@ -142,6 +143,7 @@
 
     const textX = pad + Math.round(9 * US);
     const maxW = barW - Math.round(16 * US);
+    ctx.textAlign = "left";
     ctx.textBaseline = "top";
 
     // Row 1: level tag
@@ -236,6 +238,7 @@
 
     const tx = x + padX;
     let cy = y + padY;
+    ctx.textAlign = "left";
     ctx.textBaseline = "top";
 
     ctx.font = F["bold"];
@@ -288,6 +291,7 @@
 
     const tx = x + Math.round(10 * US);
     let cy = y + Math.round(6 * US);
+    ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.font = F["bold"];
     ctx.fillStyle = bp.gold;
@@ -326,6 +330,7 @@
     ctx.stroke();
     ctx.clip();
 
+    ctx.textAlign = "left";
     ctx.textBaseline = "top";
     let cy = r.y + Math.round(16 * US);
     const maxW = r.w - Math.round(36 * US);
@@ -919,7 +924,11 @@
     ctx.fillText(_fitTextToWidth(ctx, modal.title || "DEPLOYMENT", mw - Math.round(24 * US)), mx + mw * 0.5, my + Math.round(14 * US));
     ctx.font = F["regular"];
     ctx.fillStyle = C["#cbd5e1"];
-    ctx.fillText(_fitTextToWidth(ctx, modal.capText || "", mw - Math.round(24 * US)), mx + mw * 0.5, my + Math.round(32 * US));
+    const capLines = (Array.isArray(modal.capLines) && modal.capLines.length)
+      ? modal.capLines : [modal.capText || ""];
+    for (let ci = 0; ci < capLines.length; ci++) {
+      ctx.fillText(_fitTextToWidth(ctx, capLines[ci], mw - Math.round(24 * US)), mx + mw * 0.5, my + Math.round(32 * US) + ci * Math.round(15 * US));
+    }
     ctx.textAlign = "left";
 
     const btns = Array.isArray(state.canvasButtons) ? state.canvasButtons : [];
@@ -1006,6 +1015,7 @@
 
       ctx.font = F["bold"];
       ctx.fillStyle = bp.accent;
+      ctx.textAlign = "left";
       ctx.fillText("SEL", rx + 2 * FS, ry + 22 * FS);
     }
 

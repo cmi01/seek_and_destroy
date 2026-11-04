@@ -37,6 +37,7 @@ const uiTokensTable = {
   closeBridgeW: 106,
   closeHelpW: 112,
   endgameBtnW: 156,
+  confirmDeployW: 176,
   cardW: 308,
   strokeHairline: 1,
   strokeThin: 1.2,
@@ -51,6 +52,7 @@ const uiTokensTable = {
     endgame: "REDEPLOY SECTOR",
     reinforce: "REINFORCEMENTS",
     menu: "MENU v",
-    endTurn: "END TURN"
+    endTurn: "END TURN",
+    confirmDeploy: "CONFIRM DEPLOYMENT"
   }
 };

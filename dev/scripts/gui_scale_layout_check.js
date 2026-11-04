@@ -29,6 +29,8 @@
   load("main.js children/game.js children/hud.js children/buildReserveButtons.js", ["buildReserveButtons"]);
   load("main.js children/game.js children/hud.js children/buildHelpPanel.js", ["buildHelpPanel"]);
   load("main.js children/game.js children/hud.js children/buildTopBarChrome.js", ["buildTopBarChrome"]);
+  load("main.js children/game.js children/hud.js children/buildDeploymentModel.js", ["buildDeploymentModel"]);
+  load("main.js children/game.js children/hud.js children/buildDeploymentButtons.js", ["buildDeploymentButtons"]);
 
   const tokens = ctx.uiTokensTable;
   const resolve = ctx.resolveUiMetrics;
@@ -157,6 +159,53 @@
     check(name + " GS-07 reinforcements budget",
       reinfBudget + 1 >= "REINFORCEMENTS".length * ui.charW * 0.9,
       "budget=" + reinfBudget + " estimate=" + ("REINFORCEMENTS".length * ui.charW).toFixed(1) + " textPx=" + ui.textPx);
+
+    // GS-15 deploy modal: CONFIRM fits its label, the capacity block wraps
+    // (never ellipsizes), and every deploy row label fits its button budget.
+    const depState = {
+      deployment: {
+        capacity: 2,
+        selected: [0],
+        wallet: 100,
+        fleet: [
+          { hull: "Flagship Battlecruiser", flagship: true, crew: 10, maxCrew: 10 },
+          { hull: "Missile Battleship", crew: 10, maxCrew: 10 },
+          { hull: "Attack Frigate", crew: 1, maxCrew: 10 }
+        ]
+      },
+      wallet: 100
+    };
+    const depModel = ctx.buildDeploymentModel(null, { metrics: inp.metrics, state: depState });
+    const dep = ctx.buildDeploymentButtons({ metrics: inp.metrics, state: depState }, depModel);
+    const confirm = dep.buttons[dep.buttons.length - 1];
+    const confirmBudget = confirm.w - Math.round(19 * inp.metrics.uiScale);
+    check(name + " GS-15 confirm budget",
+      confirmBudget + 1 >= "CONFIRM DEPLOYMENT".length * ui.charW * 0.9,
+      "budget=" + confirmBudget + " estimate=" + ("CONFIRM DEPLOYMENT".length * ui.charW).toFixed(1) + " w=" + confirm.w);
+    check(name + " GS-15 confirm on canvas",
+      confirm.x >= -1 && confirm.y >= -1 && confirm.x + confirm.w <= ds + 1 && confirm.y + confirm.h <= ds + 1,
+      JSON.stringify(confirm));
+    let capWrapped = depModel.capLines.length >= 1 && depModel.capLines.join(" ") === depModel.capText;
+    let capFits = true;
+    for (const line of depModel.capLines) {
+      if (line.length * ui.charW > dep.panel.w - Math.round(24 * inp.metrics.uiScale) + ui.charW) capFits = false;
+    }
+    check(name + " GS-15 cap block wraps whole",
+      capWrapped && capFits && depModel.capText.indexOf("\u2026") === -1,
+      "lines=" + JSON.stringify(depModel.capLines));
+    const capExtra = Math.max(0, depModel.capLines.length - 1) * Math.round(15 * inp.metrics.uiScale);
+    let rowsIn = true, rowsFit = true, rowsClearCap = true;
+    for (const b of dep.buttons) {
+      if (b.x < -1 || b.y < -1 || b.x + b.w > ds + 1 || b.y + b.h > ds + 1) rowsIn = false;
+      const budget = b.w - Math.round(19 * inp.metrics.uiScale);
+      if (b.label.length * ui.charW * 0.9 > budget + 1) rowsFit = false;
+      if (b.id.indexOf("DEPLOY_TOGGLE:") === 0 || b.id.indexOf("DEPLOY_LOCK:") === 0) {
+        if (b.y < dep.panel.y + Math.round(52 * inp.metrics.uiScale) + capExtra - 1) rowsClearCap = false;
+      }
+    }
+    check(name + " GS-15 deploy rows in canvas", rowsIn, JSON.stringify(dep.buttons.map(function (b) { return b.id + ":" + b.w; })));
+    check(name + " GS-15 deploy row labels fit", rowsFit, "");
+    check(name + " GS-15 rows clear wrapped cap block", rowsClearCap, "capExtra=" + capExtra + " lines=" + depModel.capLines.length);
   }
 
   const ratios = [];

@@ -11,19 +11,24 @@ const buildDeploymentButtons = function (input, modal) {
   const ui = input.metrics.ui || null;
   const px = function (design) { return Math.round(design * US); };
   const rows = (modal && Array.isArray(modal.rows)) ? modal.rows : [];
+  const capLines = (modal && Array.isArray(modal.capLines) && modal.capLines.length)
+    ? modal.capLines : [((modal && modal.capText) || "")];
   const mw = Math.min(DS - px(36), (ui && ui.endgamePanelW) || px(430));
   const btnH = (ui && ui.buttonHMd) || px(28);
   const rowH = (ui && ui.buttonHSm) || px(26);
   const gap = px(6);
   const pad = (ui && ui.padMd) || px(18);
-  const inner = rows.length * (rowH + gap) + btnH + px(70);
+  // The wrapped capacity block pushes the rows down by one line pitch per
+  // extra line (same pitch the deploy draw uses).
+  const capExtra = Math.max(0, capLines.length - 1) * px(15);
+  const inner = rows.length * (rowH + gap) + btnH + px(70) + capExtra;
   let mh = Math.max((ui && ui.endgamePanelH) || px(172), inner);
   const maxH = DS - px(8);
   if (mh > maxH) mh = maxH;
   const mx = Math.round((DS - mw) * 0.5);
   const my = Math.round((DS - mh) * 0.5);
   const buttons = [];
-  let y = my + px(52);
+  let y = my + px(52) + capExtra;
   for (let i = 0; i < rows.length; i++){
     const r = rows[i];
     buttons.push({
@@ -38,7 +43,9 @@ const buildDeploymentButtons = function (input, modal) {
     });
     y += rowH + gap;
   }
-  const confirmW = Math.min((ui && ui.endgameBtnW) || px(156), mw - pad * 2);
+  // CONFIRM width comes from the shared label-fit metric (ui.confirmDeployW),
+  // never a hardcoded floor — the v105 audit's GS-05/GS-06 defect class.
+  const confirmW = Math.min((ui && ui.confirmDeployW) || px(176), mw - pad * 2);
   buttons.push({
     id: "DEPLOY_CONFIRM",
     label: "CONFIRM DEPLOYMENT",

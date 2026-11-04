@@ -31,9 +31,34 @@ const buildDeploymentModel = function (deps, input) {
   }
   let onCount = 0;
   for (let i = 0; i < rows.length; i++) if (rows[i].selected) onCount++;
+  const capText = "DEPLOY " + onCount + " / " + cap + " CORNER SLOTS — FLAGSHIP IS ALWAYS ON";
+  // GS text-fit contract: the capacity line wraps to the panel's text budget
+  // (the same char-advance estimate the help panel wraps with) — it is never
+  // ellipsized. The draw renders `capLines`; buttons offset by the extra rows.
+  const metrics = input.metrics || {};
+  const DS = metrics.displaySize || 0;
+  const US = metrics.uiScale || 1;
+  const ui = metrics.ui || null;
+  const px = function (design) { return Math.round(design * US); };
+  const mw = Math.min(Math.max(0, DS - px(36)), (ui && ui.endgamePanelW) || px(430));
+  const availW = mw - px(24);
+  const textPx = (ui && ui.textPx) || px(15);
+  const charW = (ui && ui.charW) || Math.max(1, textPx * 0.64);
+  const perRow = Math.max(8, Math.floor(availW / charW));
+  const capWords = capText.split(" ");
+  const capLines = [];
+  let capCur = "";
+  for (let i = 0; i < capWords.length; i++) {
+    const word = capWords[i];
+    if (!capCur.length) { capCur = word; }
+    else if ((capCur + " " + word).length <= perRow) { capCur += " " + word; }
+    else { capLines.push(capCur); capCur = word; }
+  }
+  if (capCur.length) capLines.push(capCur);
   return {
     title: "DEPLOYMENT",
-    capText: "DEPLOY " + onCount + " / " + cap + " CORNER SLOTS — FLAGSHIP IS ALWAYS ON",
+    capText: capText,
+    capLines: capLines,
     capacity: cap,
     onCount: onCount,
     wallet: (input.state && typeof input.state.wallet === "number") ? input.state.wallet : 0,

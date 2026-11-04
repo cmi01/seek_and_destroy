@@ -89,6 +89,8 @@ drawn, nothing off the canvas.
 | GS-11 | campaign starmap | DS 200 | Linux Chrome | nodes and labels inside the dialog | Header ellipsized (measured 178px vs budget 86px). Visible title `CAMPAIGN STARMAP...`. Node radius floors at 22px (`round(34 × 0.26)` would be 9). Labels under nodes 2–4 are cut by the bottom edge; "NEXT OBJECTIVE" is cut on the left. Hit rects were recomputed inside the 200px canvas; the drawn labels are not. | `v105/win200-campaign.png` | `buildCampaignLayout.js` L40–42; header `uiRenderer.js` L631 |
 | GS-12 | board, close zoom | dpr 1 vs 2, CSS 1024×768, viewSpan 5 | Linux Chrome | dpr 2 shows more terrain and sprite detail | Downsampling the dpr-2 capture by 2× matches the dpr-1 capture (mean abs RGB diff 0.05). DPR 2 added no information. Terrain cache is allocated at `ceil(gridSize × cellPx)` CSS px and the cache key omits `renderScale`; the blit is 1:1 in world units under a transform that multiplies by `renderScale`. Sprites are 106px atlas tiles drawn at `ceil(cellPx × 2.2)`. At this size that is ~669 device px, a 6.3× upscale. At viewSpan 16 the dpr-2 frame is not a pure upscale (vector grid/HUD were redrawn; downsample diff ~11/30/42), so the loss is the bitmap layers, not the whole frame. | `v105/dpr1-span5.png`, `v105/dpr2-span5.png` | `graphics.js` L571–572, L616–624, L334–339; blit `backgroundRenderer.js` L138; `themes_DATA.js` L187 `tilePx: 106` |
 | GS-13 | HUD chrome | DS 200 vs DS 1072 | Linux Chrome | strokes scale with `uiScale` | 31 `lineWidth` assignments in `uiRenderer.js` are CSS-px literals (1, 1.2, 1.4, 1.5, 2, 2.2). DPR scales them; `uiScale` does not. At DS 200 a 1px stroke is ~5× thicker relative to the 768 design than at DS 1072. | `v105/win200-base.png`, `v105/os100-base.png` | `uiRenderer.js` (31 sites; examples L77, L95, L365, L776) |
+| GS-14 | HUD/top bar, help, endgame, deploy — every frame after the campaign map has drawn once (battle frames included: canvas 2D state persists across frames) | all sizes and DPRs | Linux Chrome | every text draw owns its alignment; left-anchored labels land on their anchor inside their panel/button | The map-object layer sets `textAlign = "center"` for its node labels and never restores it, so every later left-anchored draw that does not pin its own alignment inherits "center": the label is centered on its left anchor and half of it shifts off the panel/canvas and clips. Help body reads `LOSE`, `NTROLS`, title `1 // CALIBRATION RANGE`; `REINFORCEMENTS` (w 126) centered at x=545 hangs 63px out of its button; `MAP // SOL GATE STATION` (w 207) drawn at x=19 spans −84..122 — half off-canvas. Drawn strings carry no ellipsis and often keep high pixel contrast where the shifted text lands, so the GS-04..GS-11 ellipsis hook could never see this class (the card's gap (b)). | `v163/win1280x800-dpr1-span16-help.png`, `v163/win1280x800-dpr1-span16-base.png`, `v163/win1280x800-dpr1-battle-base.png` | `objectRenderer.js` `drawMapObjects` (`textAlign = "center"`, no restore); consumed by the five `uiRenderer.js` draws that never pinned alignment: `_drawButtonWidget`, `_drawTopLeftHudBar`, `_drawTelemetryCard`, `_drawIntelOverlay`, `_drawHelpModal` (plus `drawBattleWorldReticles`' SEL badge) |
+| GS-15 | deploy modal (M2, added v112 — after the GS label sweep) | all sizes and DPRs | Linux Chrome | `DEPLOY n / m CORNER SLOTS — FLAGSHIP IS ALWAYS ON` and `CONFIRM DEPLOYMENT` fully drawn | The capacity line was one unwrapped string, ellipsized to the panel width (`…FLAGSHIP IS ALWAY…`) with a draw span overflowing the canvas (x+w 809 on DS 790); the CONFIRM label ellipsized (`CONFIRM DEPLOYM…`) because the button width came from the `endgameBtnW` floor instead of a label-fit token (the GS-05/GS-06 defect class). | `v163/win1280x800-dpr1-span16-deploy.png` | `buildDeploymentModel.js` (unwrapped capText), `buildDeploymentButtons.js` (confirmW floor), `uiRenderer.js` `_drawDeployModal` (single-line cap draw) |
 
 Intel and the menu dropdown had no off-canvas buttons and no measured
 overlaps at 100–250%. Shots: `v105/os{100,125,150,200,250}-{intel,menu}.png`.
@@ -441,3 +443,162 @@ The GS-12 / issue #3 verdict itself is unchanged from Verification (v133):
 the dpr-2 render carries genuine added detail. This release's art delta is
 one ship's rail band plus the `-moved` rim — tile size and content scale are
 unchanged, so the v133 measurements still characterize the atlas.
+
+## Verification (v165)
+
+Text-visibility card (GS-14 + GS-15): reproduce, root-cause and fix the
+user-reported unreadable text on the four surfaces (HUD/top bar, help,
+endgame, deploy). Baseline tree: `v163` (`934d072`), detached worktree — the
+defect was present unchanged through `v164` (`a83160b`, a concurrent
+game.js-decomposition release that touched none of these files; the release
+number moved v164 → v165 mid-run when that tag landed first, and the whole
+audit battery was re-run against the merged tip).
+Reproduction matrix: window 1280x800 @ dpr 1 and 2, 1600x1000 @ dpr 1 and 2,
+500x700 @ dpr 1, and the minimum canvas (window 208x208 → DS 200), each at
+viewSpan 16 and 5, on the four surfaces — plus the true in-battle scene
+(started through the same `SD.SectorGenerator.generate` call
+`DEPLOY_CONFIRM` makes). Probes: `/tmp/hermes-verify-text-visibility/`
+(`repro_probe.py`, `battle_probe.py`, `matrix_summary.py`, outputs in
+`before-v163/`, `after-v165/`, `battle-before/`, `battle-after/`).
+
+### Root causes and fixes
+
+- **GS-14 — leaked draw state (the systemic class).** `objectRenderer.js`
+  `drawMapObjects` set `textAlign = "center"` for its map node labels and
+  never restored it. Canvas 2D state persists **across frames**, so from the
+  first campaign-map frame on, every later left-anchored draw that did not
+  pin its own alignment was rendered centered on its left anchor — shifted
+  left by half its width and clipped at the panel or canvas edge. The five
+  un-pinned draws were exactly the reported surfaces: `_drawButtonWidget`
+  (REINFORCEMENTS / MENU v / END TURN / CLOSE / CONFIRM labels),
+  `_drawTopLeftHudBar` (status lines), `_drawTelemetryCard`,
+  `_drawIntelOverlay`, `_drawHelpModal` (title + every body row), plus
+  `drawBattleWorldReticles`' SEL badge. Fix: the leak source is wrapped in
+  `ctx.save()/restore()`, and every one of those draws now pins
+  `ctx.textAlign` explicitly (defense in depth). The M4-M6 modals
+  (station/campaign/bridge/hail) pinned alignment at birth and were never
+  affected — matching why parts of the UI looked fine.
+- **GS-15 — deploy modal never measured (added v112, after the sweep).**
+  The capacity line was one unwrapped string, ellipsized
+  (`…FLAGSHIP IS ALWAY…`) and drawn past the canvas edge; `CONFIRM` drew
+  `CONFIRM DEPLOYM…` because its button width came from the `endgameBtnW`
+  floor. Fix: `buildDeploymentModel.js` wraps the line into `capLines`
+  (word wrap on the shared char-advance estimate, never ellipsized),
+  `uiRenderer.js` draws the block, `buildDeploymentButtons.js` offsets rows
+  past it and sizes CONFIRM from the new label-fit token
+  (`ui.confirmDeployW`, `uiTokens_DATA.js` + `resolveUiMetrics.js`).
+- **GS-03 instrument gap (hardened, in support of the standing gate).**
+  This Chromium no longer fires `matchMedia("(resolution: …)")` `change` on
+  a CDP device-metrics override (proven with a bare page: zero events while
+  `devicePixelRatio` updates), so the v107 dpr watch cannot re-bake the
+  backing store there. The resize path itself is healthy (manual
+  `HostBridge.handleResize()` re-bakes 590 → 1180 exactly). `main.js`'s
+  frame loop now polls `devicePixelRatio` once per frame as a fallback, so
+  a mid-session DPI change never leaves a stale, blurry backing store —
+  that staleness is itself a text-visibility defect.
+
+### Instruments (extended)
+
+`dev/scripts/gui_scale_browser_check.py` — the pinned label list now covers
+every label on the four surfaces (deploy `DEPLOYMENT` / `CONFIRM DEPLOYMENT`
+/ `CORNER SLOTS` / `ALWAYS ON`; endgame `CRITICAL DEFEAT` / `All friendly` /
+`REDEPLOY SECTOR` / `SECTOR MAP`; help `CLOSE` / `CONTROLS` / `[LMB]`; base
+`REINFORCEMENTS` / `MENU v` / `END TURN` / `MAP //` / `AP 4/4`; plus
+campaign/bridge close labels), each with the alignment its owner documents,
+and two new assertions beside the ellipsis hook: a **contrast floor** and a
+**textAlign assertion** (the direct instrument for the GS-14 class). The
+contrast metric is the decile ratio (mean of the brightest 10% of the
+label's glyph box vs the darkest 10%); the glyph box is derived from the
+recorded `textAlign`/`textBaseline`, and each draw is attributed to the
+longest pinned needle it contains (`CONFIRM DEPLOYMENT` never counts as a
+draw of `DEPLOYMENT`). **Pinned contrast floor: 3.0 for glyphs ≥ 6px, 2.0
+in the 4px hard-minimum band** — chosen from the measurements: the
+invisible/covered class measures 1.0–1.25, real 6px+ text 4.46–16.3, and
+real 4px text 2.77–5.0 (crowded rows and antialiasing compress the pixel
+metric at that size). `dev/scripts/gui_scale_layout_check.js` gained the
+GS-15 deploy budgets (CONFIRM label fit, cap block wraps whole, rows in
+canvas, rows clear the wrapped block).
+Measured (v165, `harness-final/measurements.json`, 228 rows): **ALL PASS** —
+108/108 align rows 0 bad, 0 ellipsized draws, contrast worst 2.77
+(`CRITICAL DEFEAT`, 4px red accent) and 3.49 next; every ≥ 6px label ≥ 4.46.
+Layout check ALL PASS (100–250% + DS 200/400/768/1440).
+
+**Positive control (instrument sensitivity):** the same extended checker
+against the pre-fix v164 parent tree reports **104 fails** — every
+left-anchored
+pinned label 100% wrong-align (e.g. `os100/base align: 38/38 draws of
+'REINFORCEMENTS' not textAlign 'left'`), `missing drawn 'CONFIRM DEPLOYMENT'
+clipped=['CONFIRM DEPLOYM…']`, and `ALWAYS ON` never drawn whole. The gate
+therefore demonstrably catches the defect class it was built for.
+
+### Reproduction matrix (before v163 → after v165)
+
+Per cell, unique non-board labels (rAF duplicates collapsed):
+
+| Cell | help wrong-align | base wrong-align | deploy ellipsis | deploy off-canvas | battle top-bar wrong-align |
+|---|---|---|---|---|---|
+| 1280x800 dpr1 | 24/24 → 0 | 5/5 → 0 | 2 → 0 | 1 → 0 | 5/5 → 0 |
+| 1280x800 dpr2 | 24/24 → 0 | 5/5 → 0 | 2 → 0 | 1 → 0 | 5/5 → 0 |
+| 1600x1000 dpr1 | 24/24 → 0 | 5/5 → 0 | 2 → 0 | 1 → 0 | 5/5 → 0 |
+| 1600x1000 dpr2 | 24/24 → 0 | 5/5 → 0 | 2 → 0 | 1 → 0 | 5/5 → 0 |
+| 500x700 dpr1 | 25/25 → 0 | 5/5 → 0 | 2 → 0 | 1 → 0 | 5/5 → 0 |
+| 208x208 (DS 200) | 24/24 → 0 | 5/5 → 0 | 2 → 0 | 1 → 0 | 5/5 → 0 |
+
+Both spans (16 and 5) show identical counts per cell. The endgame modal's
+own text draws centered (its documented design) and was correctly aligned in
+both trees — its pre-fix readability exposure was the GS-14-shifted chrome
+around it and the DS-200 size band below. Before/after shots (v105/v108
+convention, before under `v163/`, after under `v165/`):
+`win1280x800-dpr1-{base,help,deploy,endgame,battle}.png`,
+`win1600x1000-dpr1-{base,help,deploy,endgame,battle}.png`, plus
+`win200-{help,endgame,deploy}.png` (before) for the size finding. Full
+matrix captures stay in `/tmp/hermes-verify-text-visibility/`.
+
+### Defect pass/fail (re-marked at v165)
+
+| ID | Verdict | Evidence |
+|---|---|---|
+| GS-03 | verified (hardened) | dpr 1→2 without resize re-bakes 1180 backing (harness `dpr-after` rows); frame-loop fallback added — see root causes |
+| GS-04 | re-verified | campaign subtitle + `CLOSE [ESC]` full, align left, contrast ≥ 4.46 at 6px+ (os100–os250 + win200 rows) |
+| GS-05 | re-verified | same rows; ellipsis hook + `ellipsized draw` assertion clean |
+| GS-06 | re-verified | `REDEPLOY SECTOR` / `SECTOR MAP` full at every harness row and matrix cell |
+| GS-07 | re-verified | `REINFORCEMENTS` full at DS 200 (4px proportional); size caveat below |
+| GS-08 | re-verified | help panel + CLOSE on-canvas; every help row full (no ellipsis) at all matrix cells |
+| GS-09 | re-verified | endgame body above the buttons at every size; DS 200 size caveat below |
+| GS-10 | re-verified | bridge rows pass (os rows + win200) |
+| GS-11 | re-verified | campaign rows pass |
+| GS-12 | unchanged | no terrain/atlas change in v165 |
+| GS-13 | unchanged | stroke tokens untouched |
+| GS-14 | **fixed** | matrix wrong-align counts → 0 on all four surfaces + battle; 108/108 harness align rows; positive control trips 104 fails on the parent tree |
+| GS-15 | **fixed** | deploy labels full at every matrix cell; GS-15 layout budgets ALL PASS; positive control shows the clipped originals |
+
+### Standing gates and suites (v165 tree)
+
+`node --check` clean on every touched `.js`; `structure_audit.py` 0
+violations / one-function 0; `reference_audit.py` identical to the v164
+parent tree at the merged tip (legacy 6 / child-names 0 / doc-window 27 /
+import-direction 2 — the v164 checker on both sides); in-page `?test`
+**85/85 game + 5/5 audio**, zero
+page errors (one transient favicon 404 in one run; a dedicated response
+capture over the full suite run shows zero 4xx); `npx playwright test`
+green (see run log). Ad-hoc harness kept on disk:
+`/tmp/hermes-verify-text-visibility/` (probe outputs +
+`harness-final/measurements.json`).
+
+### Known characteristics and follow-ups (not fixed here)
+
+- **DS 200 glyph size (root-cause candidate 4).** At the 200px hard minimum
+  `textPx` is 4 (the v108 proportional design that removed the 8px floor to
+  stop clipping). Every label still draws whole and un-ellipsized, but 4px
+  glyphs are at the edge of human legibility regardless of contrast
+  (measured 2.77–5.0 pixel contrast; the dimmest is the red accent endgame
+  title). Fully-drawn AND legible cannot both hold for a 14-character label
+  in a 41px button at readable sizes — any font floor re-creates GS-07's
+  ellipsis. Resolving this is a design tradeoff (font floor + accepted
+  ellipsis at the floor, or raising the canvas minimum to ≈300 where
+  `textPx` ≥ 6) and belongs to the scaling strategy, not this defect card.
+- **M4–M6 modal surfaces (station/outfit, hail/dialogue, mission board).**
+  The GS-14 root cause is already fixed for them (leak contained at the
+  source; their draws pinned alignment at birth). The remainder is
+  instrument coverage: their labels are not in the pinned list. Cheap
+  follow-up: extend `PINS` with their labels.

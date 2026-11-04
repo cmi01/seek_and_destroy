@@ -57,6 +57,7 @@ const resolveUiMetrics = function (tokens, scaleFacts) {
     closeBridgeW: fit(labels.closeBridge, t.closeBridgeW || 106),
     closeHelpW: fit(labels.closeHelp, t.closeHelpW || 112),
     endgameBtnW: fit(labels.endgame, t.endgameBtnW || 156),
+    confirmDeployW: fit(labels.confirmDeploy, t.confirmDeployW || 176),
     stroke: {
       hairline: stroke(t.strokeHairline || 1),
       thin: stroke(t.strokeThin || 1.2),

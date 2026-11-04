@@ -226,6 +226,8 @@ function assertCanvasSetup() {
 }
 
 let _dprQuery = null;
+// Fallback watch value: see the poll in mainLoop below.
+let _lastSeenDpr = (typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1);
 function onDprChange() {
   armDprWatch();
   HostBridge.handleResize();
@@ -262,6 +264,13 @@ function bootGame() {
 
 // ======================== MAIN LOOP ========================
 function mainLoop(now){
+  // DPR watch fallback (GS-03): the matchMedia 'change' event is the primary
+  // signal, but some engines (CDP device-metrics emulation, some embedded
+  // webviews) update window.devicePixelRatio without ever firing it. Polling
+  // the value once per frame keeps the backing store honest there — a stale
+  // backing after a DPI change blurs every glyph.
+  const dprNow = window.devicePixelRatio || 1;
+  if (dprNow !== _lastSeenDpr) { _lastSeenDpr = dprNow; onDprChange(); }
   const visCache = Game.stepFrame(now);
   requestCanvasUpdate({ now, visCache });
   requestAnimationFrame(mainLoop);

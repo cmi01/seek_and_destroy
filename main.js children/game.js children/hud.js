@@ -138,6 +138,7 @@ function createInitialView() {
     deployModal: {
       title: "DEPLOYMENT",
       capText: "",
+      capLines: [],
       rows: [],
       panel: null
     },
@@ -194,6 +195,7 @@ const createHud = function (deps) {
       const m = buildDeploymentModel(deps, input);
       w.deployModal.title = m.title;
       w.deployModal.capText = m.capText;
+      w.deployModal.capLines = m.capLines;
       w.deployModal.rows = m.rows;
       w.deployModal.wallet = m.wallet;
       const built = buildDeploymentButtons(input, m);

@@ -19,6 +19,7 @@ import base64
 import io
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -38,15 +39,35 @@ SCALES = [
     ("os250", 768, 432, 2.50),
 ]
 # Endgame sets gameOver, which pins the HUD on that modal. Probe it last.
-SCREENS = ("base", "campaign", "help", "bridge", "endgame")
+SCREENS = ("base", "campaign", "help", "bridge", "deploy", "endgame")
 ELLIPSIS = "\u2026"
-MUST_DRAW = {
-    "campaign": ("CLOSE [ESC]",),
-    "endgame": ("REDEPLOY SECTOR", "SECTOR MAP"),
-    "help": ("CLOSE",),
-    "bridge": ("RESUME [SPC]",),
-    "base": ("REINFORCEMENTS", "END TURN"),
+# GS-14/GS-15 pinned label list: every label on the four reported surfaces,
+# with the alignment its owner documents (left-anchored text must draw with
+# textAlign "left"; the GS-14 defect class draws it inherited "center").
+PINS = {
+    "campaign": (("CLOSE [ESC]", "left"),),
+    "endgame": (("REDEPLOY SECTOR", "left"), ("SECTOR MAP", "left"),
+                ("CRITICAL DEFEAT", "center"), ("All friendly", "center")),
+    "help": (("CLOSE", "left"), ("CONTROLS", "left"), ("[LMB]", "left")),
+    "bridge": (("RESUME [SPC]", "left"),),
+    "deploy": (("DEPLOYMENT", "center"), ("CONFIRM DEPLOYMENT", "left"),
+               ("CORNER SLOTS", "center"), ("ALWAYS ON", "center")),
+    "base": (("REINFORCEMENTS", "left"), ("MENU v", "left"), ("END TURN", "left"),
+             ("MAP //", "left"), ("AP 4/4", "left")),
 }
+MUST_DRAW = {screen: tuple(needle for needle, _align in pins) for screen, pins in PINS.items()}
+# GS-14 legibility floor: WCAG contrast between the label's ink and the
+# background under it, measured on the canvas pixels (decile metric — robust
+# for sparse 15px text and dense 4px text alike). The broken class this gate
+# exists for measured 1.0-1.25 (text drawn in its own background, or clipped
+# away); every real label at 6px+ measures 3.5+. 3.0 is the pinned floor for
+# normal-size glyphs. At the 4px hard-minimum band (displaySize 200, GS-07's
+# proportional design) crowded rows compress the pixel metric — real text
+# measures 2.45-4.2 there — so the floor is 2.0, still well over the invisible
+# class. Both bands are stated in gui-scaling-audit.md (Verification v165).
+CONTRAST_FLOOR = 3.0
+CONTRAST_FLOOR_TINY = 2.0
+TINY_FONT_PX = 6.0
 
 
 def free_port(preferred: int) -> int:
@@ -81,13 +102,24 @@ def install_hooks(page) -> None:
         """() => {
           if (!window.__sdFillText) {
             window.__sdFillText = [];
+            window.__sdFillTextRec = [];
             const orig = CanvasRenderingContext2D.prototype.fillText;
             CanvasRenderingContext2D.prototype.fillText = function(t, x, y) {
               window.__sdFillText.push(String(t));
+              const tr = this.getTransform ? this.getTransform() : null;
+              let w = 0;
+              try { w = this.measureText(String(t)).width; } catch (e) {}
+              window.__sdFillTextRec.push({
+                text: String(t), x: x, y: y, w: w,
+                font: this.font || "", fillStyle: String(this.fillStyle),
+                align: this.textAlign, baseline: this.textBaseline,
+                a: tr ? tr.a : 1, d: tr ? tr.d : 1, e: tr ? tr.e : 0, f: tr ? tr.f : 0
+              });
               return orig.apply(this, arguments);
             };
           }
           window.__sdFillText.length = 0;
+          window.__sdFillTextRec.length = 0;
         }"""
     )
 
@@ -157,6 +189,7 @@ def open_screen(page, name: str) -> None:
           else if (name === "endgame") H.showEndgameModal(false);
           else if (name === "help") H.toggleHelpModal(true);
           else if (name === "bridge") H.toggleBridgeModal(true);
+          else if (name === "deploy") H.toggleDeployModal(true);
           else if (name === "menu") H.toggleMenu(true);
           if (SD.Renderer && typeof SD.Renderer.draw === "function") {
             SD.Renderer.draw(performance.now());
@@ -332,6 +365,144 @@ def check_drawn(name: str, screen: str, texts: list[str], fails: list[str]) -> N
             fails.append(
                 f"{name}/{screen} missing drawn {needle!r} clipped={clipped[:4]}"
             )
+        ell = [t for t in texts if _label_needle(screen, t) == needle and ELLIPSIS in t]
+        if ell:
+            fails.append(f"{name}/{screen} ellipsized draw of {needle!r}: {ell[:3]}")
+
+
+FONT_RE = re.compile(r"(\d+(?:\.\d+)?)px")
+
+
+def _label_needle(screen: str, text: str) -> str | None:
+    """Attribution: a record goes to the LONGEST pinned needle it contains,
+    so 'CONFIRM DEPLOYMENT' never counts as a draw of 'DEPLOYMENT'."""
+    best = None
+    for needle in MUST_DRAW.get(screen, ()):
+        if needle in text and (best is None or len(needle) > len(best)):
+            best = needle
+    return best
+
+
+def _glyph_box(rec: dict, w: float, h: float) -> tuple[float, float, float, float]:
+    """Where the glyphs actually are, given the draw's textAlign/textBaseline."""
+    a, d, e, f = rec.get("a", 1), rec.get("d", 1), rec.get("e", 0), rec.get("f", 0)
+    x0 = rec["x"] * a + e
+    y0 = rec["y"] * d + f
+    w = w * a
+    h = h * d
+    align = rec.get("align", "left")
+    if align == "center":
+        gx0, gx1 = x0 - w / 2.0, x0 + w / 2.0
+    elif align == "right":
+        gx0, gx1 = x0 - w, x0
+    else:
+        gx0, gx1 = x0, x0 + w
+    baseline = rec.get("baseline", "alphabetic")
+    if baseline == "top":
+        gy0, gy1 = y0, y0 + h
+    elif baseline == "middle":
+        gy0, gy1 = y0 - h / 2.0, y0 + h / 2.0
+    else:  # alphabetic / hanging
+        gy0, gy1 = y0 - 0.82 * h, y0 + 0.22 * h
+    return gx0, gy0, gx1, gy1
+
+
+def _srgb_to_lin(c: float) -> float:
+    c = c / 255.0
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _rel_lum(px) -> float:
+    r, g, b = px[:3]
+    return 0.2126 * _srgb_to_lin(r) + 0.7152 * _srgb_to_lin(g) + 0.0722 * _srgb_to_lin(b)
+
+
+def check_contrast(name: str, screen: str, page, fails: list[str], rows: list[dict]) -> None:
+    """GS-14: each pinned label's ink must separate from its background.
+
+    Metric (decile): ink = mean of the brightest 10% of the label's pixels,
+    background = mean of the darkest 10%; WCAG contrast between them. A
+    uniform box (text invisible, covered, or clipped away) collapses to 1.0.
+    Best value over the label's draw records wins (rAF redraws are noisy at
+    tiny font sizes).
+    """
+    im = canvas_rgb(page)
+    recs = page.evaluate("() => (window.__sdFillTextRec ? window.__sdFillTextRec.slice() : [])")
+    for needle in MUST_DRAW.get(screen, ()):
+        best = None
+        label_px = None
+        for r in recs:
+            if _label_needle(screen, r["text"]) != needle:
+                continue
+            m = FONT_RE.search(r.get("font", ""))
+            size = float(m.group(1)) if m else 10.0
+            label_px = size
+            gx0, gy0, gx1, gy1 = _glyph_box(r, max(r["w"], 1.0), max(size, 1.0))
+            W, H = im.size
+            ix0 = max(0, int(gx0 - 2))
+            iy0 = max(0, int(gy0 - 2))
+            ix1 = min(W, int(gx1 + 2) + 1)
+            iy1 = min(H, int(gy1 + 2) + 1)
+            if ix1 <= ix0 or iy1 <= iy0:
+                continue
+            crop = im.crop((ix0, iy0, ix1, iy1))
+            lums = sorted(_rel_lum(p) for p in crop.getdata())
+            n = len(lums)
+            if n < 8:
+                continue
+            k = max(2, n // 10)
+            ink = sum(lums[-k:]) / k
+            bg = sum(lums[:k]) / k
+            hi, lo = max(ink, bg), min(ink, bg)
+            cr = (hi + 0.05) / (lo + 0.05)
+            if best is None or cr > best:
+                best = cr
+        floor = (
+            CONTRAST_FLOOR_TINY
+            if label_px is not None and label_px < TINY_FONT_PX
+            else CONTRAST_FLOOR
+        )
+        rows.append(
+            {
+                "row": f"{name}/{screen}/contrast",
+                "needle": needle,
+                "contrast": best,
+                "fontPx": label_px,
+                "floor": floor,
+            }
+        )
+        if best is None:
+            fails.append(f"{name}/{screen} contrast: no measurable draw for {needle!r}")
+        elif best < floor:
+            fails.append(
+                f"{name}/{screen} contrast {best:.2f} < {floor} for {needle!r}"
+            )
+
+
+def check_align(name: str, screen: str, page, fails: list[str], rows: list[dict]) -> None:
+    """GS-14 instrument: a left-anchored label drawn with an inherited
+    "center" state is half-shifted off its anchor and clips — the ellipsis
+    hook cannot see it, and contrast can miss it when the shifted text still
+    lands on readable pixels. Assert the recorded textAlign directly."""
+    recs = page.evaluate("() => (window.__sdFillTextRec ? window.__sdFillTextRec.slice() : [])")
+    for needle, want in PINS.get(screen, ()):
+        seen = 0
+        bad = 0
+        for r in recs:
+            if _label_needle(screen, r["text"]) != needle:
+                continue
+            seen += 1
+            if r.get("align") != want:
+                bad += 1
+        rows.append(
+            {"row": f"{name}/{screen}/align", "needle": needle, "want": want, "draws": seen, "bad": bad}
+        )
+        if seen == 0:
+            fails.append(f"{name}/{screen} align: no draw for {needle!r}")
+        elif bad:
+            fails.append(
+                f"{name}/{screen} align: {bad}/{seen} draws of {needle!r} not textAlign {want!r}"
+            )
 
 
 def main() -> int:
@@ -383,6 +554,8 @@ def main() -> int:
                     open_screen(page, screen)
                     texts = page.evaluate("() => window.__sdFillText.slice()")
                     check_drawn(name, screen, texts, fails)
+                    check_contrast(name, screen, page, fails, rows)
+                    check_align(name, screen, page, fails, rows)
                     if not args.skip_shots:
                         shot_canvas(page, out / f"{name}-{screen}.png")
 
@@ -397,6 +570,8 @@ def main() -> int:
                 open_screen(page, screen)
                 texts = page.evaluate("() => window.__sdFillText.slice()")
                 check_drawn("win200", screen, texts, fails)
+                check_contrast("win200", screen, page, fails, rows)
+                check_align("win200", screen, page, fails, rows)
                 if not args.skip_shots:
                     shot_canvas(page, out / f"win200-{screen}.png")
 
