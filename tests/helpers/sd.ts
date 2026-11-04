@@ -217,8 +217,72 @@ export function runHarnessTest(page: Page, name: string): Promise<SdTestResult> 
  * State surgery helper: run `body` against the live SD handle and state inside
  * ONE evaluate (live unit objects only exist inside a single call). Returns
  * whatever the body returns. The codebase audit sanctions state surgery through
- * the SD.State live handle for logic-level scenario setup.
+ * the SD.State live handle for logic-level scenario setup. `body` must be
+ * self-contained (page.evaluate serializes it — no closures over spec-scope
+ * variables); pass fixture data in through the optional `arg`.
  */
-export function withLiveState<T>(page: Page, body: () => T): Promise<T> {
-  return page.evaluate(body);
+export function withLiveState<T>(page: Page, body: () => T): Promise<T>;
+export function withLiveState<T, A>(page: Page, body: (arg: A) => T, arg: A): Promise<T>;
+export function withLiveState(page: Page, body: (...args: never[]) => unknown, arg?: unknown): Promise<unknown> {
+  return arg === undefined
+    ? page.evaluate(body as () => unknown)
+    : page.evaluate(body as (a: unknown) => unknown, arg);
+}
+
+/** A shooter/target fixture cell pair (chosen from live terrain, see below). */
+export type CellPair = { shooter: { x: number; y: number }; target: { x: number; y: number } };
+
+/**
+ * Pick a shooter/target fixture from the LIVE sector terrain: an orthogonally
+ * adjacent pair of EMPTY cells, nearest to `anchor` (deterministic tie-break),
+ * never containing one of `exclude`. Sector terrain is randomly generated per
+ * unseeded boot and hasLineOfSight(WEAPON) correctly refuses a shot whose
+ * target cell is ASTEROID (lineOfSight.js) — so a spec that gates on canShoot
+ * must derive its fixture cells from State.terrain instead of hardcoding them
+ * (t_2922ab3c: an asteroid at the old fixed cell (16,17) gated the shot in 1/25
+ * boots). Both cells EMPTY + orthogonally adjacent keeps every gate condition
+ * terrain-independent: no intermediate ray cells, distance 1 ≤ any weapon
+ * range, and the shooter's scan (≥ 1 even under NEBULA) covers the adjacent
+ * target cell. Throws when terrain is not generated yet or no pair exists.
+ */
+export function pickEmptyAdjacentPair(
+  page: Page,
+  anchor: { x: number; y: number },
+  exclude: Array<{ x: number; y: number }> = [],
+): Promise<CellPair> {
+  return page.evaluate(
+    ([a, ex]) => {
+      const st = (window as any).SD.getRawState();
+      const terr = st.terrain;
+      if (!Array.isArray(terr)) {
+        throw new Error('pickEmptyAdjacentPair: State.terrain missing — generate a sector first');
+      }
+      const size = terr.length;
+      const isExcluded = (x: number, y: number) =>
+        (ex as Array<{ x: number; y: number }>).some((e) => e.x === x && e.y === y);
+      const cands: CellPair[] = [];
+      for (let x = 0; x < size - 1; x++) {
+        for (let y = 0; y < size; y++) {
+          if (terr[x][y] !== 'EMPTY' || terr[x + 1][y] !== 'EMPTY') continue;
+          if (isExcluded(x, y) || isExcluded(x + 1, y)) continue;
+          cands.push({ shooter: { x, y }, target: { x: x + 1, y } });
+          if (terr[x][y + 1] === 'EMPTY' && y + 1 < size && !isExcluded(x, y + 1)) {
+            cands.push({ shooter: { x, y }, target: { x, y: y + 1 } });
+          }
+        }
+      }
+      const anchorPt = a as { x: number; y: number };
+      const dist = (c: { x: number; y: number }) => Math.hypot(c.x - anchorPt.x, c.y - anchorPt.y);
+      cands.sort(
+        (p, q) =>
+          dist(p.shooter) - dist(q.shooter) ||
+          dist(p.target) - dist(q.target) ||
+          p.target.x - q.target.x ||
+          p.target.y - q.target.y,
+      );
+      if (!cands.length) throw new Error('pickEmptyAdjacentPair: no EMPTY adjacent cell pair on the board');
+      return cands[0];
+    },
+    [anchor, exclude] as [{ x: number; y: number }, Array<{ x: number; y: number }>],
+  );
 }
