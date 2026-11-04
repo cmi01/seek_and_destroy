@@ -302,6 +302,7 @@ const HUD_WIDGET_SCRIPTS = [
   "main.js children/game.js children/hud.js children/hudBanner.js",
   "main.js children/game.js children/hud.js children/buildMapHudModel.js",
   "main.js children/game.js children/hud.js children/buildHailModel.js",
+  "main.js children/game.js children/hud.js children/buildHailPanel.js",
   "main.js children/game.js children/hud.js children/buildStationModel.js",
   "main.js children/game.js children/hud.js children/buildOutfitModel.js"
 ];
@@ -510,6 +511,9 @@ const GAME_LEAF_SCRIPTS = [
   "main.js children/game.js children/reputation.js children/stanceBetween.js",
   "main.js children/game.js children/reputation.js children/adjustReputation.js",
   "main.js children/game.js children/reputation.js children/sharesSensors.js",
+  "main.js children/game.js children/factions.js children/buildDialogueModel.js",
+  "main.js children/game.js children/factions.js children/applyDialogueOutcome.js",
+  "main.js children/game.js children/campaignMap.js children/nearestOpenSquare.js",
   "main.js children/game.js children/actionLegality.js children/crewStatus.js"
 ];
 
@@ -550,7 +554,8 @@ async function startGame(){
       ["main.js children/game.js children/hud.js children/hudMenu.js",               () => typeof buildMenuModel === "function"],
       ["main.js children/game.js children/hud.js children/hudMinimap.js",            () => typeof buildMinimapModel === "function"],
       ["main.js children/game.js children/hud.js children/buildMapHudModel.js",      () => typeof buildMapHudModel === "function"],
-      ["main.js children/game.js children/hud.js children/buildHailModel.js",        () => typeof buildHailModel === "function"],
+      ["main.js children/game.js children/hud.js children/buildHailModel.js", () => typeof buildHailModel === "function"],
+      ["main.js children/game.js children/hud.js children/buildHailPanel.js", () => typeof buildHailPanel === "function"],
       ["main.js children/game.js children/hud.js children/buildStationModel.js",     () => typeof buildStationModel === "function"],
       ["main.js children/game.js children/hud.js children/hudBanner.js",             () => typeof buildPriorityBanner === "function"]
     ]);
@@ -687,6 +692,9 @@ async function startGame(){
       ["main.js children/game.js children/reputation.js children/stanceBetween.js", () => typeof stanceBetween === "function"],
       ["main.js children/game.js children/reputation.js children/adjustReputation.js", () => typeof adjustReputation === "function"],
       ["main.js children/game.js children/reputation.js children/sharesSensors.js", () => typeof sharesSensors === "function"],
+      ["main.js children/game.js children/factions.js children/buildDialogueModel.js", () => typeof buildDialogueModel === "function"],
+      ["main.js children/game.js children/factions.js children/applyDialogueOutcome.js", () => typeof applyDialogueOutcome === "function"],
+      ["main.js children/game.js children/campaignMap.js children/nearestOpenSquare.js", () => typeof nearestOpenSquare === "function"],
       ["main.js children/game.js children/actionLegality.js children/crewStatus.js", () => typeof crewStatus === "function"]
     ]);
 

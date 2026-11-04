@@ -271,7 +271,12 @@ const createHud = function (deps) {
     const w = _clone(view);
     const d = (extra && typeof extra === "object") ? Object.assign({}, extra) : {};
     d.metrics = input.metrics;
-    d.hail = w.hailEncounter ? buildHailModel(w.hailEncounter) : null;
+    // M6(c): the open shell carries the full panel (voice line + Q11
+    // options) when the parent supplied a dialogue model; the M3 shell is
+    // the fallback for encounters without one.
+    d.hail = w.hailEncounter
+      ? (w.hailDialogue ? buildHailPanel(w.hailEncounter, w.hailDialogue) : buildHailModel(w.hailEncounter))
+      : null;
     w.mapHud = buildMapHudModel(mapState, d);
     if (w.mapHud && w.mapHud.levelTag) w.levelTag = w.mapHud.levelTag;
     const r = _compose({ view: w }, _syncLayout(w, input));
@@ -613,9 +618,12 @@ const createHud = function (deps) {
     updateMapHud(view, input, mapState, extra = null) {
       return _updateMapHud(view, input, mapState, extra);
     },
-    showHailPanel(view, input, encounter) {
+    showHailPanel(view, input, encounter, dialogue) {
       const w = _clone(view);
       w.hailEncounter = encounter ? JSON.parse(JSON.stringify(encounter)) : null;
+      // M6(c): the faction dialogue model (voice line + Q11 options) rides
+      // with the encounter so the panel child can lay the shell out.
+      w.hailDialogue = dialogue ? JSON.parse(JSON.stringify(dialogue)) : null;
       return _finalize(_compose({
         view: w,
         sounds: [{ kind: "ui.modal.open", payload: {} }],
@@ -626,6 +634,7 @@ const createHud = function (deps) {
       const w = _clone(view);
       if (!w.hailEncounter) return _finalize({ view: w });
       w.hailEncounter = null;
+      w.hailDialogue = null;
       return _finalize(_compose({
         view: w,
         sounds: [{ kind: "ui.modal.close", payload: {} }],
@@ -636,11 +645,14 @@ const createHud = function (deps) {
     // Pure model reads (test/debug bridge): the two map children exposed as
     // data-in/data-out with no view mutation.
     hailModel(view, input, encounter) { return buildHailModel(encounter); },
+    hailPanel(view, input, encounter, dialogue) { return buildHailPanel(encounter, dialogue); },
     outfitModel(input) { return buildOutfitModel(input); },
     mapHudModel(view, input, mapState, extra = null) {
       const d = (extra && typeof extra === "object") ? Object.assign({}, extra) : {};
       d.metrics = input.metrics;
-      d.hail = (view && view.hailEncounter) ? buildHailModel(view.hailEncounter) : (d.hail || null);
+      d.hail = (view && view.hailEncounter)
+        ? ((view && view.hailDialogue) ? buildHailPanel(view.hailEncounter, view.hailDialogue) : buildHailModel(view.hailEncounter))
+        : (d.hail || null);
       return buildMapHudModel(mapState, d);
     },
 

@@ -27,6 +27,31 @@ const factionsDataPayload = {
       name: "Syndicate",
       defaultAlignment: -20,
       theme: "syndicate",
+      voice: {
+        tone: "rude, volatile",
+        lines: {
+          enemy: [
+            "You've got a lot of nerve broadcasting on our channel.",
+            "We're gonna wear your ship as a hat."
+          ],
+          unfriendly: [
+            "What do you want, soft-hull? Make it quick.",
+            "Ugh. It's you again. State your business or drift."
+          ],
+          neutral: [
+            "Talk fast, stranger. My finger's itchy.",
+            "You're not worth the torpedoes. Yet."
+          ],
+          friendly: [
+            "Heh. You're alright. Don't let it go to your head.",
+            "Fine, you get a pass. This time."
+          ],
+          allied: [
+            "Brothers in blood! Name the target.",
+            "Anything of ours is yours. Except the rum."
+          ]
+        }
+      },
       doctrine: {
         tactic: "rush",
         profile: "AGGRESSIVE_SWARM",
@@ -44,6 +69,31 @@ const factionsDataPayload = {
       name: "Capital",
       defaultAlignment: 20,
       theme: "capital",
+      voice: {
+        tone: "superior, polished",
+        lines: {
+          enemy: [
+            "By order of the Authority, surrender your vessel for impound.",
+            "You have been adjudicated hostile. Compliance is not expected."
+          ],
+          unfriendly: [
+            "Your file is... extensive. Do not add to it.",
+            "Civilian presence is noted. Maintain course."
+          ],
+          neutral: [
+            "Good day. Transponders in order, we trust.",
+            "Proceed, citizen. The Authority maintains watch."
+          ],
+          friendly: [
+            "Your cooperation has been noted with approval.",
+            "A credit to independent shipping. Proceed."
+          ],
+          allied: [
+            "The Authority extends its full confidence to your operations.",
+            "Joint standing confirmed. Our sensors are your sensors."
+          ]
+        }
+      },
       doctrine: {
         tactic: "optimal",
         profile: "OPTIMAL_LINE",
@@ -66,6 +116,31 @@ const factionsDataPayload = {
       name: "Freehold",
       defaultAlignment: 20,
       theme: "freehold",
+      voice: {
+        tone: "professional, egalitarian",
+        lines: {
+          enemy: [
+            "The League recalls every debt. Yours is due.",
+            "Freehold ships remember treachery."
+          ],
+          unfriendly: [
+            "We'll trade, but we'll be watching the scales.",
+            "Professional distance, for now."
+          ],
+          neutral: [
+            "Fair dealing makes fair friends. What's your cargo?",
+            "The League welcomes all at the right price."
+          ],
+          friendly: [
+            "Always a pleasure. Equal terms, as ever.",
+            "You make this sector better for everyone in it."
+          ],
+          allied: [
+            "League partners share the load — and the spoils.",
+            "Your fleet is welcome at our docks, always."
+          ]
+        }
+      },
       doctrine: {
         tactic: "missile",
         profile: "ARTILLERY_SCREEN",
@@ -83,6 +158,31 @@ const factionsDataPayload = {
       name: "Armoury",
       defaultAlignment: 20,
       theme: "armoury",
+      voice: {
+        tone: "extremely arrogant",
+        lines: {
+          enemy: [
+            "A rounding error, begging to be erased.",
+            "You are beneath our notice. Briefly."
+          ],
+          unfriendly: [
+            "Your ledger is trivial. Do not bore us.",
+            "Speak. Our time is worth more than your fleet."
+          ],
+          neutral: [
+            "Ah, a customer. Try not to disappoint.",
+            "The Armoury tolerates your presence. Wisely spent."
+          ],
+          friendly: [
+            "Adequate. You may continue to aspire.",
+            "Competence is so rare. Enjoy the compliment."
+          ],
+          allied: [
+            "You operate at our discretion — a profitable one.",
+            "Our interests align. Do keep up."
+          ]
+        }
+      },
       doctrine: {
         tactic: "capital",
         profile: "APEX_ARMADA",
@@ -100,6 +200,31 @@ const factionsDataPayload = {
       name: "Fringe",
       defaultAlignment: 20,
       theme: "fringe",
+      voice: {
+        tone: "amicable, cash-strapped",
+        lines: {
+          enemy: [
+            "We've got nothing left to steal but our guns. And they work.",
+            "Push us and we push back."
+          ],
+          unfriendly: [
+            "Sorry, friend — we can't afford trouble today.",
+            "Maybe come back when we're less desperate."
+          ],
+          neutral: [
+            "Hey! Welcome. Looking to buy or just passing by?",
+            "Times are tight, but hospitality's free."
+          ],
+          friendly: [
+            "Good to see a friendly drive signature!",
+            "Any friend of ours eats at our table."
+          ],
+          allied: [
+            "We're with you. We've got your back — cheap at twice the price!",
+            "One fleet, one family. Let's make a living."
+          ]
+        }
+      },
       doctrine: {
         tactic: "swarm",
         profile: "SWARM_PRESS",

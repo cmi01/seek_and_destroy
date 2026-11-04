@@ -1863,6 +1863,92 @@ const runGameTests = function (bridge, testName) {
       };
     },
 
+    // T-M6c-1 (M6): the dialogue model picks the band's voice line from
+    // the right faction bank and always offers the Q11 choices (trade
+    // first).
+    testDialogueModel() {
+      const bad = [];
+      for (const id of bridge.factionIds()) {
+        const row = bridge.factionRow(id);
+        const model = bridge.dialogueFor({ encounterFaction: id }, 0);
+        if (model.faction !== id) bad.push(id + ":faction");
+        if (model.tone !== row.voice.tone) bad.push(id + ":tone");
+        const pool = row.voice.lines[model.band] || [];
+        if (pool.indexOf(model.line) === -1) bad.push(id + ":line-not-in-band");
+        if (model.options.join(",") !== "trade,talk,threaten,leave") bad.push(id + ":options");
+      }
+      // The seeded pair flips the band and therefore the voice pool.
+      bridge.initializeCampaign();
+      const syn = bridge.dialogueFor({ encounterFaction: "Syndicate" }, 0);
+      if (syn.band !== "unfriendly") bad.push("syndicate-band=" + syn.band);
+      return {
+        name: "M6c-1 DIALOGUE MODEL + VOICE BANKS (5 factions x 5 bands)",
+        pass: bad.length === 0,
+        detail: "checks=23 issues=[" + bad.join("; ") + "]"
+      };
+    },
+
+    // T-M6c-2 (M6): the choice outcomes — talk is a no-op event,
+    // threaten signals the fight path, trade signals the storefront, and
+    // leave re-places the player fleet on a nearest open square (DESIGN
+    // §4.4).
+    testDialogueOutcome() {
+      const bad = [];
+      bridge.initializeCampaign();
+      const enc = { encounterFaction: "Syndicate", kind: "fleet", locationId: "sol-gate" };
+      const before = bridge.campaign;
+      const t = bridge.dialogueOutcome(enc, "talk", 7);
+      if (!t.events.length || t.events[0].kind !== "dialogueTalk") bad.push("talk-event");
+      if (t.state !== before) bad.push("talk-mutated-state");
+      const th = bridge.dialogueOutcome(enc, "threaten", 7);
+      if (!th.events.length || !th.events[0].fight) bad.push("threaten-event");
+      const tr = bridge.dialogueOutcome(enc, "trade", 7);
+      if (!tr.events.length || tr.events[0].kind !== "dialogueTrade") bad.push("trade-event");
+      // Leave: a fleet parked next to another must land on an open square.
+      const map = bridge.mapFromTable();
+      map.fleets = [
+        { id: "player", faction: "player", x: 20, y: 20, fuel: 100, ships: [{}, {}, {}] },
+        { id: "npc", faction: "Syndicate", x: 21, y: 20, fuel: 100, ships: [{}, {}] }
+      ];
+      bridge.mapSet(map);
+      const lv = bridge.dialogueOutcome(enc, "leave", 11);
+      const pf = lv.state.map.fleets.find(f => f.faction === "player");
+      const nf = lv.state.map.fleets.find(f => f.id === "npc");
+      const moved = pf && (pf.x !== 20 || pf.y !== 20);
+      const open = pf && nf && (Math.abs(pf.x - nf.x) > 1 || Math.abs(pf.y - nf.y) > 1);
+      if (!moved) bad.push("leave-did-not-move");
+      if (!open) bad.push("leave-not-open");
+      if (!lv.events.length || lv.events[0].kind !== "dialogueLeave") bad.push("leave-event");
+      return {
+        name: "M6c-2 DIALOGUE OUTCOMES + LEAVE RE-PLACEMENT (DESIGN 4.4)",
+        pass: bad.length === 0,
+        detail: "issues=[" + bad.join("; ") + "]"
+      };
+    },
+
+    // T-M6c-3 (M6): the hail panel carries the voice line and the Q11
+    // button row (HAIL_TRADE first) through the map HUD model.
+    testHailPanel() {
+      const bad = [];
+      bridge.initializeCampaign();
+      const enc = { encounterFaction: "Capital", kind: "fleet", locationId: "sol-gate" };
+      const panel = bridge.hailPanelFor(enc, 0);
+      if (panel.speaker.indexOf("CAPITAL") === -1) bad.push("speaker=" + panel.speaker);
+      const voiceLine = panel.lines.find(l => l.indexOf(String.fromCharCode(34)) !== -1);
+      if (!voiceLine) bad.push("no-voice-line");
+      if (panel.options[0] !== "trade") bad.push("trade-not-first");
+      const map = bridge.mapFromTable();
+      const hud = bridge.mapHudModel(map, { hail: panel });
+      const ids = (hud.hail && Array.isArray(hud.hail.buttons)) ? hud.hail.buttons.map(b => b.id).join(",") : "";
+      if (ids.indexOf("HAIL_TRADE") === -1) bad.push("no-trade-button: " + ids);
+      if (ids.indexOf("HAIL_LEAVE") === -1) bad.push("no-leave-button: " + ids);
+      return {
+        name: "M6c-3 HAIL PANEL + Q11 BUTTON ROW (voice line live)",
+        pass: bad.length === 0,
+        detail: "buttons=[" + ids + "] issues=[" + bad.join("; ") + "]"
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -1897,7 +1983,8 @@ const runGameTests = function (bridge, testName) {
         this.testMultiWeaponFire(), this.testRedNumbersChosenWeapon(), this.testRedNumbersShieldedTarget(),
         this.testOutfitStationFlow(), this.testGeneratorLegalLoadoutSweep(), this.testOutfitModelRows(),
         this.testFactionFleetRolls(), this.testFactionDoctrineStats(), this.testFactionTableComplete(),
-        this.testReputationBands(), this.testStanceAndSharing(), this.testReputationEvents()
+        this.testReputationBands(), this.testStanceAndSharing(), this.testReputationEvents(),
+        this.testDialogueModel(), this.testDialogueOutcome(), this.testHailPanel()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;
