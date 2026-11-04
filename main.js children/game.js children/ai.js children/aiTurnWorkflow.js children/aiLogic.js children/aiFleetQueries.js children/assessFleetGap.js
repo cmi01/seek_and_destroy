@@ -13,12 +13,12 @@ const assessFleetGap = function (env, ctx){
   const lrMin = (rf.longRangeMinRange !== undefined) ? rf.longRangeMinRange : 6;
   const aaMin = (rf.aaMinFirepower !== undefined) ? rf.aaMinFirepower : 4;
   const mine = env.myUnits(ctx), sp = env.spottedEnemies(ctx), fl = mine.find(u => u.flags.has("!flagship"));
-  const ft = !!fl && sp.some(p => p.firepower > 0 && !p.flags.has("-attacked") && env.inRange(p, fl, Math.max(1, p.range + buf)) && env.hasLineOfSight(ctx, p.x, p.y, fl.x, fl.y, "WEAPON"));
+  const ft = !!fl && sp.some(p => env.fpOf(p) > 0 && !p.flags.has("-attacked") && env.inRange(p, fl, Math.max(1, env.rngOf(p) + buf)) && env.hasLineOfSight(ctx, p.x, p.y, fl.x, fl.y, "WEAPON"));
   return {
     flagshipThreatened: ft,
     lacksScout: !mine.some(u => u.scan >= scoutScan && u.type !== exclScout),
-    lacksLongRange: !mine.some(u => u.range >= lrMin && u.firepower > 0),
+    lacksLongRange: !mine.some(u => env.rngOf(u) >= lrMin && env.fpOf(u) > 0),
     lacksBoarding: !mine.some(u => u.flags.has("#space marines") && !u.flags.has("-sent boarding party")),
-    lacksAA: !mine.some(u => u.firepower >= aaMin)
+    lacksAA: !mine.some(u => env.fpOf(u) >= aaMin)
   };
 };

@@ -1430,6 +1430,82 @@ const runGameTests = function (bridge, testName) {
       };
     },
 
+    // ---- M5(b): battle adopts the loadout as weapon truth -------------
+    // T-M5b-1: battle unit records carry their mount list and NO raw
+    // weapon fields; the seam reads match the legacy spec mirrors.
+    testBattleUnitLoadoutTruth() {
+      this.clearBoard();
+      const u = bridge.createUnit("Missile Destroyer", 1, 10, 10, false);
+      const spec = bridge.shipSpecs["Missile Destroyer"];
+      const truth = Array.isArray(u.loadout) && u.loadout.length === 1 && u.loadout[0] === "Medium Missile Battery";
+      const noRaw = u.firepower === undefined && u.range === undefined && u.wType === undefined;
+      const seam = bridge.unitFp(u) === spec.firepower && bridge.unitRng(u) === spec.range;
+      return {
+        name: "M5b-1 BATTLE UNIT TRUTH = LOADOUT (no raw weapon fields)",
+        pass: truth && noRaw && seam,
+        detail: "truth=" + truth + " noRaw=" + noRaw + " seam=" + seam
+      };
+    },
+
+    // T-M5b-2: the shield-break rule keys on the FIRING WEAPON's class,
+    // not a hull flag: railgun-class fire keeps full damage through the
+    // bubble, cannon-class fire is cut to the 1-damage strip.
+    testWeaponClassShieldBreak() {
+      this.clearBoard();
+      const st = bridge.state;
+      st.ap = 4;
+      const att = bridge.createUnit("Missile Destroyer", 1, 10, 10, false);
+      const t1 = bridge.createUnit("Attack Frigate", 2, 11, 10, false);
+      t1.flags.add("+shield");
+      att.loadout = ["Light Railgun"];       // railgun class, dmg 3
+      bridge.executeShoot(att, t1, false, 1);
+      const railHp = t1.hp, railStrip = !t1.flags.has("+shield");   // 4 - 3 = 1
+      const att2 = bridge.createUnit("Missile Destroyer", 1, 13, 10, false);
+      const t2 = bridge.createUnit("Attack Frigate", 2, 14, 10, false);
+      t2.flags.add("+shield");
+      att2.loadout = ["Light Cannon"];       // cannon class, dmg 1 -> strip only
+      bridge.executeShoot(att2, t2, false, 1);
+      const canHp = t2.hp, canStrip = !t2.flags.has("+shield");     // 4 - 1 = 3
+      const pass = railHp === 1 && railStrip && canHp === 3 && canStrip;
+      return {
+        name: "M5b-2 SHIELD BREAK KEYED ON WEAPON CLASS (railgun 3 through / cannon 1 strip)",
+        pass: pass,
+        detail: "railHp=" + railHp + " railStrip=" + railStrip + " cannonHp=" + canHp + " cannonStrip=" + canStrip
+      };
+    },
+
+    // T-M5b-3: saves carry loadouts; a pre-M5 save (units with legacy
+    // weapon fields, no mounts) migrates to the hull defaults.
+    testSaveLoadoutMigration() {
+      this.clearBoard();
+      const u = bridge.createUnit("Fighter", 1, 10, 10, false);
+      u.loadout = ["Light Cannon", "Light Cannon"];
+      const saved = JSON.parse(JSON.stringify(bridge.saveState()));
+      u.loadout = ["Ultra Railgun"];
+      bridge.loadState(saved);
+      const restored = bridge.state.units.find(x => x.type === "Fighter");
+      const kept = Boolean(restored && Array.isArray(restored.loadout) && restored.loadout.length === 2 && restored.loadout[0] === "Light Cannon");
+      // Pre-M5 payload: legacy fields, no mounts -> default mounts backfilled.
+      const legacy = JSON.parse(JSON.stringify(bridge.saveState()));
+      legacy.version = "M3-1.0";
+      for (const un of legacy.state.units) {
+        delete un.loadout;
+        const spec = bridge.shipSpecs[un.type];
+        un.firepower = spec.firepower;
+        un.range = spec.range;
+      }
+      bridge.loadState(legacy);
+      const mig = bridge.state.units.find(x => x.type === "Fighter");
+      const specF = bridge.shipSpecs["Fighter"];
+      const migrated = Boolean(mig && Array.isArray(mig.loadout) &&
+        mig.loadout.length === specF.defaultLoadout.length && mig.loadout[0] === specF.defaultLoadout[0]);
+      return {
+        name: "M5b-3 SAVE KEEPS LOADOUTS; PRE-M5 SAVE MIGRATES TO DEFAULTS",
+        pass: kept && migrated,
+        detail: "kept=" + kept + " migrated=" + migrated
+      };
+    },
+
     runAll() {
       const results = [
         this.testCampaignRosterConformance(), this.testCampaignStateRoundTrip(),
@@ -1459,7 +1535,8 @@ const runGameTests = function (bridge, testName) {
         this.testWagesMonthTick(),
         this.testMerchantFlowRescue(), this.testMerchantSaleDiscount(),
         this.testOutfitSlotFormula(), this.testOutfitValidationCapacity(),
-        this.testOutfitDefaultsFit(), this.testOutfitReaderParity(), this.testOutfitReaderCopies()
+        this.testOutfitDefaultsFit(), this.testOutfitReaderParity(), this.testOutfitReaderCopies(),
+        this.testBattleUnitLoadoutTruth(), this.testWeaponClassShieldBreak(), this.testSaveLoadoutMigration()
       ];
       console.log("%cSEEK & DESTROY â€” AI + ZOOM SELF-TEST RESULTS", "color:#facc15;font-size:14px;");
       let allPass = true;

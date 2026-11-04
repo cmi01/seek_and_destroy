@@ -392,11 +392,27 @@ function _moveEvidence(ctx, unitA, B){
     occSpotted: occ ? VisionQueries.isUnitSpottedByTeam(ctx, occ, unitA.team) : false
   };
 }
+// M5 adoption: the firing weapon resolved from the unit's loadout through
+// the seam. One attack per turn (DESIGN §2.1); until the per-shot choice
+// (M5c) the active weapon is the first mount. Null for an unarmed unit.
+function _activeWeapon(unitA){
+  if (!unitA || !Outfitting) return null;
+  const ws = Outfitting.UnitWeapons(unitA);
+  return ws.length > 0 ? ws[0] : null;
+}
+// Render/audio style key for a weapon row: the animation and audio channels
+// keep their historical pdc/missile/railgun spelling.
+function _weaponFxType(weapon){
+  if (!weapon) return "pdc";
+  return weapon.class === "cannon" ? "pdc" : weapon.class;
+}
 function _shootEvidence(ctx, unitA, B){
   if (!unitA || !B) return {};
   const occ = BoardQueries.getUnitAt(ctx, B.x, B.y);
+  const active = _activeWeapon(unitA);
   return {
-    inWeaponRange: BoardQueries.inRange(unitA, B, unitA.range),
+    inWeaponRange: BoardQueries.inRange(unitA, B, Outfitting.UnitRange(unitA)),
+    armed: Boolean(active),
     occ,
     occSpotted: occ ? VisionQueries.isUnitSpottedByTeam(ctx, occ, unitA.team) : false,
     losClear: LineOfSight.hasLineOfSight(ctx, unitA.x, unitA.y, B.x, B.y, "WEAPON")
@@ -427,7 +443,7 @@ function _priorityEvidence(ctx, unitA, gx, gy){
       occSpotted
     },
     shoot: {
-      inWeaponRange: BoardQueries.inRange(unitA, B, unitA.range),
+      inWeaponRange: BoardQueries.inRange(unitA, B, Outfitting.UnitRange(unitA)),
       losClear: LineOfSight.hasLineOfSight(ctx, unitA.x, unitA.y, gx, gy, "WEAPON"),
       occ,
       occSpotted
@@ -441,9 +457,10 @@ function _priorityEvidence(ctx, unitA, gx, gy){
   };
 }
 function _shootableEvidence(ctx, u, dest, target){
-  const ready = Boolean(u && target && target.hp > 0 && u.firepower > 0 && u.range > 0);
+  const wp = _activeWeapon(u);
+  const ready = Boolean(u && target && target.hp > 0 && wp);
   return {
-    inRange: ready && BoardQueries.inRange(dest, target, u.range),
+    inRange: ready && BoardQueries.inRange(dest, target, Outfitting.UnitRange(u)),
     spotted: ready && VisionQueries.isUnitSpottedByTeam(ctx, target, u.team),
     losClear: ready && LineOfSight.hasLineOfSight(ctx, dest.x, dest.y, target.x, target.y, "WEAPON")
   };
@@ -570,8 +587,10 @@ const Actions = {
     const origin={x:unitA.x,y:unitA.y};
     const dest={x:target.x,y:target.y};
     const visStartOrEnd=Visibility.isCellVisibleToTeam(origin.x,origin.y,1)||Visibility.isCellVisibleToTeam(dest.x,dest.y,1);
-    const spec=SHIP_SPECS[unitA.type];
-    const wType=spec.wType||"pdc";
+    // M5 adoption: the shot's stats come from the firing weapon row (the
+    // unit's loadout through the seam), never off unit fields.
+    const weapon=_activeWeapon(unitA);
+    const wType=_weaponFxType(weapon);
 
     if(isAI&&visStartOrEnd) State.historicalVectors.push({kind:"shoot",from:origin,to:dest,team:unitA.team});
     GameAudio.play("weapon.fire", {from:origin, to:dest, team:unitA.team, unitType:unitA.type, targetType:target.type, wType, isVisible:visStartOrEnd});
@@ -584,7 +603,7 @@ const Actions = {
       GameAudio.play("weapon.shieldStrip", {from:origin, to:origin, team:unitA.team, isVisible:visStartOrEnd, attackerStrip:true});
     }
 
-    const shootOutcome=CombatMath.computeShootOutcome(unitA,target);
+    const shootOutcome=CombatMath.computeShootOutcome(unitA,target,weapon);
     const {damageDealt,shieldStripped}=shootOutcome;
 
     if(shieldStripped){
@@ -663,10 +682,14 @@ const Actions = {
     const spawned=SectorGenerator.createUnit(shipType,team,pick.x,pick.y,true);
     spawned.kind="mirage";
     // M4 manning: the summoned hull enters with its roster entry's crew (the
-    // incapacitation gate reads it), not a fresh full crew.
+    // incapacitation gate reads it), not a fresh full crew. M5: likewise its
+    // roster loadout (custom mounts ride the entry, DESIGN §3.3).
     if (typeof reserve[ri].crew === "number") {
       spawned.crew = reserve[ri].crew;
       if (typeof reserve[ri].maxCrew === "number") spawned.maxCrew = reserve[ri].maxCrew;
+    }
+    if (Array.isArray(reserve[ri].loadout)) {
+      spawned.loadout = reserve[ri].loadout.slice();
     }
     Visibility.invalidate();
     Visibility.ensureCache();
@@ -819,8 +842,10 @@ function _unitDTO(u){
     hp: u.hp,
     maxHp: u.maxHp,
     move: u.move,
-    firepower: u.firepower,
-    range: u.range,
+    // M5 adoption: weapon stats are seam-derived from the unit's loadout.
+    loadout: Outfitting.LoadoutOf(u),
+    firepower: Outfitting.UnitFirepower(u),
+    range: Outfitting.UnitRange(u),
     scan: u.scan,
     cost: u.cost,
     flags: new Set(u.flags)
@@ -2314,6 +2339,9 @@ const SectorGenerator = {
           mannedIdx.push(uj);
           if (typeof deployedEntries[di].crew === "number") us[uj].crew = deployedEntries[di].crew;
           if (typeof deployedEntries[di].maxCrew === "number") us[uj].maxCrew = deployedEntries[di].maxCrew;
+          // M5: the roster entry's loadout rides onto the spawned unit the
+          // same way (custom mounts, DESIGN §3.3).
+          if (Array.isArray(deployedEntries[di].loadout)) us[uj].loadout = deployedEntries[di].loadout.slice();
           break;
         }
       }
@@ -2634,7 +2662,10 @@ const api = {
       // roster — one closure, injected where a sibling transform needs the
       // market built (campaign init and the pre-M4 save migration).
       const buildMarketSection = () => EconomyLib.BuildMarketState(CAMPAIGN_DATA.campaign.trade, SHIP_SPECS);
-      DeserializeGameState = data => stateLib.DeserializeGameState(_stateBox, data, buildMapSection, buildMarketSection);
+      // M5: the loadout-migration reader bound over the seam + roster (a
+      // hull name in, its default mount list out).
+      const hullLoadout = hull => Outfitting.DefaultLoadout(SHIP_SPECS[hull] || null);
+      DeserializeGameState = data => stateLib.DeserializeGameState(_stateBox, data, buildMapSection, buildMarketSection, hullLoadout);
 
       // M1 campaign state: pure children over the campaign section only.
       // initializeCampaign() rebuilds State.campaign from the frozen
@@ -2698,7 +2729,11 @@ const api = {
       const frameUnitDeps = {
         getEffectiveScan: u => Visibility.getEffectiveScan(u),
         isUnitSpottedByTeam: (u, team) => Visibility.isUnitSpottedByTeam(u, team),
-        canShield: (unitA, B) => Actions.canShield(unitA, B)
+        canShield: (unitA, B) => Actions.canShield(unitA, B),
+        // M5 adoption: frame unit stats are seam-derived from the loadout.
+        fpOf: u => Outfitting.UnitFirepower(u),
+        rngOf: u => Outfitting.UnitRange(u),
+        mountsOf: u => Outfitting.UnitWeapons(u)
       };
       const frameOverlayDeps = {
         buildUnitIndex: units => Rules.buildUnitIndex(units),
@@ -2710,7 +2745,10 @@ const api = {
         dist: (a, b) => MathGrid.dist(a, b),
         getSpottedEnemyAt: (gx, gy, team) => Visibility.getSpottedEnemyAt(gx, gy, team),
         canCapture: (unitA, B) => Actions.canCapture(unitA, B),
-        canShield: (unitA, B) => Actions.canShield(unitA, B)
+        canShield: (unitA, B) => Actions.canShield(unitA, B),
+        // M5 adoption: overlay numbers read the loadout through the seam.
+        fpOf: u => Outfitting.UnitFirepower(u),
+        rngOf: u => Outfitting.UnitRange(u)
       };
       FrameBoard = { build: p => kids.frameBoard(p, frameBoardDeps) };
       FrameUnits = { build: p => kids.frameUnits(p, frameUnitDeps) };
@@ -2750,10 +2788,10 @@ const api = {
         canShield(ctx, unitA, B){ return ActionLegality.canShield(unitA, B, _shieldEvidence(ctx)); },
         getPriorityActionAt(ctx, unitA, gx, gy, opts){ return ActionLegality.getPriorityActionAt(unitA, gx, gy, _priorityEvidence(ctx, unitA, gx, gy), opts); },
         getValidWarpCells(ctx, capitalUnit, radius){ return ReservePlacement.getValidWarpCells(ctx, capitalUnit, radius); },
-        shootableFrom(ctx, u, dest, target){ return CombatMath.shootableFrom(u, dest, target, _shootableEvidence(ctx, u, dest, target)); },
-        isKillShot(u, target){ return CombatMath.isKillShot(u, target); },
+        shootableFrom(ctx, u, dest, target){ return CombatMath.shootableFrom(_activeWeapon(u), dest, target, _shootableEvidence(ctx, u, dest, target)); },
+        isKillShot(u, target){ return CombatMath.isKillShot(u, target, _activeWeapon(u)); },
         computeCollisionOutcome(unitA, occupant){ return CombatMath.computeCollisionOutcome(unitA, occupant); },
-        computeShootOutcome(unitA, target){ return CombatMath.computeShootOutcome(unitA, target); },
+        computeShootOutcome(unitA, target){ return CombatMath.computeShootOutcome(unitA, target, _activeWeapon(unitA)); },
         checkEndgameStatus(units){ return EndgameStatus.checkEndgameStatus(units); }
       };
 
@@ -2782,6 +2820,16 @@ const api = {
         getValidWarpCells(ctx, capitalUnit, radius){ return Rules.getValidWarpCells(ctx, capitalUnit, radius); },
         shootableFrom(ctx, u, dest, target){ return Rules.shootableFrom(ctx, u, dest, target); },
         isKillShot(u, target){ return Rules.isKillShot(u, target); },
+        // M5 adoption: the loadout seam crosses into the AI snapshot so the
+        // AI reads weapon stats through it, never off unit fields.
+        fpOf(u){ return Outfitting.UnitFirepower(u); },
+        rngOf(u){ return Outfitting.UnitRange(u); },
+        railOf(u){
+          const ws = Outfitting.UnitWeapons(u);
+          for (let i = 0; i < ws.length; i++){ if (ws[i].class === "railgun") return true; }
+          return false;
+        },
+        mountsOf(u){ return Outfitting.UnitWeapons(u); },
         getPriorityActionAt(ctx, unitA, gx, gy, opts){ return Rules.getPriorityActionAt(ctx, unitA, gx, gy, opts); }
       });
 
@@ -2804,6 +2852,9 @@ const api = {
         canShield(unit, pos){ return Actions.canShield(unit, pos); },
         canCapture(unit, pos){ return Actions.canCapture(unit, pos); },
         canShoot(unit, pos){ return Actions.canShoot(unit, pos); },
+        // M5 adoption: hud stat lines read weapon stats through the seam.
+        fpOf(unit){ return Outfitting.UnitFirepower(unit); },
+        rngOf(unit){ return Outfitting.UnitRange(unit); },
         priorityAction(unit, gx, gy){ return Actions.getPriorityActionAt(unit, gx, gy); },
         renderedViewport(){
           const vp = MathGrid.getRenderedViewport();
@@ -3256,6 +3307,15 @@ const api = {
       },
       clearSeed(){ State.rng = null; State.rngSeed = null; },
       getRawState(){ return GetGameState(); },
+      // M5 loadout seam facade (browser evidence / test helpers): weapon
+      // stats read through the loadout readers, never off unit fields.
+      Outfitting: {
+        fpOf(u){ return Outfitting.UnitFirepower(u); },
+        rngOf(u){ return Outfitting.UnitRange(u); },
+        mountsOf(u){ return Outfitting.UnitWeapons(u); },
+        slotsOf(w){ return Outfitting.SlotSize(w); },
+        checkOf(loadout, hull){ return Outfitting.Validate(loadout, hull); }
+      },
       // M4 station storefront facade (browser evidence / probes).
       Station: {
         docked(){ return Boolean(_stationDock()); },

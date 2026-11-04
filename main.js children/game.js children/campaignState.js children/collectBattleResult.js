@@ -9,8 +9,8 @@
 // leftover living team-1 hulls match the overflow snapshot (summoned
 // reserve ships) and are captured; unmatched deployed and unmatched
 // opponents are scrapped. Remaining reserve rides through unchanged.
-// Battle units carry no roster loadout (dual representation), so each
-// entry's loadout is taken from its matching roster snapshot entry.
+// Battle units carry their mount list (the loadout is the weapon truth),
+// so each entry's loadout is taken from the unit when present.
 // ============================================================
 const collectBattleResult = function (units, reserve, snapshot, status){
   const us = Array.isArray(units) ? units : [];
@@ -36,11 +36,11 @@ const collectBattleResult = function (units, reserve, snapshot, status){
       crew: src.crew,
       flagship: isFlag
     };
-    // Battle units carry no roster loadout; carry it over from the roster
-    // snapshot entry (deployed or overflow) or leave the key off so the
-    // fold falls back to the roster table's default loadout.
-    const unitLoadout = (Array.isArray(src.loadout) && src.loadout.length) ? src.loadout : null;
-    const rosterLoadout = (roster && Array.isArray(roster.loadout) && roster.loadout.length) ? roster.loadout : null;
+    // M5: the unit's mount list is the weapon truth; carry it over (the
+    // roster snapshot entry is the fallback for pre-M5 battle records, or
+    // the key is left off and the fold defaults it).
+    const unitLoadout = Array.isArray(src.loadout) ? src.loadout : null;
+    const rosterLoadout = (roster && Array.isArray(roster.loadout)) ? roster.loadout : null;
     const loadout = unitLoadout || rosterLoadout;
     if (loadout) entry.loadout = loadout.slice();
     return entry;

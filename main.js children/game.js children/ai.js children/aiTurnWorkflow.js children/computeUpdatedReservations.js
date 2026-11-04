@@ -5,7 +5,9 @@
 // Owner: aiTurnWorkflow.js. Holds no state.
 // ============================================================
 
-const computeUpdatedReservations = function (ctx, plan, focusFireEnabled){
+// M5 adoption: `env` is the parent's seam (fpOf/rngOf/railOf) — weapon
+// stats are read through it, never off unit fields.
+const computeUpdatedReservations = function (ctx, plan, focusFireEnabled, env){
   const pv = (ctx && ctx.reservations) || new Map();
   const nx = new Map();
   const es = Array.from(pv.entries());
@@ -24,7 +26,7 @@ const computeUpdatedReservations = function (ctx, plan, focusFireEnabled){
     // double-counting already-applied damage in committedDmg.
     const cur = nx.get(st0.target.id) || { committedDmg: 0, killers: [] };
     const prevPending = cur.killers.includes(plan.unitId)
-      ? ((tgt.flags && tgt.flags.has("+shield") && u && !u.flags.has("#railgun")) ? 1 : (u ? u.firepower : 0))
+      ? ((tgt.flags && tgt.flags.has("+shield") && u && !env.railOf(u)) ? 1 : (u ? env.fpOf(u) : 0))
       : 0;
     nx.set(st0.target.id, {
       committedDmg: Math.max(0, cur.committedDmg - prevPending),
@@ -33,7 +35,7 @@ const computeUpdatedReservations = function (ctx, plan, focusFireEnabled){
   } else if (st0 && st0.kind === "MOVE" && st1 && st1.kind === "SHOOT" && st1.target){
     const tgt = ((ctx && ctx.units) || []).find(x => x.id === st1.target.id) || st1.target;
     const cur = nx.get(st1.target.id) || { committedDmg: 0, killers: [] };
-    const effDmg = (tgt.flags && tgt.flags.has("+shield") && u && !u.flags.has("#railgun")) ? 1 : (u ? u.firepower : 0);
+    const effDmg = (tgt.flags && tgt.flags.has("+shield") && u && !env.railOf(u)) ? 1 : (u ? env.fpOf(u) : 0);
     nx.set(st1.target.id, {
       committedDmg: cur.committedDmg + effDmg,
       killers: cur.killers.includes(plan.unitId) ? cur.killers.slice() : cur.killers.concat([plan.unitId])

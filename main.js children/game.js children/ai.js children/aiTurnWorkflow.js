@@ -37,7 +37,8 @@ const evaluateTurnStep = function (env, snapshot){
     result.reservations = computeUpdatedReservations(
       snapshot,
       result.selectedPlan,
-      Boolean(cfg && cfg.focusFire)
+      Boolean(cfg && cfg.focusFire),
+      env
     );
     return result;
   }

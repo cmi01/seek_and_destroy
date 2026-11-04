@@ -44,7 +44,7 @@ const buildTelemetryModels = function (deps, input) {
       locusTag,
       hp: unit.hp,
       maxHp: unit.maxHp,
-      stats: `MOV:${unit.move}  SCN:${effScan}${inNebula ? "(N)" : ""}  FP:${unit.firepower}  RNG:${unit.range}`,
+      stats: `MOV:${unit.move}  SCN:${effScan}${inNebula ? "(N)" : ""}  FP:${deps.fpOf(unit)}  RNG:${deps.rngOf(unit)}`,
       flags,
       lines: []
     };

@@ -47,9 +47,9 @@ function buildUnitPlan(env, ctx, u, unitRoll) {
       const noAtkPen = smCfg.moveInRangeNoAttackPenalty !== undefined ? smCfg.moveInRangeNoAttackPenalty : 0;
       for (let i = 0; i < cs.length; i++){
         let score = env.scoreMove(ctx, u, cs[i]);
-        if (noAtkPen > 0 && u.firepower > 0 && u.range > 0){
+        if (noAtkPen > 0 && env.fpOf(u) > 0 && env.rngOf(u) > 0){
           for (let j = 0; j < sp.length; j++){
-            if (env.inRange(cs[i], sp[j], u.range)){ score -= noAtkPen; break; }
+            if (env.inRange(cs[i], sp[j], env.rngOf(u))){ score -= noAtkPen; break; }
           }
         }
         plans.push({ unitId: u.id, apCost: 1, steps: [{ kind: "MOVE", to: cs[i] }], score });
@@ -57,7 +57,7 @@ function buildUnitPlan(env, ctx, u, unitRoll) {
     }
   }
   const msDepth = msCfg.minLookaheadDepth !== undefined ? msCfg.minLookaheadDepth : 2;
-  if (bg >= tn.compositeApCost && cfg.lookaheadDepth >= msDepth && !u.flags.has("-moved") && !u.flags.has("-attacked") && u.firepower > 0 && u.move > 0){
+  if (bg >= tn.compositeApCost && cfg.lookaheadDepth >= msDepth && !u.flags.has("-moved") && !u.flags.has("-attacked") && env.fpOf(u) > 0 && u.move > 0){
     const ds = env.reachableCells(ctx, u, msCfg.maxDestinations !== undefined ? msCfg.maxDestinations : tn.moveShootMaxDests);
     const maxT = msCfg.maxTargets !== undefined ? msCfg.maxTargets : tn.maxTargets;
     const ts = sp.slice().sort((a, b) => env.targetStrategicValue(ctx, b, u, "SHOOT") - env.targetStrategicValue(ctx, a, u, "SHOOT")).slice(0, maxT);
@@ -97,7 +97,7 @@ function buildUnitPlan(env, ctx, u, unitRoll) {
   }
   const smsMinBg = smsCfg.minBudget !== undefined ? smsCfg.minBudget : 3;
   const smsDepth = smsCfg.minLookaheadDepth !== undefined ? smsCfg.minLookaheadDepth : 2;
-  if (bg >= smsMinBg && cfg.lookaheadDepth >= smsDepth && !u.flags.has("-moved") && !u.flags.has("-attacked") && u.firepower > 0 && u.move > 0){
+  if (bg >= smsMinBg && cfg.lookaheadDepth >= smsDepth && !u.flags.has("-moved") && !u.flags.has("-attacked") && env.fpOf(u) > 0 && u.move > 0){
     const smsMaxT = smsCfg.maxTargets !== undefined ? smsCfg.maxTargets : tn.maxTargets;
     const smsCap = smsCfg.reachableCap !== undefined ? smsCfg.reachableCap : 12;
     const smsAp = smsCfg.apCost !== undefined ? smsCfg.apCost : 3;

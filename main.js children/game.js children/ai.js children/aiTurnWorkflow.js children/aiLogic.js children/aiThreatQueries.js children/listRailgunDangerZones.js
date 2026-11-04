@@ -11,15 +11,15 @@ const listRailgunDangerZones = function (env, ctx){
   const sp = env.spottedEnemies(ctx), ap = (ctx && ctx.ap !== undefined) ? ctx.ap : 0;
   for (let i = 0; i < sp.length; i++){
     const e = sp[i];
-    if (!e.flags.has("#railgun")) continue;
-    const atks = mine.filter(u => !u.flags.has("-attacked") && u.firepower > 0).slice().sort((a, b) => b.firepower - a.firepower);
+    if (!env.railOf(e)) continue;
+    const atks = mine.filter(u => !u.flags.has("-attacked") && env.fpOf(u) > 0).slice().sort((a, b) => env.fpOf(b) - env.fpOf(a));
     const lim = Math.min(ap, atks.length);
     let dmg = 0;
     for (let j = 0; j < lim; j++){
-      dmg += (e.flags.has("+shield") && !atks[j].flags.has("#railgun")) ? 1 : atks[j].firepower;
+      dmg += (e.flags.has("+shield") && !env.railOf(atks[j])) ? 1 : env.fpOf(atks[j]);
     }
     if (dmg >= e.hp + (e.flags.has("+shield") ? 1 : 0)) continue;
-    zs.push({ enemy: e, radius: e.move + Math.max(1, e.range) });
+    zs.push({ enemy: e, radius: e.move + Math.max(1, env.rngOf(e)) });
   }
   return zs;
 };

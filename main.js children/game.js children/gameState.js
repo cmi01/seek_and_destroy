@@ -36,13 +36,13 @@ const gameState = function (DATA){
     TryPatchGameState(box, delta){ return tryPatchGameState(DATA, ensure(box), delta); },
     GetStateLifetimes(){ return getStateLifetimes(DATA); },
     SerializeGameState(box){ return buildStateSave(DATA, ensure(box)); },
-    DeserializeGameState(box, data, buildMapFn, buildMarketFn){
+    DeserializeGameState(box, data, buildMapFn, buildMarketFn, loadoutFn){
       if (!isSaveData(data)) {
         console.error("[S&D state] DeserializeGameState: not a Seek & Destroy save.", data);
         return false;
       }
       initializeGameState(DATA, box);   // reset in place, then restore
-      return restoreStateSave(DATA, box, data, buildMapFn, buildMarketFn);
+      return restoreStateSave(DATA, box, data, buildMapFn, buildMarketFn, loadoutFn);
     }
   };
 };

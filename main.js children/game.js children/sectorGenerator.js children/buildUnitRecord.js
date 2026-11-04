@@ -28,8 +28,10 @@ const buildUnitRecord = function (shipSpecs, nextId, type, team, x, y, applySpaw
     crew: spec.crew,
     maxCrew: spec.crew,
     move: spec.move,
-    firepower: spec.firepower,
-    range: spec.range,
+    // M5 adoption (DESIGN §3.3): the unit's weapon truth is its loadout —
+    // the mount names are copied from the hull's frozen default; every
+    // weapon stat is read through the loadout seam, never off the record.
+    loadout: Array.isArray(spec.defaultLoadout) ? spec.defaultLoadout.slice() : [],
     scan: spec.scan,
     cost: spec.cost,
     flags

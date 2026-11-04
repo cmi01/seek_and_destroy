@@ -20,7 +20,11 @@
 // roster entries missing maxCrew are backfilled from the market's hull rows
 // (the crew gate needs a manning maximum to judge). A payload that already
 // carries a market passes through untouched.
-const restoreStateSave = function (DATA, stateBox, data, buildMapFn, buildMarketFn){
+// M5 loadout migration: battle units, reserves and roster entries from
+// pre-M5 payloads carry no mount list — backfill the hull's default loadout
+// through the injected reader (the loadout is the weapon truth). Entries
+// that already carry one pass through untouched (JSON-identity round trip).
+const restoreStateSave = function (DATA, stateBox, data, buildMapFn, buildMarketFn, loadoutFn){
   const PRE_M1_VERSION = "V58-1.0";
   const allowedKeys = new Set(Object.keys(DATA.initialState));
 
@@ -106,6 +110,22 @@ const restoreStateSave = function (DATA, stateBox, data, buildMapFn, buildMarket
       }
     }
     if (c.cargo && !c.cargo.weapons) c.cargo = Object.assign({}, c.cargo, { weapons: {} });
+  }
+  // M5 loadout migration (see header): backfill missing mount lists on
+  // battle units, reserves and roster entries.
+  if (typeof loadoutFn === "function") {
+    const backfill = function (arr) {
+      if (!Array.isArray(arr)) return;
+      for (let i = 0; i < arr.length; i++) {
+        const e = arr[i];
+        if (e && !Array.isArray(e.loadout)) {
+          arr[i] = Object.assign({}, e, { loadout: loadoutFn(e.hull || e.type) });
+        }
+      }
+    };
+    backfill(st.units);
+    backfill(st.battleReserve);
+    if (c && Array.isArray(c.fleet)) backfill(c.fleet);
   }
   return stateBox.current;
 };

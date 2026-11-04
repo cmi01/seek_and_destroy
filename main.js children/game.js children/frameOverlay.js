@@ -43,9 +43,9 @@ const buildOverlaySlice = function (p, deps){
         const cm = canMoveKnown(selUnit, B);
         const cs = Boolean(
           !deps.hasFlag(selUnit, "-attacked") &&
-          selUnit.firepower > 0 &&
+          deps.fpOf(selUnit) > 0 &&
           !(gx === selUnit.x && gy === selUnit.y) &&
-          deps.inRange(selUnit, B, selUnit.range) &&
+          deps.inRange(selUnit, B, deps.rngOf(selUnit)) &&
           hasKnownLos(selUnit.x, selUnit.y, gx, gy, "WEAPON")
         );
         const spottedEnemy = cs ? deps.getSpottedEnemyAt(gx, gy, 1) : null;
@@ -60,7 +60,7 @@ const buildOverlaySlice = function (p, deps){
             canShoot: cs,
             spottedEnemyDmg,
             isHovered: isHov,
-            firepower: selUnit.firepower,
+            firepower: deps.fpOf(selUnit),
             canCapture: cc,
             canShield: csh
           });

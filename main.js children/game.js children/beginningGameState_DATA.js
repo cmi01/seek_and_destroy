@@ -5,7 +5,7 @@
 // Owner: game.js. Holds no state unless it is a core.
 // ============================================================
 const beginningGameStateDataPayload = (() => ({
-  version: "M3-1.0",
+  version: "M5-1.0",
   schema: "seek-and-destroy.beginning-game-state",
   initialState: {
     // ---- campaign: the M1 campaign section (fleet/wallet/cargo/reputation/clock/map) ----

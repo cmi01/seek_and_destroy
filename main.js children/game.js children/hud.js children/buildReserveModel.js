@@ -40,8 +40,10 @@ const buildReserveModel = function (deps, input) {
       flagsText: (spec.flags || []).filter(function (f) { return f !== "buyable"; }).join(" ") || "RESERVE",
       hp: (entry.hp !== undefined) ? entry.hp : spec.hp,
       move: spec.move,
-      fp: spec.firepower,
-      range: spec.range,
+      // M5 adoption: the card's weapon stats come from the entry's loadout
+      // through the seam (the hull default when the entry predates it).
+      fp: deps.fpOf({ loadout: (entry && entry.loadout) || spec.defaultLoadout || [] }),
+      range: deps.rngOf({ loadout: (entry && entry.loadout) || spec.defaultLoadout || [] }),
       scan: spec.scan,
       priceOk: true,
       affordable: Boolean(canDeployLocus),

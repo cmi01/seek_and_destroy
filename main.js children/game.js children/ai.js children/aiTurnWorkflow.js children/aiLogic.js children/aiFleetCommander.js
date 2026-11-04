@@ -52,8 +52,8 @@ function selectFleetActionPlan(env, ctx) {
   if (asCfg.enabled !== false && fl){
     const shHp = asCfg.shieldEffectiveHpBonus !== undefined ? asCfg.shieldEffectiveHpBonus : 1;
     const inc = env.spottedEnemies(sCtx)
-      .filter(p => !p.flags.has("-attacked") && p.firepower > 0 && env.canShoot(sCtx, p, fl))
-      .reduce((s, p) => s + p.firepower, 0);
+      .filter(p => !p.flags.has("-attacked") && env.fpOf(p) > 0 && env.canShoot(sCtx, p, fl))
+      .reduce((s, p) => s + env.fpOf(p), 0);
     if (inc >= fl.hp + (fl.flags.has("+shield") ? shHp : 0)) em = true;
   }
   if (flCfg.enabled !== false && fl && !fl.flags.has("-moved") && !env.canEliminateAllFlagshipThreats(sCtx)){
@@ -61,7 +61,7 @@ function selectFleetActionPlan(env, ctx) {
     const retScore = flCfg.retreatScore !== undefined ? flCfg.retreatScore : 8000;
     const minShotAp = flCfg.minApForShootBeforeRetreat !== undefined ? flCfg.minApForShootBeforeRetreat : 2;
     if (rc){
-      if (ap >= minShotAp && !fl.flags.has("-attacked") && fl.firepower > 0){
+      if (ap >= minShotAp && !fl.flags.has("-attacked") && env.fpOf(fl) > 0){
         const ts = env.spottedEnemies(sCtx)
           .filter(e => !e.flags.has("+shield") && env.canShoot(sCtx, fl, e))
           .slice()

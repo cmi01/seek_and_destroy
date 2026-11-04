@@ -6,9 +6,10 @@
 // ============================================================
 
 // Decides from plain evidence the parent fetched ({ inRange, spotted,
-// losClear }) — this file never touches the board.
-const isShootableFrom = function (u, dest, target, ev){
-  if (!target || target.hp <= 0 || u.firepower <= 0 || u.range <= 0) return false;
+// losClear }) plus the firing weapon row — this file never touches the
+// board. An unarmed shot (no weapon row) never fires.
+const isShootableFrom = function (weapon, dest, target, ev){
+  if (!target || target.hp <= 0 || !weapon) return false;
   if (!ev.inRange || !ev.spotted) return false;
   return Boolean(ev.losClear);
 };

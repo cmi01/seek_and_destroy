@@ -17,8 +17,10 @@ export type SdUnit = {
   hp: number;
   maxHp: number;
   move: number;
+  /** M5: seam-derived from the unit's loadout (SD.Outfitting), not a unit field. */
   firepower: number;
   range: number;
+  loadout: string[];
   scan: number;
   cost: number;
   flags: string[];
@@ -95,8 +97,11 @@ export function getRawState(page: Page): Promise<SdRawState> {
       levelId: st.levelId,
       units: st.units.map((u: any) => ({
         id: u.id, type: u.type, team: u.team, x: u.x, y: u.y,
-        hp: u.hp, maxHp: u.maxHp, move: u.move, firepower: u.firepower,
-        range: u.range, scan: u.scan, cost: u.cost,
+        hp: u.hp, maxHp: u.maxHp, move: u.move,
+        firepower: (window as any).SD.Outfitting.fpOf(u),
+        range: (window as any).SD.Outfitting.rngOf(u),
+        loadout: Array.from((u.loadout || []) as string[]),
+        scan: u.scan, cost: u.cost,
         flags: Array.from(u.flags as Set<string>),
       })),
       battleReserve: (st.battleReserve || []).map((e: any) => ({ hull: e.hull })),

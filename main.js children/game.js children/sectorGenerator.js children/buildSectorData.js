@@ -25,8 +25,9 @@ const buildSectorData = function (params) {
       hp: spec.hp,
       maxHp: spec.hp,
       move: spec.move,
-      firepower: spec.firepower,
-      range: spec.range,
+      // M5 adoption (DESIGN §3.3): loadout is the unit's weapon truth (the
+      // same record shape the one-unit builder produces).
+      loadout: Array.isArray(spec.defaultLoadout) ? spec.defaultLoadout.slice() : [],
       scan: spec.scan,
       cost: spec.cost,
       flags
